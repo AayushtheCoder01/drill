@@ -1,0 +1,23 @@
+# Your configuration and your API key. Never commit these.
+public/config.local.json
+
+# Deck and progress backups exported from the app
+drill-backup-*.json
+insight-log.md
+
+# Editors and OS clutter
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node / build
+node_modules/
+dist/
+.vercel/
+*.local
+tsconfig.tsbuildinfo
+
+# Legacy static build, kept as a sibling backup, not part of this project

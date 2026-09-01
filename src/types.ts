@@ -1,0 +1,392 @@
+/* ============================================================================
+ * Shared types for Drill's data model. Mirrors the shapes documented in the
+ * original db.js / fsrs.js / ai.js / config.js comments.
+ *
+ * Projects, memory and the upgraded note live in types/core.ts; the ones this
+ * file needs are re-exported below so `@/types` stays the single import for
+ * the review side of the app.
+ * ========================================================================== */
+import type { Autonomy, Effort, Note, Project } from "@/types/core";
+
+export type { Autonomy, Effort, Note, Project } from "@/types/core";
+export type {
+  BackupSummary,
+  FullBackup,
+  KnowledgeItem,
+  Memory,
+  MemoryCandidate,
+  MemoryOrigin,
+  MemoryPolicy,
+  MemoryScope,
+  MemorySource,
+  MemoryType,
+  NoteSource,
+  ProjectDefaults
+} from "@/types/core";
+
+export type Grade = 1 | 2 | 3 | 4;
+
+export type CardState = "new" | "learning" | "review" | "relearning";
+
+export interface Card {
+  id: string;
+  tag: string;
+  q: string;
+  a: string;
+  /** Where this card came from, so a failing card can be traced back to the
+   *  day it was learned. Absent for cards written before Phase 2. */
+  sourceRef?: { kind: "journal" | "exam" | "chat" | "note" | "manual"; id: string };
+}
+
+/** FSRS-6 scheduling state for one card. */
+export interface SRSState {
+  id: string;
+  state: CardState;
+  step: number;
+  /** memory stability, in days */
+  S: number;
+  /** difficulty, 1..10 */
+  D: number;
+  /** next due timestamp, ms epoch */
+  due: number;
+  reps: number;
+  lapses: number;
+  /** last review timestamp, ms epoch */
+  last: number;
+  /** last computed retrievability, 0..1 */
+  lastR?: number;
+}
+
+export interface DeckMeta {
+  newToday: number;
+  dayKey: string;
+  streak: number;
+  lastActive: string | null;
+  reviews: number;
+}
+
+export interface Deck {
+  id: string;
+  name: string;
+  created: number;
+  /** Which project this deck belongs to. Every deck has one from v4 onward;
+   *  the migration files pre-existing decks under the default project. */
+  projectId: string;
+  cards: Card[];
+  srs: Record<string, SRSState>;
+  meta: DeckMeta;
+}
+
+export type Lang = "english" | "hinglish";
+
+/** A curated hue, not a raw color picker — every option is tuned to the same
+ *  lightness/chroma family so nothing reads as an accident against the rest
+ *  of the dark palette. See lib/theme.ts for the oklch values. */
+export type Accent = "blue" | "violet" | "teal" | "green" | "amber" | "rose";
+
+/** Trims padding and line-height on list-heavy surfaces (decks, chat
+ *  sidebar, the insight log) without touching the reading surfaces —
+ *  density is about chrome, textScale below is about reading. */
+export type Density = "comfortable" | "compact";
+
+/** Which printing of the book to render: `night` (warm dark, the default —
+ *  Drill is used in the evening) or `day` (warm paper). Both are the same
+ *  design; only the ink and the paper swap. See lib/theme.ts. */
+export type Theme = "night" | "day";
+
+export interface Settings {
+  backend: string;
+  key: string;
+  model: string;
+  baseUrl: string;
+  newPerDay: number;
+  tutor: string;
+  lang: Lang;
+  retention: number;
+  maxIvl: number;
+  recall: boolean;
+  mark: boolean;
+  mix: boolean;
+  interleave: boolean;
+  /** Default context depth / model tier for a message. Projects and single
+   *  conversations may override it. */
+  effort: Effort;
+  /** How freely memory may be written without being asked. */
+  autonomy: Autonomy;
+  /** Appearance — applied at runtime via lib/theme.ts, not baked into the
+   *  stylesheet, so a new option here never needs a CSS release. */
+  theme: Theme;
+  accent: Accent;
+  density: Density;
+  /** Sidebar collapsed to its icon rail. Desktop only — under 900px the
+   *  sidebar is a drawer and this is ignored, so a phone never overwrites
+   *  what you chose at a desk. */
+  navCollapsed: boolean;
+  /** Multiplier on card/chat reading text only (not UI chrome). 0.9-1.2. */
+  textScale: number;
+  /** How many cards a session asks for when you start one. A session is a
+   *  bounded amount of work for today, not a cap on the queue — the queue
+   *  keeps serving after it, you just get told you are done. */
+  sessionSize: number;
+}
+
+/**
+ * A day's bounded run of cards, started on demand.
+ *
+ * The review queue is endless by design: it serves whatever is due, forever.
+ * That is correct for scheduling and hopeless as a thing to sit down to, so a
+ * session puts a finish line somewhere — you ask for ten cards, you can see
+ * how far through you are, and arriving is a real moment rather than the
+ * queue quietly running dry.
+ *
+ * Scoped to a day and a project. Asking again on the same day resumes rather
+ * than restarting, so a reload mid-session does not lose your place.
+ */
+export interface Session {
+  /** U.today() when it was started. A session from yesterday is not resumed. */
+  day: string;
+  projectId: string;
+  /** How many cards were asked for. */
+  target: number;
+  /** How many have been graded since it started. */
+  done: number;
+  startedAt: number;
+}
+
+export interface LogEntry {
+  t: number;
+  g: Grade;
+  s: CardState;
+  d: string;
+}
+
+export interface DrillDB {
+  v: 4;
+  /** Active deck id. */
+  active: string;
+  /** Active project id. Always points at a project that exists. */
+  activeProjectId: string;
+  projects: Record<string, Project>;
+  settings: Settings;
+  log: LogEntry[];
+  notes: Note[];
+  decks: Record<string, Deck>;
+  /** Today's bounded run, or null when none has been started. */
+  session: Session | null;
+}
+
+/** { deck, def: card, st: srs state } — the unit the review loop works with. */
+export interface QueueItem {
+  deck: Deck;
+  def: Card;
+  st: SRSState;
+}
+
+/* ---------------------------------------------------------------- config -- */
+
+export type BackendType = "openrouter" | "openai" | "anthropic" | "ollama" | "custom";
+
+export interface InferenceConfig {
+  type: BackendType;
+  apiKey: string;
+  model: string;
+  baseUrl: string;
+  temperature: number;
+  headers: Record<string, string>;
+}
+
+export interface DecksConfig {
+  defaultPath: string;
+  autoSync: boolean;
+}
+
+export interface UIConfig {
+  retentionTarget: number;
+  newPerDay: number;
+  language: string;
+}
+
+export interface FSRSConfig {
+  weights: number[] | null;
+  maxInterval: number;
+  learningSteps: number[];
+  relearningSteps: number[];
+  fuzz: boolean;
+  leechThreshold: number;
+}
+
+export interface DrillConfig {
+  inference: InferenceConfig;
+  decks: DecksConfig;
+  ui: UIConfig;
+  fsrs: FSRSConfig;
+}
+
+/* ------------------------------------------------------------------ fsrs -- */
+
+export interface FSRSParams {
+  weights: number[];
+  retention: number;
+  maxInterval: number;
+  learningSteps: number[];
+  relearningSteps: number[];
+  fuzz: boolean;
+  leechThreshold: number;
+  rng?: () => number;
+}
+
+/* -------------------------------------------------------------------- ai -- */
+
+export type ChatRole = "system" | "user" | "assistant";
+
+export interface ChatMessage {
+  role: ChatRole;
+  content: string;
+}
+
+/** Token counts for one exchange. `cost` is only set when the backend
+ *  publishes pricing — undefined means unknown, never free. */
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  cost?: number;
+}
+
+export interface ChatOpts {
+  temperature?: number;
+  maxTokens?: number;
+  onToken?: (token: string, acc: string) => void;
+  /** Reported once at the end of a call, when the backend returns counts. */
+  onUsage?: (u: TokenUsage) => void;
+  /** Aborts the request. A cancelled call rejects with an AbortError, which
+   *  callers are expected to swallow rather than surface as a failure. */
+  signal?: AbortSignal;
+  /** What kind of operation this is — "journal", "distill", "exam", "chat"…
+   *  Recorded on the run transcript so "what is it doing" has an answer. */
+  label?: string;
+}
+
+/** Resolved backend + credentials for one call. */
+export interface AIContext {
+  apiKey: string;
+  model: string;
+  baseUrl: string;
+  headers: Record<string, string>;
+}
+
+export interface BackendDef {
+  id: BackendType;
+  label: string;
+  needsKey: boolean;
+  local: boolean;
+  keyUrl: string;
+  defaultBaseUrl: string;
+  defaultModel: string;
+  note: string;
+  chat(messages: ChatMessage[], opts: ChatOpts, ctx: AIContext): Promise<string>;
+  listModels(ctx: AIContext): Promise<string[]>;
+}
+
+export interface ResolvedBackend {
+  type: BackendType;
+  backend: BackendDef;
+  apiKey: string;
+  model: string;
+  baseUrl: string;
+  headers: Record<string, string>;
+  temperature?: number;
+  keyFromConfig: boolean;
+  modelFromConfig: boolean;
+  backendFromConfig: boolean;
+}
+
+export interface MarkResult {
+  grade: Grade;
+  verdict: "got" | "partial" | "missed";
+  missing: string[];
+  note: string;
+}
+
+/* -------------------------------------------------------------- payloads -- */
+
+export interface DeckPayload {
+  kind: "cards";
+  name: string | null;
+  cards: unknown[];
+}
+
+export interface BackupPayload {
+  kind: "backup";
+  data: DrillDB | LegacyDBv3 | LegacyDBv2;
+}
+
+export type ImportPayload = DeckPayload | BackupPayload;
+
+export interface ValidateResult {
+  ok: Card[];
+  problems: string[];
+}
+
+export interface ExampleDeckEntry {
+  file: string;
+  name: string;
+  cards: number;
+  description: string;
+}
+
+/* ---------------------------------------------------------- legacy (v3) -- */
+/* v3 had no projects: decks were a flat map and notes were {id,t,text,tag}.
+   Kept so a v3 backup exported before the upgrade still restores. */
+
+export interface LegacyNoteV3 {
+  id: string;
+  t: number;
+  text: string;
+  tag: string;
+}
+
+export interface LegacyDeckV3 {
+  id: string;
+  name: string;
+  created: number;
+  cards: Card[];
+  srs: Record<string, SRSState>;
+  meta: DeckMeta;
+  /** absent in true v3 records; present once migrated */
+  projectId?: string;
+}
+
+export interface LegacyDBv3 {
+  v: 3;
+  active: string;
+  settings: Partial<Settings>;
+  log: LogEntry[];
+  notes: LegacyNoteV3[];
+  decks: Record<string, LegacyDeckV3>;
+}
+
+/* ---------------------------------------------------------- legacy (v2) -- */
+
+export interface LegacyDBv2 {
+  active: string;
+  settings?: Partial<Settings> & Record<string, unknown>;
+  decks: Record<string, LegacyDeckV2>;
+}
+
+export interface LegacyDeckV2 {
+  id: string;
+  name: string;
+  created: number;
+  cards: Partial<Card>[];
+  srs?: Record<string, LegacySRSv2>;
+  meta?: DeckMeta;
+}
+
+export interface LegacySRSv2 {
+  ivl?: number;
+  ease?: number;
+  stage?: string;
+  due?: number;
+  reps?: number;
+  lapses?: number;
+}

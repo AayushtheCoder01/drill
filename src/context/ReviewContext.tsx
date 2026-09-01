@@ -1,0 +1,89 @@
+/* ============================================================================
+ * ReviewContext — the review-loop state that used to be five module-level
+ * variables at the top of ui.js (current, revealed, lastTag, lastAttempt,
+ * lastMark). Deliberately small: the card on screen, whether it is flipped,
+ * the live recall draft, and the two things the tutor wants to know about
+ * the attempt.
+ *
+ * `refresh()` is the direct equivalent of the old render(): it re-runs
+ * rollover + nextCard and resets the per-card fields. Every mutation that
+ * used to call render() (deck switches, card edits, imports…) calls
+ * refresh() here too; grade() advances the queue itself.
+ * ========================================================================== */
+import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import * as store from "@/services/store";
+import type { Grade, MarkResult, QueueItem } from "@/types";
+
+interface ReviewState {
+  current: QueueItem | null;
+  revealed: boolean;
+  attempt: string;
+  lastAttempt: string;
+  lastMark: MarkResult | null;
+  setAttempt: (s: string) => void;
+  refresh: () => void;
+  reveal: () => void;
+  setMark: (m: MarkResult | null) => void;
+  grade: (g: Grade) => void;
+}
+
+const Ctx = createContext<ReviewState | null>(null);
+
+export function ReviewProvider({ children }: { children: ReactNode }) {
+  const [current, setCurrent] = useState<QueueItem | null>(null);
+  const [revealed, setRevealed] = useState(false);
+  const [attempt, setAttempt] = useState("");
+  const [lastAttempt, setLastAttempt] = useState("");
+  const [lastMark, setLastMark] = useState<MarkResult | null>(null);
+  const [lastTag, setLastTag] = useState("");
+
+  const resetCard = useCallback((tag: string) => {
+    store.rollover();
+    setCurrent(store.nextCard(tag));
+    setRevealed(false);
+    setAttempt("");
+    setLastAttempt("");
+    setLastMark(null);
+  }, []);
+
+  const refresh = useCallback(() => resetCard(lastTag), [resetCard, lastTag]);
+
+  const grade = useCallback(
+    (g: Grade) => {
+      if (!current) return;
+      store.gradeCard(current, g);
+      const tag = current.def.tag;
+      setLastTag(tag);
+      resetCard(tag);
+    },
+    [current, resetCard]
+  );
+
+  return (
+    <Ctx.Provider
+      value={{
+        current,
+        revealed,
+        attempt,
+        lastAttempt,
+        lastMark,
+        setAttempt,
+        refresh,
+        reveal: () => {
+          setLastAttempt(attempt);
+          setRevealed(true);
+        },
+        setMark: setLastMark,
+        grade
+      }}
+    >
+      {children}
+    </Ctx.Provider>
+  );
+}
+
+export function useReview(): ReviewState {
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error("useReview must be used within ReviewProvider");
+  return ctx;
+}

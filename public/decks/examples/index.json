@@ -1,0 +1,14 @@
+[
+ {
+  "file": "math-foundations.json",
+  "name": "Maths foundations for ML",
+  "cards": 26,
+  "description": "Linear algebra, calculus and probability — the maths an ML course assumes you already have."
+ },
+ {
+  "file": "ml-course1.json",
+  "name": "ML — Course 1",
+  "cards": 66,
+  "description": "Notation, cost, gradient descent, vectorisation and shape debugging. The deck Drill ships with."
+ }
+]

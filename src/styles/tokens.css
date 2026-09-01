@@ -1,0 +1,203 @@
+/* ============================================================================
+ * tokens.css — the design system Drill is printed from.
+ *
+ * Everything downstream (style.css, views.css, chat.css) composes these and
+ * nothing else: no literal colours, no ad-hoc font sizes, no one-off radii.
+ * If a rule needs a value that is not here, the value is wrong or the scale
+ * is missing a step — add the step, don't inline the number.
+ *
+ * Two printings of the same book. `:root[data-theme]` is written by
+ * lib/theme.ts from Settings.theme; night is the default because Drill is
+ * used in the evening, and it is what renders before any JS runs.
+ *
+ * Sections:  printings · type · scale · motion
+ * ========================================================================== */
+
+/* ---------------------------------------------------------------- night -- */
+/* Warm dark — hue 70 at very low chroma, so it reads as unbleached paper
+   seen at night rather than as a neutral-grey app surface. Deliberately not
+   near-black: the page sits at 21% L, the same weight that survived two
+   earlier rounds of "too deep, too harsh". */
+:root,
+:root[data-theme="night"] {
+  --page: oklch(21% 0.008 70);
+  --page-2: oklch(18% 0.007 70);
+  --surface: oklch(25% 0.009 70);
+  --surface-2: oklch(29% 0.010 70);
+  --rule: oklch(33% 0.010 70);
+  --rule-soft: oklch(27.5% 0.009 70);
+
+  --ink: oklch(94% 0.010 85);
+  --ink-2: oklch(75% 0.012 82);
+  --ink-3: oklch(65% 0.012 80);
+
+  --on-accent: oklch(18% 0.010 70);
+  --scrim: oklch(13% 0.008 70 / 0.74);
+
+  --green: oklch(72% 0.15 150);
+  --amber: oklch(78% 0.13 78);
+  --red: oklch(68% 0.18 25);
+  --violet: oklch(70% 0.15 300);
+
+  --code-type: oklch(76% 0.10 178);
+  --code-attr: oklch(78% 0.07 250);
+
+  --lift-1: 0 1px 2px oklch(0% 0 0 / 0.28);
+  --lift-2: 0 10px 28px -16px oklch(0% 0 0 / 0.62);
+  --lift-3: 0 28px 64px -28px oklch(0% 0 0 / 0.72);
+
+  color-scheme: dark;
+}
+
+/* ------------------------------------------------------------------ day -- */
+/* Warm off-white paper with near-black ink. `--surface` is *lighter* than
+   the page here and darker than it at night: in both printings a raised
+   thing is the one closer to white, which is what makes a card read as a
+   leaf laid on the page rather than a hole cut in it. */
+:root[data-theme="day"] {
+  --page: oklch(97% 0.010 85);
+  --page-2: oklch(94% 0.013 85);
+  --surface: oklch(99.4% 0.004 85);
+  --surface-2: oklch(96% 0.010 85);
+  --rule: oklch(85% 0.013 80);
+  --rule-soft: oklch(90.5% 0.011 82);
+
+  --ink: oklch(25% 0.015 60);
+  --ink-2: oklch(46% 0.015 62);
+  --ink-3: oklch(48% 0.014 64);
+
+  --on-accent: oklch(99% 0.004 85);
+  --scrim: oklch(32% 0.020 60 / 0.34);
+
+  --green: oklch(48% 0.13 150);
+  --amber: oklch(53% 0.12 70);
+  --red: oklch(50% 0.17 25);
+  --violet: oklch(48% 0.16 300);
+
+  --code-type: oklch(44% 0.09 178);
+  --code-attr: oklch(44% 0.09 250);
+
+  --lift-1: 0 1px 2px oklch(30% 0.02 60 / 0.10);
+  --lift-2: 0 10px 26px -18px oklch(30% 0.02 60 / 0.35);
+  --lift-3: 0 26px 60px -28px oklch(30% 0.02 60 / 0.30);
+
+  color-scheme: light;
+}
+
+/* --------------------------------------------------------------- accent -- */
+/* The accent is components, not a colour, so lib/theme.ts can swap the hue
+   (Settings.accent) and the lightness (which printing) without a single rule
+   downstream knowing. `--accent-l` differs per printing on purpose: 62% is a
+   confident link on a dark page and an illegible one on paper. */
+:root {
+  --accent-l: 62%;
+  --accent-c: 0.19;
+  --accent-h: 262;
+  --accent: oklch(var(--accent-l) var(--accent-c) var(--accent-h));
+}
+:root[data-theme="day"] {
+  --accent-l: 48%;
+}
+
+/* Named tints, so no rule downstream ever spells out an oklch() again.
+   Declared after --accent-l is set in both printings, and re-resolved
+   automatically when theme.ts rewrites the components. */
+:root {
+  --accent-05: oklch(var(--accent-l) var(--accent-c) var(--accent-h) / 0.05);
+  --accent-10: oklch(var(--accent-l) var(--accent-c) var(--accent-h) / 0.1);
+  --accent-16: oklch(var(--accent-l) var(--accent-c) var(--accent-h) / 0.16);
+  --accent-25: oklch(var(--accent-l) var(--accent-c) var(--accent-h) / 0.25);
+  --accent-45: oklch(var(--accent-l) var(--accent-c) var(--accent-h) / 0.45);
+  --accent-glow: 0 6px 20px -8px oklch(var(--accent-l) var(--accent-c) var(--accent-h) / 0.5);
+
+  --green-tint: color-mix(in oklab, var(--green) 10%, transparent);
+  --green-edge: color-mix(in oklab, var(--green) 34%, transparent);
+  --amber-tint: color-mix(in oklab, var(--amber) 10%, transparent);
+  --amber-edge: color-mix(in oklab, var(--amber) 34%, transparent);
+  --red-tint: color-mix(in oklab, var(--red) 10%, transparent);
+  --red-edge: color-mix(in oklab, var(--red) 34%, transparent);
+  --violet-tint: color-mix(in oklab, var(--violet) 10%, transparent);
+  --violet-edge: color-mix(in oklab, var(--violet) 32%, transparent);
+}
+
+/* ----------------------------------------------------------------- type -- */
+:root {
+  /* Serif to read, sans for the machinery, mono for anything the computer
+     said. The reading face carries the book; the sans is deliberately quiet
+     so it never competes with it. */
+  --serif: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  --sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Nine steps, and nine is the budget. Reading sizes (--t-read and up)
+     are multiplied by --text-scale at the point of use; UI chrome is not. */
+  --t-3xs: 0.6875rem; /* 11px  micro caps, folios */
+  --t-2xs: 0.75rem; /* 12px  meta, ticks */
+  --t-xs: 0.8125rem; /* 13px  small controls */
+  --t-sm: 0.875rem; /* 14px  UI default */
+  --t-md: 1rem; /* 16px  inputs, large UI */
+  --t-read: 1.0625rem; /* 17px  running text */
+  --t-lg: 1.375rem; /* 22px  subheads */
+  --t-xl: 1.75rem; /* 28px  card question, chapter title */
+  --t-2xl: 2.25rem; /* 36px  display figures */
+
+  --lh-tight: 1.22;
+  --lh-snug: 1.4;
+  --lh-body: 1.72;
+
+  /* One tracking value for caps, one for display. Eight was seven too many. */
+  --track-caps: 0.12em;
+  --track-tight: -0.014em;
+
+  /* Settings.textScale — reading surfaces only. */
+  --text-scale: 1;
+}
+
+/* ---------------------------------------------------------------- scale -- */
+:root {
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  --r-1: 3px;
+  --r-2: 6px;
+  --r-3: 10px;
+  --r-full: 999px;
+
+  /* The measures a page can be set to. --measure is the prose column: ~64
+     characters of the reading face, which is the number every book has been
+     converging on for five centuries. */
+  --measure: 34rem;
+  --page-w: 42rem;
+  --page-wide: 54rem;
+  --gutter: var(--s-5);
+
+  --head-h: 46px;
+  /* The instrument panel. Narrower than the nav rail on purpose: it holds
+     readouts, not navigation, and must never compete with the reading
+     column for attention. */
+  --rail-w: 15.5rem;
+}
+
+/* --------------------------------------------------------------- motion -- */
+:root {
+  --ease: cubic-bezier(0.2, 0.9, 0.3, 1);
+  --fast: 0.14s;
+  --med: 0.24s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

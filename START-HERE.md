@@ -1,0 +1,852 @@
+# Drill — Build Plan
+
+> **Point a fresh Claude Code session at this file to begin.**
+>
+> Opening move: *"Read START-HERE.md and build Phase N."*
+>
+> One phase per session. A phase is finished only when it works end to end —
+> data, logic, UI, and a browser check. Never leave a phase half-wired.
+
+---
+
+## Progress
+
+### v1 — The Daily Loop
+
+| Phase | | State |
+|---|---|---|
+| 0 | Foundations and safety | **done** |
+| 1 | Projects | next |
+| 2 | Log and Journal | |
+| 3 | Memory core | |
+| 4 | Distill — journal into memory and cards | |
+| 5 | Exams | |
+| 6 | Unified settings and the run transcript | |
+
+### v2 — Depth
+| 7 | Chat on the journal | |
+| 8 | Files, attachments, `@` picker | |
+| 9 | Capture bridge from other AI apps | |
+| 10 | Context inspector and cache tuning | |
+
+### v3 — Later
+| 11 | Auto-backup to disk | |
+| 12 | Agent loop behind high effort | |
+| 13 | Period reports, mind maps, richer media | |
+
+**Phase 0 notes for whoever picks this up:**
+
+- `DrillDB` is `v: 4`. `migrateToV4` in [src/lib/migrate.ts](src/lib/migrate.ts) is
+  **idempotent** and runs on every load — it is both the upgrade and the repair
+  pass. Add new v4 fields there; do not write a second migration.
+- Pre-migration snapshot at `localStorage["mldrill:v3:backup"]`, **write-once**.
+  Verified: a later bad state cannot overwrite it.
+- `store.initReport()` returns `{fresh, fromVersion, migrated, backedUp}`.
+  Nothing surfaces it yet — Phase 6 should.
+- IndexedDB `drill-chat` is v2 with `memories` and `candidates` stores created.
+  Only [backup.ts](src/services/backup.ts) touches them so far.
+- Conversations gain new fields lazily via `chatStore.repair()`. No bulk migration.
+- New records use `U.uuid()`. `U.uid()` stays for cards and decks, whose ids
+  appear in deck files and must survive re-import.
+- `vite.config.ts` honours `PORT`; `.claude/launch.json` uses `autoPort`.
+
+---
+
+## 1. What this is
+
+**Drill is a learning journal that turns what you did today into things you
+will still know in six months.**
+
+The loop, once a day, in about two minutes of your attention:
+
+```
+   you type what you did today
+        │
+        ▼
+   ┌──────────┐   a narrative entry, not a text dump:
+   │ JOURNAL  │   what you did, what landed, where you got stuck,
+   └──────────┘   what is still open
+        │
+        ▼
+   ┌──────────┐   memory candidates + card proposals,
+   │ DISTILL  │   each one reviewed, nothing auto-committed
+   └──────────┘
+        │
+        ├──────────────► cards enter FSRS and come back on schedule
+        │
+        └──────────────► memory shapes every later answer
+                              │
+                              ▼
+                        ┌──────────┐   "test me on last week"
+                        │  EXAMINE │   graded, extendable, harder on request
+                        └──────────┘
+```
+
+Everything else in the app — chat, decks, the review loop — hangs off that
+spine.
+
+### Why this beats a chat window that remembers
+
+The old framing was *chat that accumulates memory*. The problem: memory only
+accrues if you happen to chat, and what accrues is a byproduct of conversation
+rather than a record of learning.
+
+Journaling fixes both. It gives memory a **trigger** (end of day), a **shape**
+(what did I do, what landed, what is open), and a **rhythm** (daily entries
+roll up weekly, weekly rolls into project memory). The junk-drawer failure
+mode that kills most memory systems is solved structurally rather than by a
+button nobody presses.
+
+### The single-sentence test for any feature below
+
+*Does it help the learner get from "I studied today" to "I still know it in
+six months"?* If not, it is v3 or it is cut.
+
+---
+
+## 2. Locked decisions
+
+Do not relitigate these while building.
+
+1. **Frontend only.** No backend, no accounts, no sync. Browser storage plus
+   the user's own API key.
+2. **Pipeline, not agent loop.** One API call per operation. Retrieval and
+   scoping are deterministic TypeScript. The effort dial is where a loop lands
+   in v3.
+3. **No embeddings.** Keyword + recency + usage scoring, plus date filtering,
+   which is exact and free.
+4. **Nothing commits itself.** Every stage proposes; the learner accepts.
+   The one exception is transcribing a fact the learner explicitly stated, and
+   that has an off switch.
+5. **Raw input is never destroyed.** Every generated artifact — journal
+   narrative, memory, card, exam question — records what it came from and can
+   be regenerated. A bad summarisation costs one call, never your data.
+6. **Never memorise what can be computed.** Card stats, lapses, due counts and
+   weak areas are queried live. Memory holds how you think, not what you scored.
+7. **Project is the top-level entity.** It owns decks, journals, conversations,
+   memory, and exams.
+8. **Cards are atomic and self-contained.** A card that only makes sense in the
+   context of the day it was written is a broken card. Enforced by a quality
+   gate, not by hope.
+
+---
+
+## 3. What already exists
+
+### Storage
+
+| World | Where | Holds | Access |
+|---|---|---|---|
+| `DrillDB` v4 | `localStorage["mldrill:v3"]` | settings, **projects**, decks, srs, log, notes | **sync**, `services/store.ts` |
+| Chat + memory | IndexedDB `drill-chat` v2 | conversations, meta, memories, candidates | **async**, `services/chatStore.ts`, `idb.ts` |
+
+The sync/async split is load-bearing: the review loop renders without awaiting
+IndexedDB. New small data goes in `DrillDB`; new growing data goes in
+IndexedDB behind a sync cache, copying the `chatStore` pattern.
+
+### Seams worth knowing
+
+- **`services/ai/index.ts` → `chat()`** — the single inference boundary.
+  Already provides `generateCards`, `splitCard`, **`markRecall`**,
+  `generateTitle`, `suggestFollowups`, `resolve`, `listModels`, `formatReply`.
+- **`markRecall(card, attempt)` → `{grade, verdict, missing, note}`** — exam
+  grading is this function in a loop. Do not write a second grader.
+- **`ProposalsBlock`** — `{label, cards, targetDeck, onCommitted}`. Every
+  card-proposing surface uses it. Distilled cards use it too.
+- **`lib/chatContext.ts`** — `renderSource` / `describeSource` / `sourceSize` /
+  `buildSystemPrompt`. Context is rebuilt at send time, never frozen. Handles
+  `deck`, `weak`, `due`, `notes`; `memory`, `knowledge`, `journal` are declared
+  in the type but not yet implemented.
+- **`store.isLeech`**, `weakCards`, `dueCards` — the drill-data queries exist.
+- **`types/core.ts`** — `Project`, `Memory`, `MemoryCandidate`, `Note`, `Effort`,
+  `KnowledgeItem`, `FullBackup` all defined in Phase 0.
+- **`services/backup.ts`** — full export/restore across both storage worlds,
+  ids preserved. Extend it whenever a new store appears.
+
+### Known problems still open
+
+- **Two settings surfaces** — `panes/SettingsPane.tsx` (global) and
+  `chat/SettingsDrawer.tsx` (per-conversation), each with its own model picker
+  and no indication of which wins. `SettingsPane` also mutates settings in
+  place and forces re-renders with a `setTick` counter. Phase 6.
+- **Nothing reads the memory stores yet.** Phase 3.
+
+---
+
+## 4. The five stages
+
+### Stage 1 — Capture
+
+One box. The lowest-friction thing in the app.
+
+- Free text: what you did, what you read, what confused you, links, anything.
+- Paste or drop a `.md` / `.txt` file — read with `FileReader`, appended to the
+  same day's raw log with a source marker.
+- **Append, don't replace.** Logging twice in a day adds to that day's entry.
+- Capture never calls the API. It saves instantly and works offline.
+
+That last rule matters more than it looks: if capture can fail or stall, you
+stop using it, and the whole system dies at the root.
+
+### Stage 2 — Journal
+
+One call turns the day's raw text into a **narrative entry**.
+
+Not a bulleted summary — a short piece of writing in second person that reads
+like a log of a day's work, plus structured fields alongside it:
+
+| Field | What it holds |
+|---|---|
+| `narrative` | 2–5 sentences. The journey: what you set out to do, what actually happened. |
+| `did` | concrete actions completed |
+| `learned` | what landed conceptually, in your framing |
+| `stuck` | where you struggled, and what the specific confusion was |
+| `open` | questions raised and not resolved |
+| `resources` | books, links, videos, papers mentioned |
+| `nextUp` | the obvious next step |
+
+`stuck` and `open` are the two fields that earn their keep. `stuck` is where
+cards should come from — the things you nearly know are worth drilling, the
+things you found trivial are not. `open` is what gets resurfaced weeks later
+when nothing else would have brought it back.
+
+The narrative is **regenerable**: the raw text is kept forever, so a bad entry
+is one click to redo. Editable by hand, and an edited entry is marked so a
+regeneration warns before overwriting it.
+
+### Stage 3 — Distill
+
+One call, run when you ask for it, turning a journal entry into two reviewable
+piles.
+
+**Memory candidates** — into the tray, exactly as designed before:
+- `understanding` from `learned`
+- `open` from `open`
+- `convention` / `goal` when the entry states one
+- `preference` only from things you said about yourself
+
+**Card proposals** — into `ProposalsBlock`, weighted toward `stuck` and
+`learned`.
+
+#### The card quality gate
+
+This is the part that decides whether the feature is good or merely present.
+Cards written with today's context fresh in your head are systematically
+under-specified — you write *"What was the trick with the gradient?"* because
+right now it is obvious what trick you mean. In six weeks it is unanswerable.
+
+Every proposed card is checked, in the same call, against four rules:
+
+1. **Atomic** — one fact, one question. If the answer has an "and" joining two
+   ideas, it is two cards.
+2. **Self-contained** — answerable with no memory of the day it came from. No
+   "the trick", "the paper", "as we discussed".
+3. **Recall, not recognition** — the front must demand production, not a yes/no
+   or a pick-from-list.
+4. **Non-duplicate** — checked against existing cards in the project's decks by
+   keyword overlap, locally, before the call even goes out.
+
+Cards failing 1–3 are rewritten by the model rather than dropped. Cards failing
+4 are shown greyed with the card they collide with, so you can pick.
+
+Nothing is written until you accept it. Distilling twice on the same entry is
+safe: already-committed items are recognised and shown as such.
+
+### Stage 4 — Review
+
+Unchanged — this is the existing FSRS loop, and it already works. The only new
+wiring:
+
+- Cards remember which journal entry they came from (`sourceRef`), so the
+  review screen can show *"from your log on 12 March"* and jump to it.
+- A card you keep failing can be traced back to the day you learned it, which
+  is often the actual explanation.
+
+### Stage 5 — Examine
+
+The feature that turns a pile of cards into a sense of whether you actually
+know the material.
+
+**What an exam is:** a generated, persisted set of questions with a scope, a
+difficulty, and a grade report. Retakeable. Extendable.
+
+**Scope** — any combination, resolved locally before any call:
+- a date range — *"what I learned three days ago"*, *"last week"*, *"this month"*
+- a project, a deck, or a set of tags
+- a specific journal entry
+- specific cards
+
+**Why an exam is not just a quiz over cards.** If it only re-asks cards
+one by one, it is a worse version of the review loop and should not exist. Its
+distinct job is **questions that span material**:
+
+| Kind | What it asks | Source |
+|---|---|---|
+| `recall` | one fact, short answer | a single card |
+| `apply` | use it on a new case | a card + its context |
+| `why` | justify, explain the mechanism | `learned` / `understanding` |
+| `connect` | relate two things learned separately | two or more cards |
+| `derive` | work it out from principles | a convention + a card |
+| `diagnose` | find the error in a worked example | a `stuck` entry |
+
+`connect` and `derive` are the ones the drill loop structurally cannot produce,
+and they are where the difficulty ladder lives.
+
+**Difficulty** — four rungs, and "make it harder" moves up:
+`recall → apply → analyse → synthesise`. An exam is a mix, weighted by the
+requested level, not a uniform block.
+
+**Grounding.** Every question stores `sourceRefs` — the cards, journal entries
+or memories it was built from. This is not bookkeeping: it is how you check a
+suspicious question against what you actually wrote, and it is how "more
+questions on this" knows what "this" means.
+
+**Taking it.** One question at a time, free response. Grading reuses
+`AI.markRecall` — one call per answer, the same strictness as the review loop,
+returning `{grade, verdict, missing, note}`.
+
+**The report** — per question: your answer, the verdict, what you missed.
+Overall: a score, the weakest topics, and three actions:
+- **wrong answer → new card** (through `ProposalsBlock`)
+- **wrong answer → reset that card's FSRS state**, because a card you passed in
+  drilling but failed in an exam was a false positive
+- **weak topic → more questions**
+
+**Extending.** "More questions" and "harder" re-run generation with the same
+scope, excluding questions already asked, appending to the same exam.
+
+---
+
+## 5. Time scoping
+
+*"Test me on what I learned three days ago"* has to work without an API call to
+figure out what "three days ago" means.
+
+A small local parser in `lib/when.ts` handles the phrases people actually use:
+
+```
+today · yesterday · this week · last week · this month
+last N days/weeks · N days ago · since <date> · <month> · <date>..<date>
+```
+
+Returns `{from, to, label}` or null. Anything it cannot parse falls through to
+a date-range picker rather than guessing. Deterministic, testable, free, and it
+makes the exam scope legible before you spend a call on it — you see
+*"14–20 March · 4 journal entries · 23 cards"* before generating.
+
+---
+
+## 6. Rhythm — how memory stays clean
+
+The junk-drawer problem — cheap models over-save until retrieval degrades —
+is solved by giving consolidation a natural cadence instead of a button:
+
+```
+  daily     capture → journal              (raw kept forever)
+     ↓
+  weekly    rollup: 7 entries → one period summary
+            + memory candidates promoted to project memory
+            + duplicates merged, contradictions resolved via supersededBy
+            + stale `open` items either resurfaced or retired
+     ↓
+  project   a small, sharp set of what is actually true about this subject
+```
+
+A rollup is one call and produces a **diff you approve** — `+3 new · ~2 merged
+· −1 retired`, full text shown, each line editable and individually
+rejectable. Retired entries set `active: false`; nothing is ever hard-deleted.
+
+Global memory is capped at ~25 active entries and consolidated aggressively.
+Project memory can be generous. Journals are never consolidated away — they are
+the raw record.
+
+Weekly is a default, not a rule: the rollup is available any time, and knows
+what it already covered.
+
+---
+
+## 7. Data model
+
+New types go in `src/types/journal.ts` and `src/types/exam.ts`, re-exported
+from `@/types` like `core.ts` is.
+
+```ts
+/* ------------------------------------------------------------- journal -- */
+
+export interface RawLog {
+  id: string;
+  at: number;
+  /** "typed" | "file" | "chat" — where this chunk came from */
+  via: "typed" | "file" | "chat";
+  /** filename, conversation title, or "" */
+  label: string;
+  text: string;
+}
+
+export interface JournalEntry {
+  id: string;
+  projectId: string;
+  /** local day key, "2026-03-14". One entry per project per day. */
+  day: string;
+  created: number;
+  updated: number;
+
+  /** Everything you fed it, in order, never destroyed. */
+  raw: RawLog[];
+
+  /** Null until generated. Regenerating rebuilds this from `raw`. */
+  summary: JournalSummary | null;
+  /** True once hand-edited, so regeneration warns first. */
+  edited: boolean;
+
+  /** What has already been pulled out of this entry, so distilling twice
+   *  does not propose the same things again. */
+  distilled: {
+    at: number | null;
+    memoryIds: string[];
+    cardIds: string[];
+  };
+
+  /** Which weekly rollup has already absorbed this entry. */
+  rolledUpIn: string | null;
+}
+
+export interface JournalSummary {
+  narrative: string;
+  did: string[];
+  learned: string[];
+  stuck: string[];
+  open: string[];
+  resources: { label: string; url: string }[];
+  nextUp: string[];
+  /** model + when, so a thin entry can be blamed on the right thing */
+  generatedBy: { model: string; at: number };
+}
+
+export interface PeriodRollup {
+  id: string;
+  projectId: string;
+  from: number;
+  to: number;
+  label: string;              // "Week of 10 March"
+  entryIds: string[];
+  narrative: string;
+  themes: string[];
+  stillOpen: string[];
+  created: number;
+}
+
+/* ---------------------------------------------------------------- exam -- */
+
+export type QuestionKind = "recall" | "apply" | "why" | "connect" | "derive" | "diagnose";
+export type Difficulty = "recall" | "apply" | "analyse" | "synthesise";
+
+export interface ExamScope {
+  projectId: string;
+  from: number | null;
+  to: number | null;
+  label: string;              // "last week", shown before generating
+  deckIds: string[];
+  tags: string[];
+  journalIds: string[];
+  cardIds: string[];
+}
+
+export interface ExamQuestion {
+  id: string;
+  kind: QuestionKind;
+  difficulty: Difficulty;
+  prompt: string;
+  /** What a correct answer must contain. Used for grading, hidden until then. */
+  expected: string;
+  /** Everything this was built from — the anti-hallucination trace. */
+  sourceRefs: { kind: "card" | "journal" | "memory"; id: string }[];
+
+  answer: string | null;
+  result: { grade: Grade; verdict: "got" | "partial" | "missed"; missing: string[]; note: string } | null;
+  answeredAt: number | null;
+}
+
+export interface Exam {
+  id: string;
+  projectId: string;
+  title: string;
+  created: number;
+  scope: ExamScope;
+  /** Requested weighting, not a hard filter. */
+  level: Difficulty;
+  questions: ExamQuestion[];
+  /** Set when the last question is graded; retaking clears it. */
+  finishedAt: number | null;
+  /** Rounds of "more questions", for the header. */
+  rounds: number;
+}
+```
+
+### Changes to existing types
+
+```ts
+// Card gains provenance — where it came from, so a failing card can be
+// traced back to the day it was learned.
+export interface Card {
+  // …existing…
+  sourceRef?: { kind: "journal" | "exam" | "chat" | "note" | "manual"; id: string };
+}
+
+// ContextSource gains the journal, live like everything else.
+export type ContextSource =
+  // …existing…
+  | { kind: "journal"; days: number };
+```
+
+### Storage placement
+
+| Data | Store | Why |
+|---|---|---|
+| `JournalEntry` | IndexedDB, new store `journal` | grows daily, holds raw text forever |
+| `PeriodRollup` | IndexedDB, new store `rollups` | small but lives with journals |
+| `Exam` | IndexedDB, new store `exams` | grows, and never needed synchronously |
+| `Memory`, `MemoryCandidate` | IndexedDB (exists) | |
+| `Project`, `Note`, decks, srs | `DrillDB` (exists) | needed synchronously by the review loop |
+
+IndexedDB goes to **v3** with `journal`, `rollups`, `exams`. Same guarded
+`onupgradeneeded` pattern as Phase 0 — add `contains()` blocks, do not switch
+on `oldVersion`. Extend `services/backup.ts` in the same phase that adds a
+store, every time.
+
+---
+
+## 8. Cost
+
+A full day of use, on a cheap model:
+
+| Operation | Calls | When |
+|---|---|---|
+| Capture | **0** | always instant, works offline |
+| Journal | 1 | once a day, when asked |
+| Distill | 1 | once a day, when asked |
+| Weekly rollup | 1 | once a week |
+| Exam generation | 1 | when asked |
+| Exam grading | 1 per answer | while taking it |
+| Chat | 1 per message | as before |
+
+A normal day is **two calls**. A week with one 10-question exam is about
+**twenty-five**. On DeepSeek-class pricing that is cents per month.
+
+Grading is the only per-item cost. It is worth it — `markRecall` already
+carries the review loop and the strictness is the point — but batching all
+answers into one grading call is the obvious v2 optimisation if it bites.
+
+**Prompt cache discipline** applies to every call: stable ordering, no
+timestamps in the cached prefix, volatile content last.
+
+---
+
+## 9. Versions and phases
+
+**A phase is one working session and ends with the app fully working.**
+Vertical slices — data, logic, UI, and a browser check — never a layer.
+
+---
+
+### v1 — The Daily Loop
+
+The complete workflow. Standalone value: log, journal, distil, drill, examine.
+
+---
+
+#### Phase 1 — Projects
+
+Everything scopes to a project, so this comes first.
+
+- `src/services/projects.ts` — CRUD, active project, archive, deck assignment.
+  Re-export `makeProject` from `lib/migrate.ts`.
+- `src/context/ProjectContext.tsx`
+- `ProjectSwitcher` in the header
+- Routes become `#/p/<id>/drill` and `#/p/<id>/chat/<cid>`; old hashes redirect
+  for one version
+- Decks pane and chat sidebar filter to the active project
+- Project settings: name, blurb, goals, decks in/out
+
+**Done when:** two projects with different decks and conversations coexist with
+no leakage, and switching projects changes what the review loop serves.
+
+---
+
+#### Phase 2 — Log and Journal
+
+The heart of the product. After this phase the app is already useful.
+
+- IndexedDB **v3** with the `journal` store; extend `backup.ts` in this phase
+- `src/services/journalStore.ts` — sync cache + debounced persist, modelled on
+  `chatStore.ts`
+- `src/lib/when.ts` — the date-phrase parser, with unit-style checks
+- **Capture box**: free text, append-to-today, `.md`/`.txt` drop and paste.
+  Zero API calls, saves instantly
+- `AI.writeJournal(raw, project)` → `JournalSummary`
+- **Journal view**: today's entry with narrative and the seven fields; edit any
+  field; regenerate with an are-you-sure when `edited`
+- **Timeline**: entries by day, filterable by the `when.ts` parser
+
+**Done when:** you can paste a paragraph about your day, get a narrative entry
+with `stuck` and `open` populated, edit it, regenerate it, and find it again by
+typing "last week".
+
+---
+
+#### Phase 3 — Memory core
+
+- `src/services/memoryStore.ts` — IndexedDB-backed, sync read cache, debounced
+  persist
+- `src/services/candidates.ts` — the staging tray
+- `src/lib/memoryRetrieval.ts` — scoring, token budget, `RetrievalTrace`,
+  usage telemetry on inject
+- `{ kind: "memory" }`, `{ kind: "knowledge" }`, `{ kind: "journal" }` branches
+  in `lib/chatContext.ts`
+- **Memory panel**: browse, filter by scope/type/source, edit, pin, retire
+- **Candidate tray**: badge, accept/edit/reject, bulk actions
+
+Scoring, as specified before:
+
+```
+score = 3.0 * keywordOverlap
+      + 1.5 * typeWeight          (open, goal, convention rank high)
+      + 1.0 * recencyDecay        (~60 day half-life)
+      + 0.5 * usageBoost          (log1p, capped)
+      + 10.0 * pinned
+```
+
+**Done when:** a hand-written memory is retrieved, visibly changes a chat
+answer, and the panel shows why it was picked.
+
+---
+
+#### Phase 4 — Distill
+
+Joins Phases 2 and 3 into the actual loop.
+
+- `AI.distill(entry, project, existingCards)` → memory candidates + card
+  proposals in one structured reply
+- **The card quality gate** — atomic / self-contained / recall / non-duplicate,
+  with local duplicate detection before the call
+- Review surface: two piles, memory into the tray, cards into `ProposalsBlock`
+- `entry.distilled` bookkeeping so a second run does not re-propose
+- `Card.sourceRef` set on commit; the review screen shows *"from your log on…"*
+- **Weekly rollup** with diff review, `rolledUpIn` bookkeeping
+- Memory **consolidation** with the same diff component
+
+**Done when:** one click on a journal entry yields reviewable memories and
+cards, committing them files the cards in the right deck with provenance, and
+running it again proposes only what is new.
+
+---
+
+#### Phase 5 — Exams
+
+- IndexedDB **v4** with the `exams` store; extend `backup.ts`
+- `src/services/examStore.ts`
+- **Scope builder** — date phrase or picker, deck/tag filters, showing
+  *"14–20 March · 4 entries · 23 cards"* before you spend a call
+- `AI.generateExam(scope, level, exclude)` → questions with `sourceRefs`
+- **Take view** — one question at a time, free response, grading via
+  `AI.markRecall`
+- **Report** — score, weakest topics, per-question verdict and misses
+- Three follow-through actions: wrong answer → card, wrong answer → reset that
+  card's FSRS state, weak topic → more questions
+- **Extend**: "more" and "harder", appending to the same exam without repeats
+
+**Done when:** "test me on last week" produces a grounded mixed-difficulty exam,
+grades free-text answers, and a wrong answer can become a card or reset the
+card it came from.
+
+---
+
+#### Phase 6 — Unified settings and the run transcript
+
+- Settings kit in `components/ui/`: `SettingRow`, `SelectRow`, `NumberRow`,
+  `SecretRow`, `ModelPicker`
+- `src/lib/resolveSetting.ts` — value **plus provenance**
+- One `SettingsPanel`, three scopes, every row showing where its value came
+  from: `Model: deepseek-chat (from Project)`
+- **Delete** `panes/SettingsPane.tsx` and `chat/SettingsDrawer.tsx`; fix the
+  in-place mutation and `setTick` pattern
+- Surface `store.initReport()` and storage health
+- **Run transcript**: for every AI operation — journal, distil, exam, chat —
+  what was sent, what came back, tokens, cost, elapsed. The debugging tool for
+  everything above and the honest answer to "what is it doing".
+
+**Done when:** every setting lives in one place and states its origin, and any
+operation can be opened up to see exactly what it sent.
+
+---
+
+### v2 — Depth
+
+**Phase 7 — Chat on the journal.** Journal as a `ContextSource`; "discuss this
+entry"; effort dial per message routing model and context depth; memory
+directives extracted from replies into the tray.
+
+**Phase 8 — Files, attachments, `@` picker.** `@` mentions for cards, decks,
+journals, memories, files; drag-drop and paste; project knowledge always
+attached; message-scoped vs pinned; context budget bar.
+
+**Phase 9 — Capture bridge.** A project-aware prompt to paste into another AI,
+and a parser for what it returns — notes, memory candidates, card proposals,
+open threads — in one reviewed commit. The learning you did elsewhere stops
+dying there.
+
+**Phase 10 — Context inspector and cache tuning.** Per-section token counts,
+every memory considered with its component scores, prefix stability checks.
+
+---
+
+### v3 — Later
+
+**Phase 11 — Auto-backup to disk.** File System Access API, folder picked once,
+debounced snapshots, feature-detected.
+
+**Phase 12 — Agent loop behind high effort.** Only here, and only behind the
+dial. Low and medium stay one call forever.
+
+**Phase 13 — Period reports, mind maps, richer media.** Monthly and course-long
+reports; concept maps from memory and cards; images and PDFs in capture.
+
+---
+
+## 10. File map for v1
+
+**New**
+
+```
+src/types/journal.ts                    RawLog, JournalEntry, JournalSummary, PeriodRollup
+src/types/exam.ts                       Exam, ExamQuestion, ExamScope, Difficulty
+src/services/projects.ts                project CRUD
+src/services/journalStore.ts            journal + rollups, IndexedDB + sync cache
+src/services/memoryStore.ts             memory, IndexedDB + sync cache
+src/services/candidates.ts              the staging tray
+src/services/examStore.ts               exams
+src/lib/when.ts                         date-phrase parser
+src/lib/memoryRetrieval.ts              scoring, budget, trace
+src/lib/cardGate.ts                     atomicity / self-containment / duplicate checks
+src/lib/resolveSetting.ts               inheritance with provenance
+src/context/ProjectContext.tsx
+src/context/JournalContext.tsx
+src/components/ProjectSwitcher.tsx
+src/components/journal/CaptureBox.tsx
+src/components/journal/JournalEntryView.tsx
+src/components/journal/Timeline.tsx
+src/components/journal/DistillReview.tsx
+src/components/journal/RollupDiff.tsx       shared with memory consolidation
+src/components/memory/MemoryPanel.tsx
+src/components/memory/CandidateTray.tsx
+src/components/exam/ScopeBuilder.tsx
+src/components/exam/TakeExam.tsx
+src/components/exam/ExamReport.tsx
+src/components/settings/SettingsPanel.tsx
+src/components/settings/{Global,Project,Conversation}Scope.tsx
+src/components/ui/{SettingRow,SelectRow,NumberRow,SecretRow,ModelPicker}.tsx
+src/components/RunTranscript.tsx
+```
+
+**Changed**
+
+```
+src/types.ts                Card.sourceRef; re-export journal + exam types
+src/types/chat.ts           ContextSource += journal
+src/services/idb.ts         v3 journal + rollups, v4 exams
+src/services/backup.ts      new stores, every time one is added
+src/services/store.ts       card provenance on commit
+src/services/ai/index.ts    writeJournal, distill, generateExam, rollup, consolidate
+src/lib/chatContext.ts      memory, knowledge and journal sources
+src/context/RouteContext.tsx  project-scoped routes, journal and exam views
+src/App.tsx                 ProjectProvider, JournalProvider
+```
+
+**Deleted in Phase 6**
+
+```
+src/components/panes/SettingsPane.tsx
+src/components/chat/SettingsDrawer.tsx
+```
+
+---
+
+## 11. Risks
+
+| Risk | Mitigation |
+|---|---|
+| **Journaling becomes a chore and stops** | Capture is zero-friction and zero-cost; journal generation is optional and deferred. A day with raw text and no summary is a valid day. |
+| **Cheap models write vague cards** | The quality gate rewrites rather than drops; local duplicate detection runs before the call; nothing commits unreviewed. |
+| **Exams reduce to a worse review loop** | `connect` and `derive` questions are the point. If a generated exam is all `recall`, the prompt is wrong — fix it there, not by adding features. |
+| **Hallucinated exam questions** | `sourceRefs` on every question, always shown. A question with no source is a bug. |
+| **Memory junk drawer** | Weekly rollup with diff review; hard cap on global; `supersededBy` instead of append-only. |
+| **IndexedDB eviction** | `persist()` already requested in Phase 0; full backup exists; disk auto-backup in v3. |
+| **Scope creep into an agent loop** | Phase 12, behind the effort dial. Nothing before it gets a second call. |
+| **Bundle growth in the review loop** | Journal, exam and memory UI lazy-loaded like `ChatView` already is. |
+
+---
+
+## 12. Appendix — prompt sketches
+
+Wording will need tuning; the structure should not.
+
+**Journal**
+
+> Below is what the learner did today, in their own words, possibly messy and
+> out of order. Write their log entry.
+>
+> `narrative` is 2–5 sentences in second person — the shape of the day, not a
+> list. Be concrete and do not flatter. If the day was thin, say so briefly
+> rather than inflating it.
+>
+> `stuck` is the most important field: capture the *specific* confusion, not
+> the topic. "Could not see why the chain rule gives that ordering" beats
+> "struggled with backprop". If they were not stuck on anything, leave it
+> empty rather than inventing difficulty.
+>
+> `open` is anything raised and not resolved — a question they asked and
+> dropped, a thing they said they would look up. Leave empty rather than
+> padding.
+>
+> Use only what is in the text. Do not add facts, do not correct their
+> understanding, do not teach. Reply as one fenced `drill-journal` JSON block.
+
+**Distill**
+
+> From this journal entry, produce two things.
+>
+> Memories: only what is durable. Prefer few and sharp. Never record what can
+> be computed from review history — which cards are failing, how many are due,
+> streaks. Record how they think, what framing works, what they have settled
+> on, and what they left unresolved.
+>
+> Cards: weighted toward `stuck` and `learned`. Every card must be atomic (one
+> fact), self-contained (answerable in six months with no memory of today — no
+> "the trick", "the paper", "as discussed"), and demand recall rather than
+> recognition. If a draft card fails any of these, rewrite it before returning
+> it. The existing cards listed above are already covered; do not duplicate
+> them.
+
+**Exam generation**
+
+> Build an exam from the material below, weighted toward the `{level}` rung.
+>
+> Do not simply restate flashcards. At least half the questions must span two
+> or more sources — connect ideas learned separately, apply something to a new
+> case, derive a result from a stated convention, or diagnose an error.
+>
+> Every question carries `sourceRefs` naming exactly what it was built from.
+> If you cannot ground a question in the material, do not write it. Fewer,
+> well-founded questions beat a full set with invented ones.
+>
+> `expected` states what a correct answer must contain — the marking key, not
+> a model answer.
+
+**Weekly rollup**
+
+> These are the learner's daily entries for this period. Write the period
+> summary: the themes that actually recurred, what changed in their
+> understanding, and what is still open. Then propose updates to project
+> memory — new entries, merges of things now known to be the same, and
+> retirements of anything these entries have superseded. Mark each retirement
+> with the id it replaces. Invent nothing not present in the entries.

@@ -1,0 +1,161 @@
+{
+ "name": "Maths foundations for ML",
+ "cards": [
+  {
+   "id": "mf1",
+   "tag": "Shapes",
+   "q": "<code>A</code> is <code>(m, n)</code>, <code>B</code> is <code>(n, p)</code>. What shape is <code>AB</code>?",
+   "a": "<p><code>(m, p)</code>.</p><div class='shape'>(m, n) @ (n, p) -> (m, p)\n      ^     ^\n   these must match, and they vanish</div><p><em>Every shape bug in a forward pass is this rule being broken somewhere.</em></p>"
+  },
+  {
+   "id": "mf2",
+   "tag": "Shapes",
+   "q": "What does a matrix <strong>do</strong>, in one sentence?",
+   "a": "<p>It is a <strong>linear map</strong> — it takes a vector in and gives a vector out, stretching and rotating space without bending it.</p><p><em>Stop reading matrices as grids of numbers and start reading them as verbs.</em></p>"
+  },
+  {
+   "id": "mf3",
+   "tag": "Shapes",
+   "q": "Where do you read a matrix's columns?",
+   "a": "<p>Column <var>j</var> is <strong>where the <var>j</var>-th basis vector lands</strong> after the map.</p><p><em>That single fact makes most of matrix multiplication obvious: you are just asking where each axis goes.</em></p>"
+  },
+  {
+   "id": "mf4",
+   "tag": "Shapes",
+   "q": "Why is <code>AB ≠ BA</code> in general?",
+   "a": "<p>Because they are compositions of maps, and order changes the result. Rotate then stretch is not stretch then rotate.</p><p><em>The rare cases where they do commute are worth noticing — they usually mean the two maps share eigenvectors.</em></p>"
+  },
+  {
+   "id": "mf5",
+   "tag": "Vectors",
+   "q": "Write the dot product <code>x · y</code>.",
+   "a": "<div class='formula'>x · y = Σᵢ xᵢ yᵢ</div><div class='shape'>np.dot(x, y)   # (n,) with (n,) -> scalar</div>"
+  },
+  {
+   "id": "mf6",
+   "tag": "Vectors",
+   "q": "<code>x · y = 0</code>. What does that tell you?",
+   "a": "<p>The two vectors are <strong>orthogonal</strong> — at right angles, no shared direction.</p><p><em>This is why the dot product shows up wherever a model asks \"how much of this is in that?\"</em></p>"
+  },
+  {
+   "id": "mf7",
+   "tag": "Vectors",
+   "q": "Write <code>‖x‖₂</code>.",
+   "a": "<div class='formula'>‖x‖₂ = √(Σᵢ xᵢ²)</div><p><em>It is just Pythagoras in <var>n</var> dimensions, and it is the same quantity as <code>√(x · x)</code>.</em></p>"
+  },
+  {
+   "id": "mf8",
+   "tag": "Linear algebra",
+   "q": "What is the <strong>rank</strong> of a matrix?",
+   "a": "<p>The number of <strong>independent directions that survive</strong> the map — the dimension of its column space.</p><p><em>Rank below <code>min(m, n)</code> means the map squashes space, and squashing cannot be undone.</em></p>"
+  },
+  {
+   "id": "mf9",
+   "tag": "Linear algebra",
+   "q": "<code>A</code> is square. When does <code>A⁻¹</code> fail to exist?",
+   "a": "<p>When <code>det(A) = 0</code> — the map collapses at least one dimension to zero.</p><p><em>Information that was destroyed cannot be recovered, so there is nothing to invert. \"Singular matrix\" in an error log means exactly this.</em></p>"
+  },
+  {
+   "id": "mf10",
+   "tag": "Linear algebra",
+   "q": "What does <code>Av = λv</code> say about <code>v</code>?",
+   "a": "<p><code>v</code> is an <strong>eigenvector</strong>: the map leaves its direction alone and only scales it, by <code>λ</code>.</p><p><em>The eigenvectors are the axes along which a transformation is simple. Finding them is finding the coordinate system the problem wanted all along.</em></p>"
+  },
+  {
+   "id": "mf11",
+   "tag": "Linear algebra",
+   "q": "Why is <code>XᵀX</code> always symmetric?",
+   "a": "<div class='formula'>(XᵀX)ᵀ = Xᵀ(Xᵀ)ᵀ = XᵀX</div><p><em>Transposing it gives it back. This is why the normal equations behave so well — symmetric matrices have real eigenvalues and orthogonal eigenvectors.</em></p>"
+  },
+  {
+   "id": "mf12",
+   "tag": "Calculus",
+   "q": "<code>∂J/∂w</code> — say it in plain words.",
+   "a": "<p>How much <code>J</code> changes per unit change in <code>w</code>, with everything else held still.</p><p><em>It is a slope, not a step. The step is the slope times the learning rate.</em></p>"
+  },
+  {
+   "id": "mf13",
+   "tag": "Calculus",
+   "q": "Write the chain rule for <code>z = f(g(x))</code>.",
+   "a": "<div class='formula'>dz/dx = f′(g(x)) · g′(x)</div><p><em>Backpropagation is this line applied repeatedly, right to left. Nothing else.</em></p>"
+  },
+  {
+   "id": "mf14",
+   "tag": "Calculus",
+   "q": "What shape is <code>∇f</code> if <code>f</code> takes <var>n</var> inputs?",
+   "a": "<p><code>(n,)</code> — one partial derivative per input.</p><p><em>The gradient always has the shape of the thing you are differentiating with respect to. That is the fastest shape check you have.</em></p>"
+  },
+  {
+   "id": "mf15",
+   "tag": "Calculus",
+   "q": "Why does gradient descent <strong>subtract</strong> the gradient?",
+   "a": "<p>The gradient points in the direction of steepest <strong>increase</strong>. You want to go down, so you step the other way.</p><div class='formula'>w := w − α ∂J/∂w</div>"
+  },
+  {
+   "id": "mf16",
+   "tag": "Calculus",
+   "q": "Differentiate <code>σ(z) = 1 / (1 + e⁻ᶻ)</code>.",
+   "a": "<div class='formula'>σ′(z) = σ(z)·(1 − σ(z))</div><p><em>The derivative is written in terms of the function's own output, which is why a sigmoid layer is cheap to backprop through — you already have the number you need.</em></p>"
+  },
+  {
+   "id": "mf17",
+   "tag": "Calculus",
+   "q": "What breaks when the learning rate is too large?",
+   "a": "<p>You overshoot the minimum and land further up the other side. Cost <strong>rises</strong> instead of falling, often to <code>inf</code> or <code>nan</code>.</p><p><em>A cost that climbs on the first few iterations is almost never a bad model — it is α.</em></p>"
+  },
+  {
+   "id": "mf18",
+   "tag": "Calculus",
+   "q": "Why is a <strong>convex</strong> cost worth having?",
+   "a": "<p>Every local minimum is the global minimum, so gradient descent cannot get stuck in a bad one.</p><p><em>Linear and logistic regression have this. Neural networks do not, which is why so much of deep learning is about escaping bad places rather than proving you found the best one.</em></p>"
+  },
+  {
+   "id": "mf19",
+   "tag": "Probability",
+   "q": "Write Bayes' rule.",
+   "a": "<div class='formula'>P(A | B) = P(B | A) · P(A) / P(B)</div><p><em>It converts the conditional you can measure into the one you actually want.</em></p>"
+  },
+  {
+   "id": "mf20",
+   "tag": "Probability",
+   "q": "Define <code>E[X]</code> for a discrete <code>X</code>.",
+   "a": "<div class='formula'>E[X] = Σₓ x · P(X = x)</div><p><em>A weighted average where the weights are probabilities. Every loss you minimise is an expectation estimated from a sample.</em></p>"
+  },
+  {
+   "id": "mf21",
+   "tag": "Probability",
+   "q": "What does <strong>variance</strong> measure?",
+   "a": "<div class='formula'>Var(X) = E[(X − E[X])²]</div><p>The average squared distance from the mean.</p><p><em>Squared, so spread in either direction counts, and so far-out points count much more than near ones.</em></p>"
+  },
+  {
+   "id": "mf22",
+   "tag": "Probability",
+   "q": "When may you write <code>P(A, B) = P(A)·P(B)</code>?",
+   "a": "<p>Only when <code>A</code> and <code>B</code> are <strong>independent</strong>.</p><p><em>Naive Bayes is called naive because it assumes this about features that plainly are not independent — and still works often enough to be worth knowing.</em></p>"
+  },
+  {
+   "id": "mf23",
+   "tag": "Probability",
+   "q": "Why maximise the <strong>log</strong>-likelihood rather than the likelihood?",
+   "a": "<p>A product of thousands of probabilities underflows to zero. <code>log</code> turns the product into a sum, which is stable and differentiable term by term.</p><p><em>The answer does not change: <code>log</code> is monotonic, so the argmax is the same.</em></p>"
+  },
+  {
+   "id": "mf24",
+   "tag": "Practice",
+   "q": "Why standardise features before running gradient descent?",
+   "a": "<p>Features on wildly different scales make the cost surface a long thin valley, and descent zigzags across it instead of running down it.</p><div class='shape'>x_norm = (x - x.mean(axis=0)) / x.std(axis=0)</div>"
+  },
+  {
+   "id": "mf25",
+   "tag": "Practice",
+   "q": "<code>argmin</code> versus <code>min</code> — what is the difference?",
+   "a": "<p><code>min</code> gives you the smallest <strong>value</strong>. <code>argmin</code> gives you the <strong>input</strong> that achieves it.</p><p><em>Training wants argmin: you keep the parameters, not the loss.</em></p>"
+  },
+  {
+   "id": "mf26",
+   "tag": "Practice",
+   "q": "Your data doubles. What happens to an <code>O(n)</code> step versus an <code>O(n²)</code> one?",
+   "a": "<p><code>O(n)</code> takes twice as long. <code>O(n²)</code> takes <strong>four</strong> times as long.</p><p><em>This is the whole argument for stochastic and mini-batch methods: they keep the per-step cost linear in what you touch, not in what you own.</em></p>"
+  }
+ ]
+}

@@ -1,0 +1,401 @@
+{
+ "name": "ML — Course 1",
+ "cards": [
+  {
+   "id": "n1",
+   "tag": "Notation",
+   "q": "<code>m</code>",
+   "a": "<p>Number of <strong>training examples</strong> — the rows.</p><div class='shape'>m = X.shape[0]</div>"
+  },
+  {
+   "id": "n2",
+   "tag": "Notation",
+   "q": "<code>n</code>",
+   "a": "<p>Number of <strong>features</strong> — the columns.</p><div class='shape'>n = X.shape[1]</div>"
+  },
+  {
+   "id": "n3",
+   "tag": "Notation",
+   "q": "<code>x⁽ⁱ⁾</code> — and what's the trap?",
+   "a": "<p>The <strong>i-th training example</strong>. In code, <code>X[i]</code>.</p><p><em>The superscript is an index, not a power.</em></p>"
+  },
+  {
+   "id": "n4",
+   "tag": "Notation",
+   "q": "<code>x⁽ⁱ⁾ⱼ</code>",
+   "a": "<p>Feature <var>j</var> of the <var>i</var>-th example — one single number.</p><div class='shape'>X[i, j]</div>"
+  },
+  {
+   "id": "n5",
+   "tag": "Notation",
+   "q": "<code>y</code> versus <code>ŷ</code>",
+   "a": "<p><code>y</code> is the <strong>true</strong> value from your data. <code>ŷ</code> is your model's <strong>guess</strong>.</p><p><em>All of training is shrinking the gap between them. When a formula confuses you, check which of the two you're looking at first.</em></p>"
+  },
+  {
+   "id": "n6",
+   "tag": "Notation",
+   "q": "<code>w</code> and <code>b</code> — what are they, and what shape?",
+   "a": "<p><code>w</code> = weight(s). Scalar with one feature, vector <code>(n,)</code> with n features.</p><p><code>b</code> = bias / intercept. <strong>Always a scalar</strong>, however many features you have.</p>"
+  },
+  {
+   "id": "n7",
+   "tag": "Notation",
+   "q": "<code>α</code>",
+   "a": "<p>The <strong>learning rate</strong> — how big a step gradient descent takes each iteration.</p>"
+  },
+  {
+   "id": "n8",
+   "tag": "Notation",
+   "q": "<code>J(w,b)</code>",
+   "a": "<p>The <strong>cost function</strong>. One number scoring how good the current parameters are. Lower is better, zero is perfect.</p>"
+  },
+  {
+   "id": "n9",
+   "tag": "Notation",
+   "q": "Of <code>X</code>, <code>y</code>, <code>w</code>, <code>b</code>, <code>J</code> — which actually move during training?",
+   "a": "<p>Only <strong>w and b</strong>.</p><p><code>X</code> and <code>y</code> are fixed data. <code>J</code> is just the score that falls out. Training = nudging w and b to shrink J.</p>"
+  },
+  {
+   "id": "n10",
+   "tag": "Notation",
+   "q": "The course writes <code>x⁽¹⁾</code> for the first example. What does NumPy call it?",
+   "a": "<p><code>X[0]</code>.</p><p><em>Maths indexes from 1, code indexes from 0. Same thing, offset by one.</em></p>"
+  },
+  {
+   "id": "m1",
+   "tag": "The model",
+   "q": "Model with one feature — write it.",
+   "a": "<div class='formula'>f_{w,b}(x) = wx + b</div><p>School maths called it <em>y = mx + c</em>. Nothing changed but the letters.</p>"
+  },
+  {
+   "id": "m2",
+   "tag": "The model",
+   "q": "Model with n features — write it.",
+   "a": "<div class='formula'>f_{w,b}(\\vec{x}) = \\vec{w} \\cdot \\vec{x} + b</div><div class='shape'>np.dot(w, x) + b</div>"
+  },
+  {
+   "id": "m3",
+   "tag": "The model",
+   "q": "What does <code>w</code> do to the line? What does <code>b</code> do?",
+   "a": "<p><code>w</code> <strong>tilts</strong> it — bigger w is steeper, negative w points it downhill.</p><p><code>b</code> <strong>slides</strong> the whole line up or down without changing the tilt.</p>"
+  },
+  {
+   "id": "c1",
+   "tag": "Cost",
+   "q": "Squared error cost — write it.",
+   "a": "<div class='formula'>J(w,b) = \\frac{1}{2m} \\sum_{i=0}^{m-1} \\left( f(x^{(i)}) - y^{(i)} \\right)^2</div><p>The average of the squared gaps between prediction and truth.</p>"
+  },
+  {
+   "id": "c2",
+   "tag": "Cost",
+   "q": "Why square the error?",
+   "a": "<p>Two jobs at once:</p><p>It <strong>kills the sign</strong>, so +5 and −5 are equally bad and can't cancel each other out.</p><p>And it <strong>punishes big misses disproportionately</strong> — a miss of 10 costs four times a miss of 5.</p>"
+  },
+  {
+   "id": "c3",
+   "tag": "Cost",
+   "q": "Why divide by <code>m</code>?",
+   "a": "<p>To <strong>average</strong> it. Without that, a dataset with 10,000 rows automatically scores worse than one with 10 — even if the line fits better.</p>"
+  },
+  {
+   "id": "c4",
+   "tag": "Cost",
+   "q": "Why the extra <code>1/2</code>?",
+   "a": "<p>Pure convenience. When you differentiate the square, a 2 falls out and cancels it, so the gradient formula comes out clean.</p><p><em>It has no effect on where the minimum is.</em></p>"
+  },
+  {
+   "id": "c5",
+   "tag": "Cost",
+   "q": "Hold <code>b</code> fixed and plot <code>J</code> against <code>w</code>. What shape?",
+   "a": "<p>A <strong>U-shaped parabola</strong>.</p><p>Let both vary and you get a 3-D bowl, usually drawn as a contour plot — concentric rings, minimum at the centre.</p>"
+  },
+  {
+   "id": "c6",
+   "tag": "Cost",
+   "q": "Why does the bowl shape matter so much?",
+   "a": "<p>Squared-error cost with a linear model is <strong>convex</strong> — one global minimum, no local traps. A bowl has exactly one bottom, so whatever point you start from, walking downhill gets you there.</p><p><em>Neural networks later have non-convex costs. That's when local minima become a real concern.</em></p>"
+  },
+  {
+   "id": "g1",
+   "tag": "Gradient descent",
+   "q": "The update rule — both lines.",
+   "a": "<div class='formula'>\\begin{aligned} w &= w - \\alpha \\frac{\\partial J}{\\partial w} \\\\ b &= b - \\alpha \\frac{\\partial J}{\\partial b} \\end{aligned}</div>"
+  },
+  {
+   "id": "g2",
+   "tag": "Gradient descent",
+   "q": "Gradient with respect to <code>w</code>, one feature.",
+   "a": "<div class='formula'>\\frac{\\partial J}{\\partial w} = \\frac{1}{m} \\sum_{i=0}^{m-1} \\left( f(x^{(i)}) - y^{(i)} \\right) x^{(i)}</div>"
+  },
+  {
+   "id": "g3",
+   "tag": "Gradient descent",
+   "q": "Gradient with respect to <code>b</code>.",
+   "a": "<div class='formula'>\\frac{\\partial J}{\\partial b} = \\frac{1}{m} \\sum_{i=0}^{m-1} \\left( f(x^{(i)}) - y^{(i)} \\right)</div><p><em>Identical to the w gradient minus the trailing x.</em></p>"
+  },
+  {
+   "id": "g4",
+   "tag": "Gradient descent",
+   "q": "Why does the <code>w</code> gradient multiply each error by <code>x⁽ⁱ⁾</code>, but the <code>b</code> gradient doesn't?",
+   "a": "<p>Because <code>w</code> is <strong>attached to x</strong>. How much w should change depends on how big x was — a big feature value means w has a big effect on that prediction.</p><p><code>b</code> is added on its own, so it just takes the raw error.</p>"
+  },
+  {
+   "id": "g5",
+   "tag": "Gradient descent",
+   "q": "The slope at your current <code>w</code> is <strong>positive</strong>. What happens, and why is it right?",
+   "a": "<p>Cost rises as w grows, so subtracting makes w <strong>smaller</strong> — away from the uphill direction. Correct.</p><p><em>Negative slope: subtracting a negative makes w bigger. Also correct. The rule handles both without you thinking about it.</em></p>"
+  },
+  {
+   "id": "g6",
+   "tag": "Gradient descent",
+   "q": "The slope is <strong>zero</strong>. What now?",
+   "a": "<p>You're at the bottom. <code>w − α×0 = w</code>, so the parameter stops moving.</p><p>That's <strong>convergence</strong>.</p>"
+  },
+  {
+   "id": "g7",
+   "tag": "Gradient descent",
+   "q": "What is the minus sign in the update rule doing?",
+   "a": "<p>Turning <strong>“which way is uphill”</strong> into <strong>“go the other way”</strong>. The derivative points up the slope; you want down.</p>"
+  },
+  {
+   "id": "g8",
+   "tag": "Gradient descent",
+   "q": "Simultaneous update — what does it mean and what's the wrong version?",
+   "a": "<p>Compute <strong>both gradients from the old values</strong>, then assign both.</p><div class='shape'>tmp_w = w - alpha * dj_dw\ntmp_b = b - alpha * dj_db\nw = tmp_w\nb = tmp_b</div><p><em>Assigning w first means dj_db gets computed from a w that already moved. That's a genuinely different algorithm.</em></p>"
+  },
+  {
+   "id": "g9",
+   "tag": "Gradient descent",
+   "q": "What does <strong>batch</strong> mean in “batch gradient descent”?",
+   "a": "<p>Every single update step uses <strong>all m examples</strong>.</p><p><em>Stochastic and mini-batch variants use subsets — later in the specialisation.</em></p>"
+  },
+  {
+   "id": "g10",
+   "tag": "Gradient descent",
+   "q": "Gradient with respect to <code>wⱼ</code>, n features. What's the only new thing?",
+   "a": "<div class='formula'>\\frac{\\partial J}{\\partial w_j} = \\frac{1}{m} \\sum_{i=0}^{m-1} \\left( f(x^{(i)}) - y^{(i)} \\right) x_j^{(i)}</div><p>Only the subscript <code>j</code>. You now compute one gradient <strong>per feature</strong> instead of one gradient total — all updated simultaneously.</p>"
+  },
+  {
+   "id": "a1",
+   "tag": "Learning rate",
+   "q": "α is <strong>too large</strong>. What do you see?",
+   "a": "<p>Steps overshoot the minimum and land further out each time. Cost <strong>increases</strong>, oscillates, or goes to <code>NaN</code>.</p>"
+  },
+  {
+   "id": "a2",
+   "tag": "Learning rate",
+   "q": "α is <strong>too small</strong>. What do you see?",
+   "a": "<p>It still works — the cost decreases on every iteration. It just takes forever.</p>"
+  },
+  {
+   "id": "a3",
+   "tag": "Learning rate",
+   "q": "How do you diagnose α?",
+   "a": "<p>Plot <code>J</code> against iteration number — the learning curve.</p><p>It should decrease on <strong>every single iteration</strong>. If it ever goes up: α too big, or you have a bug. If it's still visibly falling at the end: run longer.</p>"
+  },
+  {
+   "id": "a4",
+   "tag": "Learning rate",
+   "q": "Standard procedure for picking α?",
+   "a": "<p>Try values roughly <strong>3× apart</strong>:</p><div class='shape'>0.001  0.003  0.01  0.03  0.1  0.3</div><p>Pick the largest one that still decreases smoothly.</p>"
+  },
+  {
+   "id": "a5",
+   "tag": "Learning rate",
+   "q": "Why don't you need to shrink α as you approach the minimum?",
+   "a": "<p>Because the steps shrink themselves. Near the bottom the slope flattens, so <code>α × slope</code> gets smaller automatically.</p><p><em>Fixed α, naturally decelerating steps.</em></p>"
+  },
+  {
+   "id": "f1",
+   "tag": "Multiple features",
+   "q": "Multiple linear regression vs multivariate regression.",
+   "a": "<p><strong>Multiple</strong> linear regression: many inputs, <strong>one</strong> output. That's this course.</p><p><strong>Multivariate</strong> regression: many outputs. Different technique entirely.</p><p><em>This shows up in quizzes.</em></p>"
+  },
+  {
+   "id": "f2",
+   "tag": "Multiple features",
+   "q": "Going from 1 feature to n — what changes, and what stays identical?",
+   "a": "<p><strong>Changes:</strong> <code>w</code>, <code>x</code> and <code>dj_dw</code> become vectors of shape <code>(n,)</code>.</p><p><strong>Identical:</strong> the cost function, the update rule, and all the learning-rate logic.</p><p><em>That's the whole conceptual content of the first half of week 2.</em></p>"
+  },
+  {
+   "id": "f3",
+   "tag": "Multiple features",
+   "q": "Shapes of <code>X</code>, <code>y</code>, <code>w</code>, <code>b</code>.",
+   "a": "<div class='shape'>X   (m, n)   m rows = examples, n cols = features\ny   (m,)     one true answer per example\nw   (n,)     one weight per feature\nb   scalar   still just one number</div>"
+  },
+  {
+   "id": "f4",
+   "tag": "Multiple features",
+   "q": "A house is 1416 sq ft, 3 bed, 2 floors, 40 years old. Write <code>x⁽ⁱ⁾</code>, give its shape, and say where its price lives.",
+   "a": "<div class='shape'>x⁽ⁱ⁾ = [1416, 3, 2, 40]    shape (4,)</div><p>Its price sits in <code>y[i]</code>.</p>"
+  },
+  {
+   "id": "f5",
+   "tag": "Multiple features",
+   "q": "What is <code>w · x</code> actually doing?",
+   "a": "<p>Multiplying each weight by its matching feature and summing the lot — <code>w₀x₀ + w₁x₁ + … + wₙ₋₁xₙ₋₁</code>.</p><p>The long form, written in three characters. Result is one <strong>scalar</strong>.</p>"
+  },
+  {
+   "id": "v1",
+   "tag": "Vectorization",
+   "q": "Replace this loop.<div class='shape'>f = 0\nfor j in range(n):\n    f += w[j] * x[j]\nf += b</div>",
+   "a": "<div class='shape'>f = np.dot(w, x) + b</div>"
+  },
+  {
+   "id": "v2",
+   "tag": "Vectorization",
+   "q": "Why is <code>np.dot</code> so much faster than the loop?",
+   "a": "<p>The loop runs one multiplication at a time in the Python interpreter.</p><p><code>np.dot</code> hands the whole array to optimised C that uses <strong>SIMD</strong> — Single Instruction, Multiple Data — doing many multiplications <em>in parallel</em>, then summing.</p>"
+  },
+  {
+   "id": "v3",
+   "tag": "Vectorization",
+   "q": "Vectorize the weight update for n = 16.",
+   "a": "<div class='shape'>w = w - 0.1 * dj_dw</div><p>All 16 at once, instead of a loop over <code>j</code>.</p>"
+  },
+  {
+   "id": "v4",
+   "tag": "Vectorization",
+   "q": "Why does <code>w - alpha * dj_dw</code> work on whole arrays?",
+   "a": "<p>NumPy applies arithmetic <strong>element-wise</strong> across arrays of the same shape. <code>alpha * dj_dw</code> scales every element; the subtraction pairs them up index by index.</p>"
+  },
+  {
+   "id": "v5",
+   "tag": "Vectorization",
+   "q": "Why does vectorization matter <em>at scale</em>, not just for tidiness?",
+   "a": "<p>Gradient descent runs this operation once per example, per iteration, for thousands of iterations.</p><p>On 10 million elements it's hundreds of milliseconds versus a few. At that scale it's the difference between a model that trains and one that doesn't.</p>"
+  },
+  {
+   "id": "p1",
+   "tag": "NumPy",
+   "q": "Four ways to make a 1-D array of length 4.",
+   "a": "<div class='shape'>np.zeros(4)              [0. 0. 0. 0.]\nnp.arange(4.)            [0. 1. 2. 3.]\nnp.random.rand(4)        4 floats in [0,1)\nnp.array([5,4,3,2])      manual</div><p><em><code>np.zeros(4)</code> and <code>np.zeros((4,))</code> are the same thing.</em></p>"
+  },
+  {
+   "id": "p2",
+   "tag": "NumPy",
+   "q": "<code>a = np.arange(10)</code>. What is <code>a[2:7:2]</code>?",
+   "a": "<div class='shape'>[2 4 6]</div><p><code>start:stop:step</code> — and <strong>stop is excluded</strong>.</p>"
+  },
+  {
+   "id": "p3",
+   "tag": "NumPy",
+   "q": "On a 2-D array: <code>a[1]</code> versus <code>a[1, 3]</code>.",
+   "a": "<p><strong>One index</strong> → the whole row, a 1-D array.</p><p><strong>Both indices</strong> → a single scalar.</p><p><em>That first case is exactly how <code>X[i]</code> hands you one training example, ready for np.dot.</em></p>"
+  },
+  {
+   "id": "p4",
+   "tag": "NumPy",
+   "q": "<code>a</code> has shape <code>(2,10)</code>. What is <code>a[:, 2]</code>, and what shape?",
+   "a": "<p>The whole of column 2, as a <strong>1-D array of shape (2,)</strong>.</p><p><em><code>:</code> on its own means “everything along this axis”.</em></p>"
+  },
+  {
+   "id": "p5",
+   "tag": "NumPy",
+   "q": "<code>np.arange(6).reshape(-1, 2)</code> — what does the <code>-1</code> mean and what comes out?",
+   "a": "<p>“2 columns, and work out the rows yourself.” With 6 elements it infers 3.</p><div class='shape'>[[0 1]\n [2 3]\n [4 5]]</div>"
+  },
+  {
+   "id": "p6",
+   "tag": "NumPy",
+   "q": "What does <code>np.dot(a, b)</code> return, and what's the requirement?",
+   "a": "<p>Always a <strong>scalar</strong>, never an array.</p><p>Both vectors must be the <strong>same length</strong>.</p>"
+  },
+  {
+   "id": "p7",
+   "tag": "NumPy",
+   "q": "Two array attributes you'll check constantly.",
+   "a": "<p><code>a.shape</code> — the dimensions.</p><p><code>a.dtype</code> — the element type.</p>"
+  },
+  {
+   "id": "d1",
+   "tag": "Debugging",
+   "q": "First move when anything breaks.",
+   "a": "<div class='shape'>print(X.shape, w.shape, y.shape)</div><p>Nearly every error in this course is a shape problem, and the mismatch is almost always visible immediately.</p>"
+  },
+  {
+   "id": "d2",
+   "tag": "Debugging",
+   "q": "<code>np.dot(X, w)</code> versus <code>np.dot(X[i], w)</code>.",
+   "a": "<p><code>np.dot(X, w)</code> → a prediction for <strong>every example at once</strong>, shape <code>(m,)</code>.</p><p><code>np.dot(X[i], w)</code> → <strong>one scalar</strong>, the prediction for example i.</p>"
+  },
+  {
+   "id": "d3",
+   "tag": "Debugging",
+   "q": "Is <code>(4,)</code> the same as <code>(4,1)</code>?",
+   "a": "<p><strong>No.</strong> A 1-D vector and a column matrix behave differently in arithmetic — and can silently broadcast into a <code>(4,4)</code> result instead of erroring.</p><p><code>.reshape(-1)</code> flattens back to 1-D.</p>"
+  },
+  {
+   "id": "d4",
+   "tag": "Debugging",
+   "q": "How do you initialise <code>dj_dw</code>, and why not <code>0</code>?",
+   "a": "<div class='shape'>dj_dw = np.zeros((n,))</div><p>It has to accumulate one gradient <strong>per feature</strong>. A plain <code>0</code> gives you a scalar and the shapes fall apart.</p>"
+  },
+  {
+   "id": "d5",
+   "tag": "Debugging",
+   "q": "<code>operands could not be broadcast together with shapes (4,) (2,)</code> — read it.",
+   "a": "<p>It tried to pair a 4-element array with a 2-element one, element by element, and there's no pairing that works.</p><p><em>The two shapes in the message are exactly the two things to go look at.</em></p>"
+  },
+  {
+   "id": "d6",
+   "tag": "Debugging",
+   "q": "Cost goes up, or becomes NaN. Where do you look?",
+   "a": "<p><strong>Not</strong> at shapes. That's α being too large.</p><p>Divide it by 10.</p>"
+  },
+  {
+   "id": "d7",
+   "tag": "Debugging",
+   "q": "Trace the shapes.<div class='shape'>err = (np.dot(X[i], w) + b) - y[i]\ndj_dw += err * X[i]</div>",
+   "a": "<div class='shape'>X[i]             (n,)     one example\nnp.dot(X[i], w)  scalar   prediction, pre-bias\nerr              scalar   prediction minus truth\nerr * X[i]       (n,)     scalar × vector, element-wise\ndj_dw            (n,)     one gradient per feature</div>"
+  },
+  {
+   "id": "d8",
+   "tag": "Debugging",
+   "q": "In the n-feature gradient function, the loop over features is gone but the loop over examples stays. Why?",
+   "a": "<p>The <code>j</code> loop got absorbed into <code>np.dot(X[i], w)</code> and <code>err * X[i]</code>.</p><p>The <code>i</code> loop can be vectorized away too — the course shows that later.</p>"
+  },
+  {
+   "id": "k1",
+   "tag": "Concepts",
+   "q": "Supervised versus unsupervised — what's the single test?",
+   "a": "<p><strong>Are there labels?</strong></p><p>Emails already tagged spam / not spam, learn to detect spam → supervised. Emails with no tags, find groups of similar ones → unsupervised.</p>"
+  },
+  {
+   "id": "k2",
+   "tag": "Concepts",
+   "q": "Regression versus classification.",
+   "a": "<p><strong>Regression</strong> → a number, from infinitely many possible values.</p><p><strong>Classification</strong> → one of a small, fixed set of categories.</p><p><em>It's about the output, not the input.</em></p>"
+  },
+  {
+   "id": "k3",
+   "tag": "Concepts",
+   "q": "Predicting a house's price, versus predicting whether it sells within 30 days.",
+   "a": "<p>Price → <strong>regression</strong>. Sells-in-30-days → <strong>classification</strong>.</p><p><em>Same data, different question. That's the whole distinction.</em></p>"
+  },
+  {
+   "id": "k4",
+   "tag": "Concepts",
+   "q": "Clustering — what and an example.",
+   "a": "<p>Groups similar examples together <strong>without being told what the groups are</strong>.</p><p>Google News grouping articles about the same story; DNA microarray grouping.</p>"
+  },
+  {
+   "id": "k5",
+   "tag": "Concepts",
+   "q": "Anomaly detection — what and an example.",
+   "a": "<p>Flags examples that look <strong>unlike the rest</strong>.</p><p>Fraudulent transactions; a machine part about to fail.</p>"
+  },
+  {
+   "id": "k6",
+   "tag": "Concepts",
+   "q": "Dimensionality reduction — what and why.",
+   "a": "<p>Compresses many features into fewer while keeping the signal.</p><p>Squashing 100 features down to 2 so you can actually plot them.</p>"
+  },
+  {
+   "id": "k7",
+   "tag": "Concepts",
+   "q": "The three moves this entire course repeats.",
+   "a": "<p><strong>1.</strong> Pick a formula with unknown numbers in it.</p><p><strong>2.</strong> Define what “wrong” means.</p><p><strong>3.</strong> Nudge the numbers until it stops being wrong.</p><p><em>Multiple features, vectorization, feature scaling, logistic regression — all variations on those three.</em></p>"
+  }
+ ]
+}

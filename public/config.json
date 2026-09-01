@@ -1,0 +1,48 @@
+{
+  "_": [
+    "Drill's default configuration. Committed, so keep it free of secrets.",
+    "",
+    "To set your own: copy this file to config.local.json and edit that.",
+    "config.local.json is gitignored and overrides anything here.",
+    "",
+    "If you open Drill by double-clicking index.html (a file:// page), the",
+    "browser will not let it read config.local.json. run.bat converts the file",
+    "into config.local.js for you; run it once after editing your config.",
+    "",
+    "Every field below can also be set in the app under Menu -> Settings, and",
+    "what you set there wins over what is written here."
+  ],
+
+  "inference": {
+    "_": "type: openrouter | ollama | openai | anthropic | custom",
+    "type": "openrouter",
+    "apiKey": "",
+    "model": "",
+    "baseUrl": "",
+    "temperature": 0.4,
+    "headers": {}
+  },
+
+  "decks": {
+    "_": "defaultPath is where the Example decks browser looks. autoSync only means Drill checks that folder on startup when it is served over http; there is no cloud sync and nothing leaves your machine.",
+    "defaultPath": "./decks",
+    "autoSync": true
+  },
+
+  "ui": {
+    "_": "Starting values for a fresh install. Changing them later has no effect once your browser has a database; use Settings instead.",
+    "retentionTarget": 0.9,
+    "newPerDay": 10,
+    "language": "en"
+  },
+
+  "fsrs": {
+    "_": "weights: null uses the pinned FSRS-6 defaults. Supply an array of exactly 21 numbers to use your own optimised set; anything else falls back to the defaults.",
+    "weights": null,
+    "maxInterval": 365,
+    "learningSteps": [10],
+    "relearningSteps": [10],
+    "fuzz": true,
+    "leechThreshold": 4
+  }
+}

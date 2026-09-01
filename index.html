@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2b2723">
+<meta name="description" content="Drill — spaced repetition, a journal, generated exams and a tutor that knows what you keep forgetting.">
+<title>Drill</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Serif to read, sans for the machinery, mono for what the computer said.
+     Source Serif 4 is loaded with its italic: the reading surfaces use real
+     italics for emphasis, and a synthesised oblique is the fastest way to
+     make a page stop looking typeset. -->
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400..700;1,8..60,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+/* Set the printing before first paint. Without this the page renders night,
+   then flips to day one frame later for anyone who chose paper — the exact
+   flash the setting exists to avoid. Deliberately tiny and failure-tolerant:
+   a corrupt or absent store just leaves the night default in the markup. */
+(function () {
+  try {
+    var raw = localStorage.getItem("mldrill:v3");
+    if (!raw) return;
+    var theme = (JSON.parse(raw).settings || {}).theme;
+    if (theme === "day") {
+      document.documentElement.dataset.theme = "day";
+      var m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.setAttribute("content", "#f7f4ee");
+    }
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

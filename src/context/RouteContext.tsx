@@ -1,0 +1,152 @@
+/* ============================================================================
+ * RouteContext — a hash router in under 100 lines.
+ *
+ * Every route is scoped to a project, the same way the URL of a real
+ * multi-tenant app is scoped to a workspace: it makes a link to "this
+ * project's chat list" shareable and bookmarkable, and it is the seam that
+ * keeps store.activeProjectId (what the review loop and every pane read
+ * synchronously) and the address bar saying the same thing.
+ *
+ *   #/p/<id>/drill              the review loop, project <id> active
+ *   #/p/<id>/chat               chat, no conversation selected
+ *   #/p/<id>/chat/<cid>         a conversation
+ *   #/p/<id>/journal            today's journal entry
+ *   #/p/<id>/journal/<day>      a specific day, "2026-3-14"
+ *   #/p/<id>/exam               the exam list / scope builder
+ *   #/p/<id>/exam/<eid>         a specific exam, taking it or its report
+ *
+ * Old two-segment links (#/drill, #/chat/<id>, from before projects existed)
+ * still resolve — parse() reads them with projectId left blank, and the
+ * mount-time redirect below fills in the active project and rewrites the
+ * hash, so a stale bookmark heals itself on first visit.
+ * ========================================================================== */
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import * as store from "@/services/store";
+
+export type View = "drill" | "chat" | "journal" | "exam";
+
+export interface Route {
+  view: View;
+  projectId: string;
+  conversationId: string | null;
+  journalDay: string | null;
+  examId: string | null;
+}
+
+function parse(hash: string): Omit<Route, "projectId"> & { projectId: string } {
+  const clean = hash.replace(/^#\/?/, "");
+  const parts = clean.split("/").filter(Boolean);
+  let projectId = "";
+  let rest = parts;
+  if (parts[0] === "p" && parts[1]) {
+    projectId = parts[1];
+    rest = parts.slice(2);
+  }
+  const blank = { conversationId: null, journalDay: null, examId: null };
+  if (rest[0] === "chat") return { view: "chat", projectId, ...blank, conversationId: rest[1] || null };
+  if (rest[0] === "journal") return { view: "journal", projectId, ...blank, journalDay: rest[1] || null };
+  if (rest[0] === "exam") return { view: "exam", projectId, ...blank, examId: rest[1] || null };
+  return { view: "drill", projectId, ...blank };
+}
+
+function serialise(r: Route): string {
+  const base = "#/p/" + r.projectId;
+  if (r.view === "chat") return base + "/chat" + (r.conversationId ? "/" + r.conversationId : "");
+  if (r.view === "journal") return base + "/journal" + (r.journalDay ? "/" + r.journalDay : "");
+  if (r.view === "exam") return base + "/exam" + (r.examId ? "/" + r.examId : "");
+  return base + "/drill";
+}
+
+/** A project id from the URL might be stale (deleted, archived, a typo in a
+ *  hand-edited link) or simply absent (a legacy hash). Either way it resolves
+ *  to something real, and — since store.activeProjectId is the single source
+ *  of truth every non-route reader (DecksPane, ChatSidebar, …) uses directly
+ *  — it is synced there too, so the two never disagree. */
+function resolveProjectId(id: string): string {
+  const projects = store.projects();
+  const pid = id && projects[id] ? id : store.get().activeProjectId;
+  if (pid !== store.get().activeProjectId) store.setActiveProject(pid);
+  return pid;
+}
+
+function resolveRoute(hash: string): Route {
+  const parsed = parse(hash);
+  return { ...parsed, projectId: resolveProjectId(parsed.projectId) };
+}
+
+interface RouteCtx extends Route {
+  go: (r: Partial<Route>) => void;
+  openChat: (id?: string | null, projectId?: string) => void;
+  openDrill: () => void;
+  openJournal: (day?: string | null) => void;
+  openExam: (id?: string | null) => void;
+  /** Makes a project active and lands on its drill view (or chat, if you're
+   *  already there) with no conversation selected — switching projects mid
+   *  conversation would otherwise leave you pointed at a thread that just
+   *  disappeared from the sidebar. */
+  switchProject: (projectId: string) => void;
+}
+
+const Ctx = createContext<RouteCtx | null>(null);
+
+export function RouteProvider({ children }: { children: ReactNode }) {
+  const [route, setRoute] = useState<Route>(() => resolveRoute(window.location.hash));
+
+  useEffect(() => {
+    // Heals a missing, legacy or stale-project hash into its canonical form —
+    // used both on mount and whenever the hash changes underneath us (back /
+    // forward, a bookmarked legacy link), so the address bar never lags
+    // behind what actually rendered.
+    const apply = (hash: string) => {
+      const resolved = resolveRoute(hash);
+      const target = serialise(resolved);
+      if (window.location.hash !== target) window.location.replace(target);
+      setRoute(resolved);
+    };
+    const onHash = () => apply(window.location.hash);
+    window.addEventListener("hashchange", onHash);
+    apply(window.location.hash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  const go = useCallback((next: Partial<Route>) => {
+    setRoute((prev) => {
+      const merged = { ...prev, ...next };
+      const target = serialise(merged);
+      if (window.location.hash !== target) window.location.hash = target;
+      return merged;
+    });
+  }, []);
+
+  const openChat = useCallback(
+    (id?: string | null, projectId?: string) => {
+      const patch: Partial<Route> = { view: "chat", conversationId: id ?? null };
+      if (projectId) {
+        store.setActiveProject(projectId);
+        patch.projectId = projectId;
+      }
+      go(patch);
+    },
+    [go]
+  );
+  const openDrill = useCallback(() => go({ view: "drill", conversationId: null }), [go]);
+  const openJournal = useCallback((day?: string | null) => go({ view: "journal", journalDay: day ?? null }), [go]);
+  const openExam = useCallback((id?: string | null) => go({ view: "exam", examId: id ?? null }), [go]);
+  const switchProject = useCallback(
+    (projectId: string) => {
+      store.setActiveProject(projectId);
+      go({ projectId, conversationId: null, journalDay: null, examId: null });
+    },
+    [go]
+  );
+
+  return (
+    <Ctx.Provider value={{ ...route, go, openChat, openDrill, openJournal, openExam, switchProject }}>{children}</Ctx.Provider>
+  );
+}
+
+export function useRoute(): RouteCtx {
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error("useRoute must be used within RouteProvider");
+  return ctx;
+}

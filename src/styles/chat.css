@@ -1,0 +1,1072 @@
+/* ============================================================================
+ * chat.css — the chat section.
+ *
+ * Chat used to be a separate application that happened to share a palette:
+ * its own header, its own nav, its own tab styling, its own settings
+ * surface, a permanent 268px split that no other view had, and a transcript
+ * set 200px wider than every other reading column in the app.
+ *
+ * Now it sits under the same running head as everything else, and the
+ * transcript is set to --measure like every other page. What is left that
+ * is genuinely chat-specific: the index of conversations, the turn, and the
+ * composer.
+ * ========================================================================== */
+
+/* ---------------------------------------------------------------- shell -- */
+/* Chat has no shell of its own any more. Shell supplies `.app` and
+   `.app-main`; this is the conversation column inside it. */
+.chat-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------------------------------------------- index, inside the sidebar -- */
+/* The conversation list is passed to Sidebar as `.nav-extra` content, so it
+   inherits the rail's ground and only has to lay itself out. */
+.side-head {
+  padding: var(--s-3) var(--s-2) var(--s-2);
+  flex: 0 0 auto;
+}
+.side-new {
+  font-size: var(--t-xs);
+  padding: var(--s-2) var(--s-3);
+}
+.side-search {
+  padding: 0 var(--s-2) var(--s-2);
+  flex: 0 0 auto;
+}
+.side-search input {
+  width: 100%;
+  background: var(--page);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  border-radius: var(--r-2);
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  padding: var(--s-2) var(--s-3);
+}
+.side-search input::placeholder {
+  color: var(--ink-3);
+}
+.side-search input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.side-list {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: 0 var(--s-2) var(--s-3);
+  min-height: 0;
+}
+.side-group {
+  padding: var(--s-3) var(--s-2) var(--s-2);
+  margin: 0;
+  position: sticky;
+  top: 0;
+  background: var(--page-2);
+  z-index: 1;
+}
+.side-item {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--rule-soft);
+  border-radius: 0;
+  padding: var(--s-2);
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  display: block;
+  position: relative;
+  transition: background var(--fast);
+}
+.side-item:hover {
+  background: var(--surface-2);
+}
+.side-item.on {
+  background: var(--accent-10);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.side-item .st {
+  font-family: var(--sans);
+  font-weight: 500;
+  font-size: var(--t-xs);
+  line-height: 1.35;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  padding-right: var(--s-5);
+}
+.side-item .sp {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.side-item .sx {
+  position: absolute;
+  top: var(--s-2);
+  right: var(--s-1);
+  opacity: 0;
+  color: var(--ink-3);
+  padding: 2px 4px;
+  border-radius: var(--r-1);
+  line-height: 1;
+  display: flex;
+}
+.side-item:hover .sx {
+  opacity: 1;
+}
+.side-item .sx:hover {
+  color: var(--red);
+  background: var(--red-tint);
+}
+.side-pin {
+  color: var(--amber);
+  font-size: 8px;
+  margin-right: var(--s-1);
+  vertical-align: 2px;
+}
+.side-foot {
+  border-top: 1px solid var(--rule-soft);
+  padding: var(--s-2);
+  display: flex;
+  gap: var(--s-2);
+  flex: 0 0 auto;
+}
+.side-foot button {
+  flex: 1;
+}
+
+/* --------------------------------------------------- conversation header -- */
+/* Only what is true of *this conversation*. Section navigation, the project
+   and settings all live in the running head above it now. */
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) calc(var(--gutter) - var(--s-2));
+  border-bottom: 1px solid var(--rule-soft);
+  flex: 0 0 auto;
+  min-height: 44px;
+}
+.chat-title {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: var(--t-md);
+  letter-spacing: var(--track-tight);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: none;
+  border: none;
+  color: var(--ink);
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r-1);
+  cursor: text;
+  min-width: 0;
+  max-width: 40%;
+}
+.chat-title:hover {
+  background: var(--surface-2);
+}
+.chat-meta {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+  display: flex;
+  gap: var(--s-3);
+  align-items: center;
+  margin-right: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.chat-headbtn {
+  font-size: var(--t-2xs);
+  padding: var(--s-2);
+}
+
+/* ------------------------------------------------------------ context -- */
+.ctxbar {
+  display: flex;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+  padding: var(--s-2) var(--gutter);
+  border-bottom: 1px solid var(--rule-soft);
+  align-items: center;
+  flex: 0 0 auto;
+}
+.ctxbar .lbl {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.ctxchip {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  border: 1px solid var(--violet-edge);
+  color: var(--violet);
+  background: var(--violet-tint);
+  border-radius: var(--r-1);
+  padding: 3px var(--s-2);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.ctxchip button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.6;
+  line-height: 1;
+  display: flex;
+}
+.ctxchip button:hover {
+  opacity: 1;
+}
+
+/* --------------------------------------------------------------- turns -- */
+.msgs {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+}
+.msgs-inner {
+  width: 100%;
+  max-width: var(--page-w);
+  margin: 0 auto;
+  padding: var(--s-6) var(--gutter) var(--s-3);
+}
+
+.turn {
+  margin-bottom: var(--s-6);
+  position: relative;
+}
+.turn-head {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: var(--s-2);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.turn.user .turn-head {
+  color: var(--accent);
+}
+/* The model's reply is the reading surface — serif, at the measure. */
+.turn-body {
+  font-family: var(--serif);
+  font-size: calc(var(--t-read) * var(--text-scale));
+  line-height: var(--lh-body);
+  color: var(--ink-2);
+  max-width: var(--measure);
+  text-wrap: pretty;
+}
+/* What you asked is marked in the margin rather than bubbled — a question
+   pencilled beside the text, not a speech balloon. */
+.turn.user .turn-body {
+  font-family: var(--sans);
+  font-size: var(--t-sm);
+  line-height: 1.6;
+  color: var(--ink);
+  border-left: 2px solid var(--rule);
+  padding-left: var(--s-4);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.turn.user.starred .turn-body,
+.turn.assistant.starred .turn-body {
+  border-left: 2px solid var(--amber);
+  padding-left: var(--s-4);
+}
+
+/* markdown inside an assistant turn */
+.turn-body > *:first-child {
+  margin-top: 0;
+}
+.turn-body > *:last-child {
+  margin-bottom: 0;
+}
+.turn-body p {
+  margin: 0 0 var(--s-4);
+}
+.turn-body h1,
+.turn-body h2,
+.turn-body h3,
+.turn-body h4 {
+  font-family: var(--serif);
+  font-weight: 600;
+  letter-spacing: var(--track-tight);
+  line-height: var(--lh-tight);
+  color: var(--ink);
+  margin: var(--s-6) 0 var(--s-3);
+}
+.turn-body h1 {
+  font-size: var(--t-lg);
+}
+.turn-body h2 {
+  font-size: 1.25rem;
+}
+.turn-body h3 {
+  font-size: 1.125rem;
+}
+.turn-body h4 {
+  font-size: var(--t-md);
+  color: var(--ink-2);
+}
+.turn-body ul,
+.turn-body ol {
+  margin: 0 0 var(--s-4);
+  padding-left: 1.3em;
+}
+.turn-body li {
+  margin-bottom: var(--s-1);
+}
+.turn-body li::marker {
+  color: var(--ink-3);
+}
+.turn-body li > p {
+  margin-bottom: var(--s-2);
+}
+.turn-body blockquote {
+  margin: 0 0 var(--s-4);
+  padding: 2px 0 2px var(--s-4);
+  border-left: 2px solid var(--rule);
+  color: var(--ink-3);
+  font-style: italic;
+}
+.turn-body a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+.turn-body hr {
+  margin: var(--s-5) 0;
+}
+.turn-body strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.turn-body em {
+  font-style: italic;
+}
+.turn-body :not(pre) > code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  background: var(--accent-10);
+  color: var(--accent);
+  padding: 0.1em 0.32em;
+  border-radius: var(--r-1);
+  word-break: break-word;
+}
+.turn-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 var(--s-4);
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  display: block;
+  overflow-x: auto;
+}
+.turn-body th,
+.turn-body td {
+  border-bottom: 1px solid var(--rule-soft);
+  padding: var(--s-2) var(--s-3);
+  text-align: left;
+}
+.turn-body th {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 400;
+  border-bottom-color: var(--rule);
+}
+
+/* code blocks */
+.codeblock {
+  margin: 0 0 var(--s-4);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-2);
+  overflow: hidden;
+  background: var(--page-2);
+  max-width: var(--page-w);
+}
+.codehead {
+  display: flex;
+  align-items: center;
+  padding: var(--s-1) var(--s-2) var(--s-1) var(--s-3);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.codelang {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-right: auto;
+}
+.codecopy {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px var(--s-2);
+  --btn-edge: transparent;
+}
+.codeblock pre {
+  margin: 0;
+  padding: var(--s-3) var(--s-4);
+  overflow-x: auto;
+}
+.codeblock code {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  line-height: 1.7;
+  background: none;
+  padding: 0;
+  color: var(--ink);
+}
+
+/* katex */
+.turn-body .katex {
+  font-size: 1.05em;
+}
+.turn-body .katex-display {
+  margin: var(--s-4) 0;
+  padding: var(--s-1) 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* attachments */
+.att-row {
+  display: flex;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--s-2);
+}
+.att-chip {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  padding: 3px var(--s-2);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.att-chip .x {
+  cursor: pointer;
+  opacity: 0.55;
+}
+.att-chip .x:hover {
+  opacity: 1;
+  color: var(--red);
+}
+
+/* turn actions */
+.turn-acts {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  margin-top: var(--s-3);
+  opacity: 0;
+  transition: opacity var(--fast);
+  flex-wrap: wrap;
+}
+.turn:hover .turn-acts,
+.turn-acts:focus-within {
+  opacity: 1;
+}
+.turn-acts.always {
+  opacity: 1;
+}
+.tact {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: var(--s-1) var(--s-2);
+  --btn-edge: transparent;
+  --btn-fg: var(--ink-3);
+}
+.tact.on {
+  --btn-fg: var(--amber);
+}
+.variant-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  padding: 2px var(--s-1);
+}
+.variant-nav button {
+  background: none;
+  border: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  padding: 1px 3px;
+  font-size: var(--t-3xs);
+}
+.variant-nav button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.turn-foot {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+  margin-top: var(--s-2);
+}
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  animation: blink 1s steps(2) infinite;
+  margin-left: 2px;
+}
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ----------------------------------------------------------- followups -- */
+.followups {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-1);
+  margin: 0 0 var(--s-6);
+  max-width: var(--measure);
+}
+.fchip {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--rule-soft);
+  border-radius: 0;
+  color: var(--ink-2);
+  font-family: var(--serif);
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  padding: var(--s-3) 0;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: color var(--fast);
+}
+.fchip::before {
+  content: "→";
+  color: var(--ink-3);
+  margin-right: var(--s-2);
+  font-family: var(--sans);
+}
+.fchip:hover {
+  color: var(--accent);
+}
+.fchip:hover::before {
+  color: var(--accent);
+}
+
+/* ------------------------------------------------------------ composer -- */
+.composer {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--rule-soft);
+  padding: var(--s-3) var(--gutter) var(--s-4);
+  background: var(--page);
+}
+.composer-inner {
+  width: 100%;
+  max-width: var(--page-w);
+  margin: 0 auto;
+  position: relative;
+}
+.composer-box {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  background: var(--page-2);
+  transition: border-color var(--fast);
+}
+.composer-box:focus-within {
+  border-color: var(--accent-45);
+}
+.composer textarea {
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--ink);
+  resize: none;
+  font-family: var(--sans);
+  font-size: calc(var(--t-md) * var(--text-scale));
+  line-height: 1.55;
+  padding: var(--s-3) var(--s-4) var(--s-1);
+  outline: none;
+  max-height: 300px;
+  min-height: 24px;
+  display: block;
+}
+.composer textarea::placeholder {
+  color: var(--ink-3);
+}
+.composer-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-1) var(--s-2) var(--s-2) var(--s-3);
+}
+.cbtn {
+  font-size: var(--t-2xs);
+  padding: var(--s-1) var(--s-2);
+  --btn-edge: transparent;
+}
+.cbtn:hover {
+  --btn-edge: var(--rule);
+}
+.csend {
+  margin-left: auto;
+  font-size: var(--t-xs);
+  padding: var(--s-2) var(--s-4);
+}
+.csend.stop {
+  --btn-bg: var(--red-tint);
+  --btn-edge: var(--red);
+  --btn-fg: var(--red);
+  box-shadow: none;
+}
+.csend.stop:hover {
+  --btn-bg: var(--red-tint);
+  --btn-edge: var(--red);
+  --btn-fg: var(--red);
+}
+.composer-hint {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+  margin-top: var(--s-2);
+  display: flex;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+}
+
+/* slash menu */
+.slashmenu {
+  position: absolute;
+  bottom: calc(100% + var(--s-2));
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  overflow: hidden;
+  z-index: 40;
+  box-shadow: var(--lift-3);
+  max-height: 300px;
+  overflow-y: auto;
+}
+.slashitem {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: var(--s-2) var(--s-3);
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+}
+.slashitem:hover,
+.slashitem.sel {
+  background: var(--accent-10);
+}
+.slashitem .cmd {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  color: var(--accent);
+  flex: 0 0 auto;
+  min-width: 92px;
+}
+.slashitem .desc {
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  color: var(--ink-3);
+}
+
+/* --------------------------------------------------------- empty state -- */
+.chat-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--s-7) var(--gutter);
+  overflow-y: auto;
+}
+/* Auto margins rather than justify-content: centre, so that when the
+   openers are taller than the pane the top stays reachable instead of
+   being clipped above the scroll origin. */
+.chat-empty > :first-child {
+  margin-top: auto;
+}
+.chat-empty > :last-child {
+  margin-bottom: auto;
+}
+.chat-empty h2 {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: var(--t-xl);
+  letter-spacing: var(--track-tight);
+  color: var(--ink);
+  margin: 0 0 var(--s-2);
+  text-align: center;
+}
+.chat-empty p {
+  font-family: var(--serif);
+  color: var(--ink-2);
+  font-size: var(--t-read);
+  line-height: var(--lh-body);
+  margin: 0 0 var(--s-6);
+  max-width: 44ch;
+  text-align: center;
+}
+/* Openers read as a contents list, not a grid of tiles. */
+.starters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--s-6);
+  width: 100%;
+  max-width: var(--page-wide);
+  border-top: 1px solid var(--rule-soft);
+}
+.starter {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--rule-soft);
+  border-radius: 0;
+  padding: var(--s-4) var(--s-2);
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  transition: background var(--fast);
+}
+.starter:hover {
+  background: var(--surface-2);
+}
+.starter .t {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: var(--t-md);
+  color: var(--ink);
+  display: block;
+  margin-bottom: var(--s-1);
+}
+.starter .s {
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  color: var(--ink-3);
+  line-height: 1.5;
+  display: block;
+}
+
+/* ---------------------------------------------------- command palette -- */
+.palette-wrap {
+  align-items: flex-start;
+  padding: 12vh var(--s-5) var(--s-5);
+}
+.palette {
+  width: 100%;
+  max-width: 34rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-3);
+  overflow: hidden;
+  box-shadow: var(--lift-3);
+  display: flex;
+  flex-direction: column;
+  max-height: 66vh;
+  animation: rise var(--fast) var(--ease);
+}
+.palette input {
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--rule-soft);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--t-md);
+  padding: var(--s-4) var(--s-5);
+  outline: none;
+}
+.palette input::placeholder {
+  color: var(--ink-3);
+}
+.palette-list {
+  overflow-y: auto;
+  padding: var(--s-2);
+}
+.palette-item {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.palette-item.sel {
+  background: var(--accent-10);
+}
+.palette-item .pt {
+  font-family: var(--sans);
+  font-size: var(--t-sm);
+  color: var(--ink);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.palette-item .pk {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+  letter-spacing: 0.06em;
+}
+.palette-empty {
+  padding: var(--s-6);
+  text-align: center;
+  color: var(--ink-3);
+  font-family: var(--serif);
+  font-size: var(--t-read);
+}
+
+/* -------------------------------------------------- conversation drawer -- */
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 340px;
+  background: var(--surface);
+  border-left: 1px solid var(--rule);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--lift-3);
+  animation: slidein var(--med) var(--ease);
+}
+@keyframes slidein {
+  from {
+    transform: translateX(12px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-4) var(--s-3);
+  border-bottom: 1px solid var(--rule-soft);
+  flex: 0 0 auto;
+}
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--s-4);
+}
+
+.personagrid {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--s-4);
+  border-top: 1px solid var(--rule-soft);
+}
+.personaopt {
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--rule-soft);
+  border-radius: 0;
+  padding: var(--s-3) var(--s-2);
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  transition: background var(--fast);
+}
+.personaopt:hover {
+  background: var(--surface-2);
+}
+.personaopt.on {
+  background: var(--accent-10);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.personaopt .pn {
+  font-family: var(--sans);
+  font-weight: 500;
+  font-size: var(--t-sm);
+  color: var(--ink);
+  display: block;
+}
+.personaopt .pb {
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  color: var(--ink-3);
+  display: block;
+  margin-top: 3px;
+  line-height: 1.5;
+}
+.range {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+.range input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+.range .rv {
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  color: var(--accent);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* -------------------------------------------------------------- density -- */
+[data-density="compact"] .side-item {
+  padding: var(--s-1) var(--s-2);
+}
+[data-density="compact"] .msgs-inner {
+  padding-top: var(--s-4);
+}
+[data-density="compact"] .turn {
+  margin-bottom: var(--s-5);
+}
+
+/* --------------------------------------------------------------- mobile -- */
+@media (max-width: 900px) {
+  .drawer {
+    width: 100%;
+  }
+  .chat-title {
+    max-width: 55%;
+  }
+  .starters {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* -------------------------------------------------- syntax highlighting -- */
+/* Hand-rolled against the app palette rather than importing one of
+   highlight.js's themes: every shipped theme brings its own background and
+   grey scale, and the result reads as a foreign widget pasted into the page.
+   Composed from the same semantic inks, so it re-prints with the theme. */
+.hljs {
+  color: var(--ink);
+  background: none;
+}
+.hljs-comment,
+.hljs-quote {
+  color: var(--ink-3);
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-doctag,
+.hljs-name,
+.hljs-strong {
+  color: var(--violet);
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta .hljs-string {
+  color: var(--green);
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link,
+.hljs-selector-attr,
+.hljs-template-variable,
+.hljs-variable {
+  color: var(--amber);
+}
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.function_,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: var(--accent);
+}
+.hljs-built_in,
+.hljs-class .hljs-title,
+.hljs-type {
+  color: var(--code-type);
+}
+.hljs-attr,
+.hljs-property {
+  color: var(--code-attr);
+}
+.hljs-params {
+  color: var(--ink);
+}
+.hljs-deletion {
+  color: var(--red);
+}
+.hljs-meta {
+  color: var(--ink-3);
+}
+.hljs-emphasis {
+  font-style: italic;
+}

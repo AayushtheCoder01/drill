@@ -1,0 +1,632 @@
+/* ============================================================================
+ * services/ai/index.ts — resolution, the chat entry point, and the three
+ * features built on it: card writing, recall marking, and the tutor.
+ *
+ * Nothing in this file reads config directly; resolve() does that once, so
+ * settings typed into the app always win over settings from a config file.
+ *
+ * This whole module is the "inference boundary" — if Drill grows a backend,
+ * `chat()` is the one function to redirect (e.g. POST /api/chat with the same
+ * ChatMessage[]/ChatOpts shape) instead of calling a BackendDef directly.
+ * ========================================================================== */
+import * as U from "@/lib/util";
+import * as CFG from "@/lib/config";
+import * as store from "@/services/store";
+import * as transcript from "@/services/transcript";
+import { BACKENDS, BACKEND_ORDER, isAbort } from "./backends";
+import type {
+  BackendType,
+  Card,
+  ChatMessage,
+  ChatOpts,
+  InferenceConfig,
+  MarkResult,
+  ResolvedBackend,
+  TokenUsage
+} from "@/types";
+import type { JournalEntry, JournalSummary, MemoryDiffLine } from "@/types/journal";
+import type { Memory, MemoryType, Project } from "@/types/core";
+import type { Difficulty, ExamQuestion, QuestionKind } from "@/types/exam";
+
+export { BACKENDS, BACKEND_ORDER };
+
+/**
+ * Work out which backend to call and with what. In-app Settings beat the
+ * config file for every field, so a shared config.json can ship sane
+ * defaults without pinning anyone to them.
+ */
+/** Per-call overrides. A chat conversation pins its own backend and model so
+ *  changing the global default in Settings does not silently retarget a
+ *  thread you are halfway through. */
+export interface Override {
+  backend?: BackendType | "";
+  model?: string;
+}
+
+export function resolve(override?: Override): ResolvedBackend {
+  const s = store.settings();
+  const c = CFG.get().inference || ({} as InferenceConfig);
+  const type = (override?.backend || s.backend || c.type || "openrouter") as keyof typeof BACKENDS;
+  const be = BACKENDS[type] || BACKENDS.openrouter;
+  const baseUrl = (s.baseUrl || c.baseUrl || be.defaultBaseUrl || "").replace(/\/+$/, "");
+  return {
+    type: be.id,
+    backend: be,
+    apiKey: s.key || c.apiKey || "",
+    model: override?.model || s.model || c.model || be.defaultModel,
+    baseUrl,
+    headers: c.headers || {},
+    temperature: c.temperature,
+    keyFromConfig: !s.key && !!c.apiKey,
+    modelFromConfig: !s.model && !!c.model,
+    backendFromConfig: !s.backend && !!c.type
+  };
+}
+
+export function ready(override?: Override): { ok: boolean; why?: string } {
+  const r = resolve(override);
+  if (r.backend.needsKey && !r.apiKey) return { ok: false, why: "No " + r.backend.label + " key yet — Menu → Settings." };
+  if (!r.model) return { ok: false, why: "No model chosen — Menu → Settings." };
+  return { ok: true };
+}
+
+/** The single entry point every feature uses. Every call is recorded on the
+ *  run transcript (services/transcript.ts) — the "what is it doing" answer
+ *  for journal, distill, exam and chat calls alike. */
+export function chat(messages: ChatMessage[], opts: ChatOpts = {}, override?: Override): Promise<string> {
+  const r = resolve(override);
+  const check = ready(override);
+  if (!check.ok) return Promise.reject(new Error(check.why));
+  if (opts.temperature == null && r.temperature != null) opts.temperature = r.temperature;
+
+  const started = Date.now();
+  let usage: TokenUsage | undefined;
+  const passedOnUsage = opts.onUsage;
+  const wrapped: ChatOpts = {
+    ...opts,
+    onUsage: (u) => {
+      usage = u;
+      passedOnUsage?.(u);
+    }
+  };
+
+  return r.backend.chat(messages, wrapped, r).then(
+    (res) => {
+      transcript.record({ at: started, label: opts.label || "chat", model: r.model, messages, response: res, error: null, usage, elapsedMs: Date.now() - started });
+      return res;
+    },
+    (err: unknown) => {
+      if (!isAbort(err)) {
+        transcript.record({
+          at: started,
+          label: opts.label || "chat",
+          model: r.model,
+          messages,
+          response: null,
+          error: (err as Error)?.message || String(err),
+          usage,
+          elapsedMs: Date.now() - started
+        });
+      }
+      throw err;
+    }
+  );
+}
+
+export function listModels(override?: Override): Promise<string[]> {
+  const r = resolve(override);
+  return r.backend.listModels(r);
+}
+
+export function test(): Promise<string> {
+  return chat([{ role: "user", content: "Reply with the single word: ready" }], { temperature: 0, maxTokens: 16, label: "test" });
+}
+
+/* ------------------------------------------------------------ card writing */
+
+const STYLE_RULES =
+  "You write spaced-repetition flashcards for a self-taught learner going deep on mathematics and machine learning.\n\n" +
+  "HOUSE STYLE\n" +
+  "- One idea per card. If a card needs the word 'and', it is probably two cards. This is the minimum information principle and it is the single thing that decides whether a card survives.\n" +
+  "- The front is a prompt to recall, not a quiz with options. Short. Often just a symbol, an instruction to write a formula, or a 'why does this work' question.\n" +
+  "- The back is the shortest thing that would rebuild the idea in someone's head. Answer first, then one line on why it matters or the trap people fall into, wrapped in <em>.\n" +
+  "- Favour why-questions, what-breaks-if-not, and tracing shapes over plain definitions.\n" +
+  "- Plain prose, no filler, no praise, no exclamation marks.\n\n" +
+  "FORMAT\n" +
+  'Back may use only: <p>, <strong>, <em>, <code>, <var>, <sub>, <sup>, <div class="formula"> for a centred formula, and <div class="shape"> for code, array shapes or literal output (real newlines inside are preserved).\n' +
+  "Front may use only <code> and <strong>.\n\n" +
+  "MATHS\n" +
+  "Write every expression as LaTeX, never as typed-out symbols. Inline maths goes in single dollars — $\\alpha$, " +
+  "$x^{(i)}$ — and a displayed formula goes inside a formula div as bare LaTeX with no dollars:\n" +
+  '<div class="formula">J(w,b) = \\frac{1}{2m} \\sum_{i=0}^{m-1} \\left( f(x^{(i)}) - y^{(i)} \\right)^2</div>\n' +
+  "Use \\frac for every fraction. Never write a fraction as 1/2m, as <sup>1</sup>/<sub>2m</sub>, or with unicode " +
+  "superscripts — those are unreadable at a glance, which defeats the point of the card.\n\n" +
+  "OUTPUT\n" +
+  "Return ONLY a JSON array. No prose around it, no code fence.\n" +
+  '[{"tag":"Short section name","q":"front","a":"<p>back</p>"}]';
+
+/** Models wrap JSON in fences, in apologies, in both. Cut to the array. */
+function parseCards(txt: string): Card[] {
+  let s = String(txt || "").trim();
+  s = s.replace(/^```(?:json)?/i, "").replace(/```\s*$/, "").trim();
+  const a = s.indexOf("[");
+  const b = s.lastIndexOf("]");
+  if (a < 0 || b < a) throw new Error("The model did not return a card list. It said: " + s.slice(0, 220));
+  let arr: unknown;
+  try {
+    arr = JSON.parse(s.slice(a, b + 1));
+  } catch (e) {
+    throw new Error("Could not read the card list back (" + (e as Error).message + "). Try again, or a stronger model.");
+  }
+  if (!Array.isArray(arr)) throw new Error("Expected a list of cards.");
+  const out = (arr as Record<string, unknown>[])
+    .filter((c) => c && c.q && c.a)
+    .map((c) => store.normCard({ tag: c.tag as string, q: c.q as string, a: c.a as string }));
+  if (!out.length) throw new Error("No usable cards came back.");
+  return out;
+}
+
+/** Show the model a few of your existing cards so new ones land in the same
+ *  voice instead of reading like a textbook glossary. */
+function styleSystem(): string {
+  const ex = store
+    .deck()
+    .cards.slice(0, 3)
+    .map((c) => ({ tag: c.tag, q: c.q, a: c.a }));
+  return STYLE_RULES + (ex.length ? "\n\nMATCH THE STYLE OF THESE EXISTING CARDS:\n" + JSON.stringify(ex) : "");
+}
+
+export function generateCards(mode: "topic" | "notes", payload: string, n: number | string, focus?: string): Promise<Card[]> {
+  const user =
+    (mode === "topic"
+      ? "Write " + n + " cards on: " + payload
+      : "Turn this into " + n + " cards. Keep what is worth remembering, drop the filler.\n\nSOURCE:\n" + payload) +
+    (focus ? "\n\nExtra instruction: " + focus : "");
+  return chat([{ role: "system", content: styleSystem() }, { role: "user", content: user }], {
+    temperature: 0.5,
+    maxTokens: 4096,
+    label: "cards"
+  }).then(parseCards);
+}
+
+export function splitCard(card: Card, lapses?: number): Promise<Card[]> {
+  const usr =
+    "This card keeps being forgotten (" +
+    (lapses || 0) +
+    " lapses). Rewrite it as 2 to 4 atomic cards that together carry the same content, each asking for one thing only. Keep the same section tag.\n\n" +
+    "FRONT:\n" +
+    card.q +
+    "\n\nBACK:\n" +
+    card.a;
+  return chat([{ role: "system", content: styleSystem() }, { role: "user", content: usr }], {
+    temperature: 0.4,
+    maxTokens: 3072,
+    label: "split card"
+  }).then(parseCards);
+}
+
+/* ------------------------------------------------------------ recall marking */
+
+const MARK_SYS =
+  "You mark a learner's attempt at recalling a flashcard. Be strict but fair: reward the idea, not the wording. " +
+  'Reply ONLY with JSON: {"grade":1|2|3|4,"verdict":"got"|"partial"|"missed","missing":["short phrase",...],"note":"one short sentence"}. ' +
+  "grade 1 = nothing right, 2 = the gist with real gaps or a wrong part, 3 = correct, 4 = correct and complete with no hesitation markers. " +
+  "missing lists only what they left out or got wrong, at most three items, each under twelve words. " +
+  "note is one sentence of the single most useful correction, or the one thing worth noticing if they got it right.";
+
+function parseMarkResult(out: string): MarkResult {
+  let j: MarkResult | null = null;
+  try {
+    j = JSON.parse(out.slice(out.indexOf("{"), out.lastIndexOf("}") + 1));
+  } catch {
+    /* handled below */
+  }
+  if (!j || !j.verdict) throw new Error("unclear reply");
+  j.grade = U.clamp(parseInt(String(j.grade), 10) || 2, 1, 4) as MarkResult["grade"];
+  j.missing = Array.isArray(j.missing) ? j.missing.filter((x): x is string => typeof x === "string") : [];
+  j.note = typeof j.note === "string" ? j.note : "";
+  return j;
+}
+
+export async function markRecall(card: Card, attempt: string): Promise<MarkResult> {
+  const usr =
+    "CARD FRONT:\n" + U.stripTags(card.q) + "\n\nCARD BACK (the truth):\n" + U.stripTags(card.a) + "\n\nTHEIR ATTEMPT:\n" + attempt;
+  const out = await chat([{ role: "system", content: MARK_SYS }, { role: "user", content: usr }], {
+    temperature: 0.1,
+    maxTokens: 512,
+    label: "mark recall"
+  });
+  return parseMarkResult(out);
+}
+
+/* ---------------------------------------------------------------- shared JSON parsing */
+
+/** Models wrap JSON in fences, in apologies, in both — same problem as
+ *  parseCards, generalised to an object or an array. */
+function extractJSON<T>(text: string, opener: "{" | "[" = "{"): T {
+  const closer = opener === "{" ? "}" : "]";
+  let s = String(text || "").trim();
+  s = s.replace(/^```(?:json)?/i, "").replace(/```\s*$/, "").trim();
+  const a = s.indexOf(opener);
+  const b = s.lastIndexOf(closer);
+  if (a < 0 || b < a) throw new Error("The model did not return usable JSON. It said: " + s.slice(0, 220));
+  return JSON.parse(s.slice(a, b + 1)) as T;
+}
+
+function strArr(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && !!x.trim()).map((x) => x.trim()) : [];
+}
+
+const MEMORY_TYPES: MemoryType[] = ["profile", "preference", "goal", "convention", "understanding", "open", "reference"];
+function normMemType(v: unknown): MemoryType {
+  const s = String(v || "").toLowerCase();
+  return (MEMORY_TYPES.find((t) => t === s) as MemoryType) || "understanding";
+}
+
+/* -------------------------------------------------------------- journal -- */
+
+const JOURNAL_SYS =
+  "Below is what a learner did today, in their own words, possibly messy and out of order. Write their journal " +
+  "entry for the day.\n\n" +
+  "`narrative` is 2 to 5 sentences in second person — the shape of the day, not a list. Be concrete and do not " +
+  "flatter. If the day was thin, say so briefly rather than inflating it.\n\n" +
+  "`stuck` is the most important field: capture the SPECIFIC confusion, not the topic. \"Could not see why the " +
+  "chain rule gives that ordering\" beats \"struggled with backprop\". Leave empty rather than inventing " +
+  "difficulty.\n\n" +
+  "`open` is anything raised and not resolved — a question asked and dropped, a thing they said they would look " +
+  "up. Leave empty rather than padding.\n\n" +
+  "Use only what is in the text. Do not add facts, do not correct their understanding, do not teach.\n\n" +
+  "Reply ONLY with JSON: {\"narrative\":\"...\",\"did\":[\"...\"],\"learned\":[\"...\"],\"stuck\":[\"...\"]," +
+  "\"open\":[\"...\"],\"resources\":[{\"label\":\"...\",\"url\":\"...\"}],\"nextUp\":[\"...\"]}";
+
+export async function writeJournal(rawText: string, project: Project): Promise<JournalSummary> {
+  const usr =
+    "PROJECT: " + project.name + (project.goals ? " — goal: " + project.goals : "") + "\n\nTODAY'S RAW LOG:\n" + rawText;
+  const out = await chat([{ role: "system", content: JOURNAL_SYS }, { role: "user", content: usr }], {
+    temperature: 0.4,
+    maxTokens: 1600,
+    label: "journal"
+  });
+  const j = extractJSON<Partial<JournalSummary> & { resources?: unknown }>(out);
+  const resources = Array.isArray(j.resources)
+    ? (j.resources as Record<string, unknown>[])
+        .filter((r) => r && (r.label || r.url))
+        .map((r) => ({ label: String(r.label || r.url || ""), url: String(r.url || "") }))
+    : [];
+  return {
+    narrative: String(j.narrative || "").trim(),
+    did: strArr(j.did),
+    learned: strArr(j.learned),
+    stuck: strArr(j.stuck),
+    open: strArr(j.open),
+    resources,
+    nextUp: strArr(j.nextUp),
+    generatedBy: { model: resolve().model, at: Date.now() }
+  };
+}
+
+/* -------------------------------------------------------------- distill -- */
+
+const DISTILL_SYS =
+  "From this journal entry, produce two things.\n\n" +
+  "Memories: only what is durable. Prefer few and sharp. Never record what can be computed from review history — " +
+  "which cards are failing, how many are due, streaks. Record how the learner thinks, what framing works, what " +
+  "they have settled on, and what they left unresolved. Each memory has a `type`: profile, preference, goal, " +
+  "convention, understanding, open, or reference — `understanding` from things learned, `open` from things left " +
+  "unresolved, `goal`/`convention` only when the entry actually states one. Do not propose a memory that " +
+  "duplicates or closely restates one already captured, listed below.\n\n" +
+  "Cards: weighted toward stuck and learned. Every card must be atomic (one fact — if the answer needs \"and\", " +
+  "it is two cards), self-contained (answerable in six months with no memory of today — no \"the trick\", \"the " +
+  "paper\", \"as discussed\"), and demand recall rather than recognition (never yes/no or pick-from-list). If a " +
+  "draft card fails any of these, rewrite it before returning it. Do not propose a card that duplicates one of " +
+  "the existing cards listed below.\n\n" +
+  'Reply ONLY with JSON: {"memories":[{"type":"...","text":"..."}],"cards":[{"tag":"...","q":"...","a":"<p>...</p>"}]}';
+
+export interface DistillResult {
+  memories: { type: MemoryType; text: string }[];
+  cards: Card[];
+}
+
+export async function distill(
+  entry: JournalEntry,
+  project: Project,
+  existingCards: { tag: string; q: string }[],
+  existingMemoryTexts: string[] = []
+): Promise<DistillResult> {
+  const s = entry.summary;
+  if (!s) throw new Error("Generate the journal narrative before distilling.");
+  const usr = [
+    "PROJECT: " + project.name,
+    "NARRATIVE:\n" + s.narrative,
+    s.learned.length ? "LEARNED:\n" + s.learned.map((x) => "- " + x).join("\n") : "",
+    s.stuck.length ? "STUCK:\n" + s.stuck.map((x) => "- " + x).join("\n") : "",
+    s.open.length ? "OPEN:\n" + s.open.map((x) => "- " + x).join("\n") : "",
+    existingCards.length
+      ? "EXISTING CARDS (do not duplicate):\n" + existingCards.slice(0, 100).map((c) => `- (${c.tag}) ${U.stripTags(c.q)}`).join("\n")
+      : "",
+    existingMemoryTexts.length
+      ? "ALREADY CAPTURED AS MEMORY OR PROPOSED (do not repeat these or close restatements):\n" +
+        existingMemoryTexts.slice(0, 60).map((t) => "- " + t).join("\n")
+      : ""
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const out = await chat([{ role: "system", content: DISTILL_SYS }, { role: "user", content: usr }], {
+    temperature: 0.4,
+    maxTokens: 2600,
+    label: "distill"
+  });
+  const j = extractJSON<{ memories?: Record<string, unknown>[]; cards?: Record<string, unknown>[] }>(out);
+  const memories = (j.memories || [])
+    .filter((m) => m && typeof m.text === "string" && m.text.trim())
+    .map((m) => ({ type: normMemType(m.type), text: String(m.text).trim() }));
+  const cards = (j.cards || [])
+    .filter((c) => c && c.q && c.a)
+    .map((c) => store.normCard({ tag: c.tag as string, q: c.q as string, a: c.a as string }));
+  return { memories, cards };
+}
+
+/* ---------------------------------------------------------- weekly rollup */
+
+const ROLLUP_SYS =
+  "These are a learner's daily journal entries for this period. Write the period summary: the themes that " +
+  "actually recurred, what changed in their understanding, and what is still open. Then propose updates to " +
+  "project memory: new entries worth keeping, merges of entries that are now known to be the same thing, and " +
+  "retirements of anything these entries have superseded. Invent nothing not present in the entries.\n\n" +
+  "Memories marked [PINNED] are off limits: never merge them, never retire them. Reference only ids that appear " +
+  "in the list below — a diff line naming an id that is not there does nothing at all.\n\n" +
+  'Reply ONLY with JSON: {"narrative":"...","themes":["..."],"stillOpen":["..."],' +
+  '"diff":[{"kind":"add","type":"...","text":"..."},{"kind":"merge","from":["memoryId",...],"text":"..."},' +
+  '{"kind":"retire","id":"memoryId","reason":"..."}]}';
+
+export interface RollupResult {
+  narrative: string;
+  themes: string[];
+  stillOpen: string[];
+  diff: MemoryDiffLine[];
+}
+
+function normalizeDiffLine(raw: unknown): MemoryDiffLine | null {
+  const r = raw as Record<string, unknown>;
+  if (!r || typeof r !== "object") return null;
+  if (r.kind === "add" && typeof r.text === "string" && r.text.trim()) {
+    return { kind: "add", type: normMemType(r.type), text: r.text.trim() };
+  }
+  if (r.kind === "merge" && Array.isArray(r.from) && typeof r.text === "string" && r.text.trim()) {
+    const from = r.from.filter((x): x is string => typeof x === "string");
+    if (from.length) return { kind: "merge", from, text: r.text.trim() };
+  }
+  if (r.kind === "retire" && typeof r.id === "string" && r.id) {
+    return { kind: "retire", id: r.id, reason: typeof r.reason === "string" ? r.reason : "" };
+  }
+  return null;
+}
+
+export async function rollup(entries: JournalEntry[], project: Project, existingMemories: Memory[]): Promise<RollupResult> {
+  const usr = [
+    "PROJECT: " + project.name,
+    "ENTRIES:\n" +
+      entries
+        .map((e) => {
+          const s = e.summary!;
+          return `--- ${e.day} ---\n${s.narrative}\nLearned: ${s.learned.join("; ")}\nStuck: ${s.stuck.join("; ")}\nOpen: ${s.open.join("; ")}`;
+        })
+        .join("\n\n"),
+    existingMemories.length
+      ? "EXISTING PROJECT MEMORY (reference by id when merging/retiring):\n" +
+        [...existingMemories]
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .slice(0, MAX_CONSOLIDATE)
+          .map(memoryLine)
+          .join("\n")
+      : ""
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const out = await chat([{ role: "system", content: ROLLUP_SYS }, { role: "user", content: usr }], {
+    temperature: 0.4,
+    maxTokens: 2400,
+    label: "rollup"
+  });
+  const j = extractJSON<{ narrative?: string; themes?: unknown; stillOpen?: unknown; diff?: unknown[] }>(out);
+  const diff = Array.isArray(j.diff) ? (j.diff.map(normalizeDiffLine).filter((x): x is MemoryDiffLine => !!x)) : [];
+  return { narrative: String(j.narrative || "").trim(), themes: strArr(j.themes), stillOpen: strArr(j.stillOpen), diff };
+}
+
+/** How a memory is shown to a model that may propose merging or retiring it.
+ *  The id is what a diff line has to reference, and [PINNED] marks the ones the
+ *  learner asked to keep. memoryStore.retire() refuses a pinned id anyway, but
+ *  a proposal the learner has to notice and reject is already a bad proposal. */
+function memoryLine(m: Memory): string {
+  return `- [${m.id}]${m.pinned ? " [PINNED]" : ""} (${m.type}) ${m.text}`;
+}
+
+/** Past roughly this many entries, ids start coming back wrong — a model runs
+ *  out of attention for copying verbatim strings long before it runs out of
+ *  context window. Consolidation sees the most recently changed slice; the rest
+ *  keep their turn on the next pass. */
+const MAX_CONSOLIDATE = 80;
+
+const CONSOLIDATE_SYS =
+  "Below is a learner's current memory for one project. Tidy it: merge entries that say the same thing, retire " +
+  "anything stale or superseded, and leave everything else alone. Do not invent new memory — only merges and " +
+  "retirements of what is listed. Memories marked [PINNED] are off limits: never merge or retire them. " +
+  "Reference only ids that appear below. If nothing needs changing, return an empty diff.\n\n" +
+  'Reply ONLY with JSON: {"diff":[{"kind":"merge","from":["memoryId",...],"text":"..."},' +
+  '{"kind":"retire","id":"memoryId","reason":"..."}]}';
+
+export async function consolidateMemory(memories: Memory[], project: Project): Promise<MemoryDiffLine[]> {
+  const shown = [...memories].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_CONSOLIDATE);
+  const usr = "PROJECT: " + project.name + "\n\nMEMORY:\n" + shown.map(memoryLine).join("\n");
+  const out = await chat([{ role: "system", content: CONSOLIDATE_SYS }, { role: "user", content: usr }], {
+    temperature: 0.3,
+    maxTokens: 1600,
+    label: "consolidate"
+  });
+  const j = extractJSON<{ diff?: unknown[] }>(out);
+  return Array.isArray(j.diff) ? j.diff.map(normalizeDiffLine).filter((x): x is MemoryDiffLine => !!x) : [];
+}
+
+/* ------------------------------------------------------------------ exam */
+
+const EXAM_SYS =
+  "Build an exam from the material below, weighted toward the requested level.\n\n" +
+  "Do not simply restate flashcards. At least half the questions must span two or more sources — connect ideas " +
+  "learned separately, apply something to a new case, derive a result from a stated convention, or diagnose an " +
+  "error in a worked example. `kind` is one of: recall, apply, why, connect, derive, diagnose. `difficulty` is " +
+  "one of: recall, apply, analyse, synthesise.\n\n" +
+  "Every question carries `sourceRefs` naming exactly what it was built from — items are tagged [card:id] or " +
+  "[journal:id] in the material. If you cannot ground a question in the material, do not write it. Fewer, " +
+  "well-founded questions beat a full set with invented ones.\n\n" +
+  "`expected` states what a correct answer must contain — the marking key, not a model answer.\n\n" +
+  'Reply ONLY with a JSON array: [{"kind":"...","difficulty":"...","prompt":"...","expected":"...",' +
+  '"sourceRefs":[{"kind":"card"|"journal","id":"..."}]}]';
+
+const QUESTION_KINDS: QuestionKind[] = ["recall", "apply", "why", "connect", "derive", "diagnose"];
+const DIFFICULTIES: Difficulty[] = ["recall", "apply", "analyse", "synthesise"];
+function normKind(v: unknown): QuestionKind {
+  return (QUESTION_KINDS.find((k) => k === v) as QuestionKind) || "recall";
+}
+function normDiff(v: unknown, fallback: Difficulty): Difficulty {
+  return (DIFFICULTIES.find((d) => d === v) as Difficulty) || fallback;
+}
+
+export async function generateExam(material: string, level: Difficulty, exclude: string[]): Promise<ExamQuestion[]> {
+  const usr =
+    "LEVEL: " +
+    level +
+    "\n\n" +
+    (exclude.length ? "ALREADY ASKED (do not repeat these or close variants):\n" + exclude.map((x) => "- " + x).join("\n") + "\n\n" : "") +
+    "MATERIAL:\n" +
+    material;
+  const out = await chat([{ role: "system", content: EXAM_SYS }, { role: "user", content: usr }], {
+    temperature: 0.5,
+    maxTokens: 3200,
+    label: "exam generation"
+  });
+  const j = extractJSON<Record<string, unknown>[]>(out, "[");
+  const out2 = (Array.isArray(j) ? j : []).filter((q) => q && typeof q.prompt === "string" && typeof q.expected === "string");
+  if (!out2.length) throw new Error("No well-grounded questions came back. Try a wider scope.");
+  return out2.map((q) => ({
+    id: U.uuid(),
+    kind: normKind(q.kind),
+    difficulty: normDiff(q.difficulty, level),
+    prompt: String(q.prompt),
+    expected: String(q.expected),
+    sourceRefs: Array.isArray(q.sourceRefs)
+      ? (q.sourceRefs as Record<string, unknown>[])
+          .filter((r) => r && (r.kind === "card" || r.kind === "journal" || r.kind === "memory") && r.id)
+          .map((r) => ({ kind: r.kind as "card" | "journal" | "memory", id: String(r.id) }))
+      : [],
+    answer: null,
+    result: null,
+    answeredAt: null
+  }));
+}
+
+const EXAM_MARK_SYS =
+  "You mark a learner's attempt at an exam question that may span multiple ideas at once. Be strict but fair: " +
+  "reward the idea, not the wording, and check specifically for what the marking key requires. " +
+  'Reply ONLY with JSON: {"grade":1|2|3|4,"verdict":"got"|"partial"|"missed","missing":["short phrase",...],"note":"one short sentence"}. ' +
+  "grade 1 = nothing right, 2 = the gist with real gaps or a wrong part, 3 = correct, 4 = correct and complete. " +
+  "missing lists only what they left out or got wrong, at most three items, each under twelve words.";
+
+export async function markExamAnswer(prompt: string, expected: string, attempt: string): Promise<MarkResult> {
+  const usr = "QUESTION:\n" + prompt + "\n\nWHAT A CORRECT ANSWER MUST CONTAIN:\n" + expected + "\n\nTHEIR ANSWER:\n" + attempt;
+  const out = await chat([{ role: "system", content: EXAM_MARK_SYS }, { role: "user", content: usr }], {
+    temperature: 0.1,
+    maxTokens: 512,
+    label: "exam grading"
+  });
+  return parseMarkResult(out);
+}
+
+/* ------------------------------------------------------------------ tutor */
+
+export function tutorSystem(card: Card): string {
+  const s = store.settings();
+  let t = s.tutor || store.DEFAULT_TUTOR;
+  if (s.lang === "hinglish") {
+    t +=
+      "\n\nWrite in natural Hinglish — Hindi and English mixed the way an Indian engineer explains to a friend — but keep every technical term, formula, symbol and code fragment in English.";
+  }
+  return t + "\n\nThe learner is drilling this flashcard.\nFRONT: " + card.q + "\nBACK: " + card.a;
+}
+
+/* ------------------------------------------------------- chat utilities -- */
+
+/** Name a conversation from its opening exchange. Deliberately cheap: low
+ *  temperature, tiny budget, and truncated inputs — this runs on every new
+ *  thread and nobody wants to pay tutor rates for a sidebar label. */
+export async function generateTitle(userMsg: string, assistantMsg: string, override?: Override): Promise<string> {
+  const out = await chat(
+    [
+      {
+        role: "system",
+        content:
+          "Write a title for this conversation: 2 to 5 words, no quotes, no trailing punctuation, " +
+          "no filler like 'discussion about'. Name the actual subject. Reply with the title alone."
+      },
+      { role: "user", content: `USER: ${userMsg.slice(0, 800)}\n\nASSISTANT: ${assistantMsg.slice(0, 800)}` }
+    ],
+    { temperature: 0.2, maxTokens: 24, label: "title" },
+    override
+  );
+  return out
+    .trim()
+    .replace(/^["'`#\s]+|["'`.\s]+$/g, "")
+    .split("\n")[0]
+    .slice(0, 60);
+}
+
+/** Three next questions worth asking. Returned as plain strings; a model that
+ *  ignores the format yields an empty list and the UI simply shows nothing,
+ *  which is the correct failure for a garnish feature. */
+export async function suggestFollowups(
+  messages: ChatMessage[],
+  override?: Override,
+  signal?: AbortSignal
+): Promise<string[]> {
+  const tail = messages.slice(-4);
+  try {
+    const out = await chat(
+      [
+        {
+          role: "system",
+          content:
+            "Given the end of a tutoring conversation, propose three follow-up questions the learner " +
+            "should ask next. Favour questions that go deeper into the mechanism, probe an edge case, or " +
+            "connect the idea to something adjacent — not questions already answered. Each under 12 words, " +
+            "written in the learner's voice. Reply ONLY with a JSON array of three strings."
+        },
+        { role: "user", content: tail.map((m) => `${m.role.toUpperCase()}: ${m.content.slice(0, 1200)}`).join("\n\n") }
+      ],
+      { temperature: 0.7, maxTokens: 200, signal, label: "followups" },
+      override
+    );
+    const a = out.indexOf("[");
+    const b = out.lastIndexOf("]");
+    if (a < 0 || b < a) return [];
+    const arr = JSON.parse(out.slice(a, b + 1));
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((x): x is string => typeof x === "string" && x.length > 0).slice(0, 3);
+  } catch {
+    return [];
+  }
+}
+
+/** Models answer in markdown however hard you ask for HTML. Convert the three
+ *  things they actually use, then run it through the same sanitiser as cards. */
+export function formatReply(t: string): string {
+  let s = String(t || "");
+  s = s.replace(/```(?:\w+)?\n?([\s\S]*?)```/g, (_m, c) => '<div class="shape">' + U.esc(c.replace(/\s+$/, "")) + "</div>");
+  s = s.replace(/`([^`\n]+)`/g, (_m, c) => "<code>" + U.esc(c) + "</code>");
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  if (!/<p[\s>]/i.test(s)) {
+    s = s
+      .split(/\n{2,}/)
+      .map((p) => "<p>" + p.replace(/\n/g, "<br>") + "</p>")
+      .join("");
+  }
+  return U.clean(s);
+}

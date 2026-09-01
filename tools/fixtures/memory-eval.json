@@ -1,0 +1,70 @@
+{
+  "_": "Retrieval evaluation set for tools/bench-memory.ts. `ageDays` is how long ago the memory was last changed, measured back from the bench's fixed clock, so scores are reproducible. `expect` lists the ids a human says should come back for that query, best first. Keep queries phrased the way they would actually be typed into the composer.",
+
+  "memories": [
+    { "id": "g-background",  "scope": "global",  "type": "profile",       "ageDays": 120, "text": "You are an engineer moving into machine learning from a web background, and you learn best from code before maths." },
+    { "id": "g-derivations", "scope": "global",  "type": "preference",    "ageDays": 90,  "pinned": true, "text": "You want derivations shown before intuition, not after." },
+    { "id": "g-hinglish",    "scope": "global",  "type": "preference",    "ageDays": 60,  "text": "Explaining in Hinglish is fine when tutoring, but flashcards should stay in English." },
+    { "id": "g-evenings",    "scope": "global",  "type": "profile",       "ageDays": 45,  "text": "You study in the evening, usually about forty-five minutes at a time." },
+    { "id": "g-course",      "scope": "global",  "type": "reference",     "ageDays": 100, "text": "The Machine Learning Specialisation is your main course." },
+    { "id": "g-numpy",       "scope": "global",  "type": "preference",    "ageDays": 30,  "text": "You prefer plain numpy over frameworks while you are still learning the fundamentals." },
+
+    { "id": "p-goal-backprop", "scope": "project", "type": "goal",       "ageDays": 40, "text": "You want to implement backpropagation from scratch in numpy without looking anything up." },
+    { "id": "p-goal-march",    "scope": "project", "type": "goal",       "ageDays": 20, "text": "You are aiming to finish Course 1 before the end of March." },
+
+    { "id": "p-notation-mn",    "scope": "project", "type": "convention", "ageDays": 70, "text": "You use m for the number of training examples and n for the number of features." },
+    { "id": "p-notation-cols",  "scope": "project", "type": "convention", "ageDays": 68, "text": "You write vectors as column vectors, so the design matrix X is shaped (n, m) rather than (m, n)." },
+    { "id": "p-notation-wb",    "scope": "project", "type": "convention", "ageDays": 65, "text": "You use w and b for parameters rather than theta." },
+    { "id": "p-check-shapes",   "scope": "project", "type": "convention", "ageDays": 15, "text": "You always print array shapes before trying to debug the maths." },
+
+    { "id": "p-gd",         "scope": "project", "type": "understanding", "ageDays": 55, "text": "You understand gradient descent as repeatedly stepping opposite the gradient until the cost stops falling." },
+    { "id": "p-lr",         "scope": "project", "type": "understanding", "ageDays": 54, "text": "You settled on thinking of the learning rate as the step size, where too large a value overshoots the minimum." },
+    { "id": "p-sigmoid",    "scope": "project", "type": "understanding", "ageDays": 48, "text": "Logistic regression clicked once you saw the sigmoid as squashing a linear score into a probability." },
+    { "id": "p-logloss",    "scope": "project", "type": "understanding", "ageDays": 47, "text": "You read the logistic cost as log loss, which penalises confident wrong answers heavily." },
+    { "id": "p-backprop",   "scope": "project", "type": "understanding", "ageDays": 12, "text": "Backpropagation finally made sense as the chain rule applied in reverse through the computation graph." },
+    { "id": "p-softmax",    "scope": "project", "type": "understanding", "ageDays": 10, "text": "You see the softmax as normalising logits into a distribution that sums to one." },
+    { "id": "p-vectorise",  "scope": "project", "type": "understanding", "ageDays": 35, "text": "Vectorisation clicked when you replaced the loop over training examples with a single matrix multiply." },
+    { "id": "p-regular",    "scope": "project", "type": "understanding", "ageDays": 25, "text": "You understand regularisation as penalising large weights so the model stops fitting noise." },
+    { "id": "p-scaling",    "scope": "project", "type": "understanding", "ageDays": 50, "text": "Feature scaling matters because gradient descent zig-zags when features have very different ranges." },
+    { "id": "p-layer",      "scope": "project", "type": "understanding", "ageDays": 18, "text": "You think of a neural network layer as a linear map followed by a nonlinearity." },
+    { "id": "p-overfit",    "scope": "project", "type": "understanding", "ageDays": 22, "text": "Overfitting became concrete when your training loss kept falling while validation loss rose." },
+    { "id": "p-relu",       "scope": "project", "type": "understanding", "ageDays": 16, "text": "You read the derivative of ReLU as one for positive inputs and zero otherwise." },
+    { "id": "p-normaleq",   "scope": "project", "type": "understanding", "ageDays": 60, "text": "The normal equation gives a closed form solution but is impractical for large n because of the matrix inverse." },
+    { "id": "p-saturate",   "scope": "project", "type": "understanding", "ageDays": 14, "text": "The sigmoid saturates for large inputs, which is why gradients vanish in deep stacks." },
+    { "id": "p-perceptron", "scope": "project", "type": "understanding", "ageDays": 44, "text": "You realised a perceptron is logistic regression with a step function instead of a sigmoid." },
+
+    { "id": "p-open-bias",     "scope": "project", "type": "open", "ageDays": 30, "text": "You never resolved why the bias term is left out of regularisation while the weights are penalised." },
+    { "id": "p-open-loss",     "scope": "project", "type": "open", "ageDays": 26, "text": "You are still unsure when to reach for cross-entropy rather than mean squared error." },
+    { "id": "p-open-sigderiv", "scope": "project", "type": "open", "ageDays": 21, "text": "You asked why the derivative of the sigmoid can be written in terms of the sigmoid itself, and never followed it up." },
+    { "id": "p-open-batchnorm","scope": "project", "type": "open", "ageDays": 8,  "text": "You wanted to check whether batch normalisation is worth it at the scale you are working at." },
+    { "id": "p-open-ordering", "scope": "project", "type": "open", "ageDays": 6,  "text": "You still cannot see why the chain rule gives that particular ordering of the matrix multiplications in backpropagation." },
+    { "id": "p-open-adam",     "scope": "project", "type": "open", "ageDays": 33, "text": "You meant to look up why Adam usually converges faster than plain gradient descent." },
+
+    { "id": "p-ref-3b1b",     "scope": "project", "type": "reference", "ageDays": 38, "text": "The 3Blue1Brown neural network series is the video source you keep returning to." },
+    { "id": "p-ref-notebook", "scope": "project", "type": "reference", "ageDays": 11, "text": "You keep a numpy scratch notebook for testing array shapes before writing the real thing." },
+    { "id": "p-ref-goodfellow","scope": "project","type": "reference", "ageDays": 75, "text": "The Deep Learning book chapter on feedforward networks is where you go for notation." },
+
+    { "id": "r-goal-rust",  "scope": "project", "projectId": "p2", "type": "goal",          "ageDays": 9,  "text": "You want to get comfortable with Rust ownership and borrowing." },
+    { "id": "r-ownership",  "scope": "project", "projectId": "p2", "type": "understanding", "ageDays": 7,  "text": "Ownership clicked when you saw that a move invalidates the original binding." },
+    { "id": "r-open-rcarc", "scope": "project", "projectId": "p2", "type": "open",          "ageDays": 5,  "text": "You never worked out when to reach for Rc rather than Arc." },
+    { "id": "r-clippy",     "scope": "project", "projectId": "p2", "type": "convention",    "ageDays": 4,  "text": "You run cargo clippy before every commit." }
+  ],
+
+  "queries": [
+    { "q": "why does the chain rule give that ordering in backpropagation",   "expect": ["p-open-ordering", "p-backprop"] },
+    { "q": "explain the softmax to me",                                       "expect": ["p-softmax"] },
+    { "q": "when should I use cross entropy instead of mean squared error",   "expect": ["p-open-loss", "p-logloss"] },
+    { "q": "why do gradients vanish when I use sigmoid activations",          "expect": ["p-saturate", "p-sigmoid"] },
+    { "q": "what is the learning rate actually doing in gradient descent",    "expect": ["p-lr", "p-gd"] },
+    { "q": "how do I vectorise the loop over training examples",              "expect": ["p-vectorise", "p-notation-mn"] },
+    { "q": "should the bias be regularised too",                              "expect": ["p-open-bias", "p-regular"] },
+    { "q": "my training loss keeps falling but validation loss is rising",    "expect": ["p-overfit", "p-regular"] },
+    { "q": "what shape should the design matrix X be",                        "expect": ["p-notation-cols", "p-notation-mn"] },
+    { "q": "is the normal equation worth using instead of gradient descent",  "expect": ["p-normaleq"] },
+    { "q": "how should you explain things to me",                             "expect": ["g-derivations", "g-hinglish"] },
+    { "q": "remind me what I am trying to achieve here",                      "expect": ["p-goal-backprop", "p-goal-march"] },
+    { "q": "what is the derivative of relu",                                  "expect": ["p-relu"] },
+    { "q": "why is adam faster than plain gradient descent",                  "expect": ["p-open-adam", "p-gd"] },
+    { "q": "explain rust ownership and what a move does", "projectId": "p2",  "expect": ["r-ownership", "r-goal-rust"] }
+  ]
+}

@@ -1,0 +1,203 @@
+/* ============================================================================
+ * views.css — the journal and exam sections.
+ *
+ * The shell (`.app`, `.app-scroll`, `.page`, the running head) and every
+ * control they use come from style.css; what is left here is only the two
+ * sections' own type and structure. Loaded lazily with each view, so none of
+ * it ships to the review loop's first paint.
+ * ========================================================================== */
+
+/* ---------------------------------------------------------------- journal -- */
+/* The journal is the most book-like thing in the app and is set as such:
+   narrative in the reading face at the reading measure, fields separated by
+   rules and space rather than boxed off from each other. */
+/* Journal and exam open the same way the review section does: eyebrow,
+   title, rule. Three sections, one chapter opening. */
+.page-eyebrow {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: var(--s-2);
+}
+.jrnl-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding-bottom: var(--s-4);
+  margin-bottom: var(--s-5);
+  border-bottom: 1px solid var(--rule);
+}
+.jrnl-head h2,
+.page h2 {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: var(--t-xl);
+  letter-spacing: var(--track-tight);
+  line-height: var(--lh-tight);
+  color: var(--ink);
+  margin: 0;
+}
+.jrnl-capture {
+  margin-bottom: var(--s-6);
+  padding-bottom: var(--s-5);
+  border-bottom: 1px solid var(--rule);
+}
+.jrnl-rawlist {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--s-3);
+  border-top: 1px solid var(--rule-soft);
+}
+.jrnl-rawitem {
+  border-bottom: 1px solid var(--rule-soft);
+  padding: var(--s-3) var(--s-1);
+}
+.jrnl-rawtext {
+  font-family: var(--serif);
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  margin-top: var(--s-1);
+  line-height: var(--lh-body);
+}
+.jrnl-drop {
+  border: 1px dashed var(--rule);
+  border-radius: var(--r-2);
+  text-align: center;
+  padding: var(--s-1);
+  transition: border-color var(--fast), background var(--fast);
+}
+.jrnl-drop:hover {
+  border-color: var(--accent-45);
+  background: var(--accent-05);
+}
+
+.jrnl-narrative {
+  font-family: var(--serif);
+  font-size: calc(var(--t-read) * var(--text-scale));
+  line-height: var(--lh-body);
+  color: var(--ink);
+  margin: 0 0 var(--s-5);
+  max-width: var(--measure);
+  text-wrap: pretty;
+}
+.jrnl-field {
+  margin-bottom: var(--s-5);
+  max-width: var(--measure);
+}
+.jrnl-fieldhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-2);
+}
+.jrnl-list {
+  margin: 0;
+  padding-left: 1.15em;
+  font-family: var(--serif);
+  font-size: var(--t-read);
+  line-height: var(--lh-body);
+  color: var(--ink-2);
+}
+.jrnl-list li {
+  margin-bottom: var(--s-1);
+}
+.jrnl-list li::marker {
+  color: var(--ink-3);
+}
+.jrnl-empty-field {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--ink-3);
+  font-size: var(--t-sm);
+}
+.jrnl-edited-flag {
+  color: var(--amber);
+}
+.jrnl-timeline {
+  margin-bottom: var(--s-5);
+  padding-bottom: var(--s-4);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* ------------------------------------------------------------------- exam -- */
+.exam-scope-row {
+  display: flex;
+  gap: var(--s-2);
+  margin-bottom: var(--s-1);
+}
+.exam-scope-row .fi {
+  margin-bottom: 0;
+  flex: 1;
+}
+.exam-counts {
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  color: var(--ink-3);
+  margin: var(--s-3) 0 var(--s-4);
+}
+.exam-q-meta {
+  display: flex;
+  gap: var(--s-3);
+  align-items: center;
+  margin-bottom: var(--s-4);
+}
+.exam-progress {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: var(--s-3);
+}
+/* An exam question is read, so it is set in the reading face — the same
+   size and leading a card question gets, because it is the same job. */
+.exam-prompt {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: calc(var(--t-lg) * var(--text-scale));
+  line-height: var(--lh-snug);
+  letter-spacing: var(--track-tight);
+  color: var(--ink);
+  margin: 0 0 var(--s-5);
+  max-width: var(--measure);
+  text-wrap: pretty;
+}
+.exam-report-score {
+  text-align: center;
+  padding: var(--s-5) 0 var(--s-6);
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: var(--s-5);
+}
+.exam-report-score .bignum {
+  font-size: 3rem;
+}
+.exam-qrow {
+  border-bottom: 1px solid var(--rule-soft);
+  padding: var(--s-4) var(--s-1);
+}
+.exam-qrow .eqh {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-2);
+}
+.exam-qrow .eqp {
+  font-family: var(--serif);
+  font-size: var(--t-read);
+  line-height: var(--lh-body);
+  color: var(--ink);
+}
+.exam-qrow .eqa {
+  font-family: var(--serif);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--ink-2);
+  margin-top: var(--s-3);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--rule-soft);
+}
