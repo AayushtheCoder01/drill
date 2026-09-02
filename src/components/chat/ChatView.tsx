@@ -16,6 +16,7 @@ import { useRoute } from "@/context/RouteContext";
 import { useToast } from "@/context/ToastContext";
 import { useDrillStore } from "@/hooks/useDrillStore";
 import { describeSource } from "@/lib/chatContext";
+import { catalogue } from "@/lib/references";
 import { markdownToText } from "@/lib/markdown";
 import { estimateTurnTokens, formatCost, formatTokens } from "@/lib/tokens";
 import { getPersona } from "@/lib/personas";
@@ -30,6 +31,8 @@ import ConversationSettings from "./ConversationSettings";
 import CommandPalette, { type PaletteAction } from "./CommandPalette";
 import CardsModal from "./CardsModal";
 import ChatEmpty from "./ChatEmpty";
+import ModelChip from "./ModelChip";
+import EffortChip from "./EffortChip";
 
 /* Imported here rather than in main.tsx so both stylesheets ride along with
    the lazy chat chunk instead of blocking the review loop's first paint. */
@@ -51,6 +54,15 @@ export default function ChatView() {
   const pinnedToBottom = useRef(true);
 
   const c = chat.conversation;
+
+  /* Rebuilt whenever the stores change, which is what useDrillStore above is
+     for — a journal entry written a minute ago has to be referenceable now,
+     not after a reload. Cheap: every `text` in it is a thunk. */
+  const references = useMemo(
+    () => catalogue(c?.projectId || store.get().activeProjectId),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [c?.projectId, store.getVersion()]
+  );
 
   useEffect(() => {
     void chatStore.init();
@@ -249,7 +261,7 @@ export default function ChatView() {
        own navigation, its own project switcher and its own settings surface,
        none of which agreed with the rest of the app; what is left below is
        only the conversation itself. */
-    <Shell current="chat" sidebar={<ChatSidebar onNew={newChat} />} aside={<ChatRail conversation={c} />}>
+    <Shell current="chat" sidebar={<ChatSidebar onNew={newChat} />} aside={<ChatRail conversation={c} />} asideLabel="Context">
       <div className="chat-main">
         <div className="chat-head">
           {c ? (
@@ -373,6 +385,13 @@ export default function ChatView() {
           disabled={!readiness.ok}
           busy={chat.busy}
           commands={commands}
+          references={references}
+          tools={
+            <>
+              <ModelChip conversation={c} draftModel={chat.draftModel} onDraftModel={chat.setDraftModel} />
+              <EffortChip conversation={c} draftEffort={chat.draftEffort} onDraftEffort={chat.setDraftEffort} />
+            </>
+          }
           seed={seed}
           placeholder={readiness.ok ? "Ask anything — / for commands" : readiness.why}
           onSend={(text, attachments) => void chat.send(text, attachments)}

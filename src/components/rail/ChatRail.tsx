@@ -45,9 +45,23 @@ export default function ChatRail({ conversation }: { conversation: Conversation 
     <>
       <RailGroup title="What it can see" note={c.context.length ? `~${formatTokens(contextTokens)}` : undefined}>
         {c.context.length === 0 ? (
-          <RailEmpty>
-            Nothing attached — this is a plain chat. Attach your decks or memory in the conversation settings.
-          </RailEmpty>
+          <>
+            <RailEmpty>
+              Nothing attached — this thread is a plain model that cannot see your day, your cards or your journal.
+            </RailEmpty>
+            {/* Every conversation made before defaults existed has an empty
+                context, and finding the settings panel to fix that is more
+                than anyone should have to do to make the tutor work. */}
+            <button
+              className="btn sm"
+              onClick={() => {
+                c.context = chatStore.defaultContext();
+                chatStore.persist(c, true);
+              }}
+            >
+              Let it see your work
+            </button>
+          </>
         ) : (
           <RailList>
             {c.context.map((s, i) => (

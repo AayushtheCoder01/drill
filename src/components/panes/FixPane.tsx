@@ -6,6 +6,7 @@ import SheetShell from "../SheetShell";
 import ProposalsBlock from "../ProposalsBlock";
 import type { Card, QueueItem } from "@/types";
 import CardHtml from "../CardHtml";
+import Working from "../ui/Working";
 
 export default function FixPane({ item }: { item: QueueItem }) {
   const { close } = useSheet();
@@ -45,7 +46,7 @@ export default function FixPane({ item }: { item: QueueItem }) {
       <div style={{ marginTop: 18 }}>
         {busy && (
           <div className="empty">
-            <span className="spin"></span> rewriting
+            <Working stages={["reading the card", "finding where it holds two ideas", "splitting it"]} />
           </div>
         )}
         {error && <div className="err">{error}</div>}

@@ -197,6 +197,30 @@ export interface CreateOpts {
   effort?: Effort | "";
 }
 
+/**
+ * What a new conversation knows about you before you have typed anything.
+ *
+ * This used to be `[]`. That is why the tutor answered "I don't know
+ * anything" when asked what the learner did today: a fresh chat was a bare
+ * model with a persona and no access to the app it was sitting inside, and
+ * the only way to fix it was to know that Conversation settings existed and
+ * to attach sources by hand.
+ *
+ * Every source here renders to nothing when it has nothing to say
+ * (chatContext.renderSource returns null), so a brand-new install pays no
+ * tokens for the ones that are empty — but the moment there *is* a day, a
+ * journal, a weak card or a memory, the tutor can see it.
+ */
+export function defaultContext(): ContextSource[] {
+  return [
+    { kind: "memory", scope: "both", limit: 8 },
+    { kind: "today", days: 1 },
+    { kind: "journal", days: 7 },
+    { kind: "weak", deckId: null },
+    { kind: "knowledge" }
+  ];
+}
+
 export function create(opts: CreateOpts = {}): Conversation {
   const persona = getPersona(opts.personaId || DEFAULT_PERSONA_ID);
   const now = Date.now();
@@ -216,7 +240,7 @@ export function create(opts: CreateOpts = {}): Conversation {
     temperature: opts.temperature ?? persona.temperature ?? 0.6,
     maxTokens: 4096,
     effort: opts.effort || "",
-    context: opts.context || [],
+    context: opts.context ?? defaultContext(),
     pinnedAttachments: [],
     turns: [],
     usage: { promptTokens: 0, completionTokens: 0 },

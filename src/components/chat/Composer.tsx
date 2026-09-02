@@ -5,10 +5,21 @@
  * go hunting for them in a menu mid-thought. Typing "/" and three letters
  * keeps quizzing, card-making and context-attaching inside the flow of the
  * conversation.
+ *
+ * "@" is the other half. A slash command *does* something; an "@" points at
+ * something you already have — a journal entry, a book on the project shelf,
+ * a deck, a card, a memory — and rides along with this one message. It is the
+ * file-attach gesture every chat app has, except the things being attached
+ * are yours and already in the app, so there is nothing to upload.
+ *
+ * Note the difference from conversation context, which is standing policy
+ * attached to every message in the thread. A reference is for the sentence
+ * you are writing now.
  * ========================================================================== */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as U from "@/lib/util";
 import { estimateTokens } from "@/lib/tokens";
+import { KIND_LABEL, search, toAttachment, type Reference } from "@/lib/references";
 import type { Attachment } from "@/types/chat";
 import Icon from "../ui/Icon";
 
@@ -24,6 +35,12 @@ interface Props {
   busy: boolean;
   placeholder?: string;
   commands: SlashCommand[];
+  /** Everything referenceable, rebuilt by the caller so the composer never
+   *  reaches into the stores itself. */
+  references: Reference[];
+  /** Rendered at the left of the composer bar — the model chip. Passed in
+   *  rather than built here so the composer stays ignorant of conversations. */
+  tools?: ReactNode;
   onSend: (text: string, attachments: Attachment[]) => void;
   onStop: () => void;
   /** set to a string to overwrite the draft from outside (follow-up chips) */
@@ -32,10 +49,21 @@ interface Props {
 
 const MAX_FILE_BYTES = 400_000;
 
-export default function Composer({ disabled, busy, placeholder, commands, onSend, onStop, seed }: Props) {
+export default function Composer({ disabled, busy, placeholder, commands, references, tools, onSend, onStop, seed }: Props) {
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [slashSel, setSlashSel] = useState(0);
+  const [refSel, setRefSel] = useState(0);
+  /** Where the caret was when the last change happened. The "@" token is
+   *  found by looking backwards from here, not from the end of the text, so a
+   *  reference can be dropped into the middle of a sentence. */
+  const [caret, setCaret] = useState(0);
+  /** Set the moment a reference is chosen (or the picker is dismissed), and
+   *  cleared by the next keystroke. Without it the menu reopens on its own
+   *  inserted token: the caret moves in a rAF *after* React has re-rendered
+   *  with the new text and the old caret, and that one frame is enough to
+   *  match "@" again and leave the menu stuck open. */
+  const [refOff, setRefOff] = useState(false);
   const ref = useRef<HTMLTextAreaElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -60,12 +88,54 @@ export default function Composer({ disabled, busy, placeholder, commands, onSend
     return m ? m[1].toLowerCase() : null;
   }, [text]);
 
+  /* The "@" token immediately before the caret, if there is one. Anchored to
+     a word boundary so an email address does not open the picker, and with
+     brackets excluded so the "@[journal: ...]" token this inserts cannot
+     match itself and hold the menu open. */
+  const refQuery = useMemo(() => {
+    if (refOff) return null;
+    const before = text.slice(0, caret);
+    const m = /(?:^|\s)@([^\n@\[\]]{0,40})$/.exec(before);
+    if (!m) return null;
+    return m[1];
+  }, [text, caret, refOff]);
+
+  const refMatches = useMemo(
+    () => (refQuery == null ? [] : search(references, refQuery)),
+    [refQuery, references]
+  );
+
+  useEffect(() => setRefSel(0), [refQuery]);
+
   const matches = useMemo(
     () => (slashQuery == null ? [] : commands.filter((c) => c.cmd.slice(1).startsWith(slashQuery))),
     [slashQuery, commands]
   );
 
   useEffect(() => setSlashSel(0), [slashQuery]);
+
+  /** Swap the "@query" token for a readable label and attach the material.
+   *  The label stays in the text so the sentence still reads as a sentence
+   *  when you look at it later — "compare @[journal: 2026-9-1] with today". */
+  function pickRef(r: Reference) {
+    const before = text.slice(0, caret);
+    const after = text.slice(caret);
+    const token = /(?:^|\s)@([^\n@\[\]]{0,40})$/.exec(before);
+    const cut = token ? before.length - token[1].length - 1 : before.length;
+    const label = `@[${KIND_LABEL[r.kind]}: ${r.label}] `;
+    const next = before.slice(0, cut) + label + after;
+    setText(next);
+    setRefOff(true);
+    setAttachments((prev) => (prev.some((a) => a.name === `${KIND_LABEL[r.kind]}: ${r.label}`) ? prev : [...prev, toAttachment(r)]));
+    const pos = cut + label.length;
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(pos, pos);
+      setCaret(pos);
+    });
+  }
 
   function runSlash(c: SlashCommand) {
     const arg = text.replace(/^\/\w*\s*/, "");
@@ -95,6 +165,28 @@ export default function Composer({ disabled, busy, placeholder, commands, onSend
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (refMatches.length) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setRefSel((i) => (i + 1) % refMatches.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setRefSel((i) => (i - 1 + refMatches.length) % refMatches.length);
+        return;
+      }
+      if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+        e.preventDefault();
+        pickRef(refMatches[refSel]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setRefOff(true); // closes it without touching what was typed
+        return;
+      }
+    }
     if (matches.length) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -170,6 +262,26 @@ export default function Composer({ disabled, busy, placeholder, commands, onSend
           </div>
         )}
 
+        {refMatches.length > 0 && (
+          <div className="slashmenu refmenu">
+            <div className="refmenu-head">Refer to something of yours</div>
+            {refMatches.map((r, i) => (
+              <button
+                key={r.id}
+                className={"slashitem" + (i === refSel ? " sel" : "")}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pickRef(r);
+                }}
+              >
+                <span className="cmd">{KIND_LABEL[r.kind]}</span>
+                <span className="reflabel">{r.label}</span>
+                <span className="desc">{r.hint}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="composer-box">
           {attachments.length > 0 && (
             <div className="att-row" style={{ padding: "10px 12px 0" }}>
@@ -190,7 +302,13 @@ export default function Composer({ disabled, busy, placeholder, commands, onSend
             value={text}
             disabled={disabled}
             placeholder={placeholder || "Ask anything — / for commands"}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              setCaret(e.target.selectionStart ?? e.target.value.length);
+              setRefOff(false);
+            }}
+            onKeyUp={(e) => setCaret((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
+            onClick={(e) => setCaret((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
             onKeyDown={onKeyDown}
             onPaste={onPaste}
             onDrop={(e) => {
@@ -202,6 +320,7 @@ export default function Composer({ disabled, busy, placeholder, commands, onSend
           />
 
           <div className="composer-bar">
+            {tools}
             <button className="cbtn ghost" onClick={() => fileRef.current?.click()} title="Attach a text file">
               📎
             </button>
@@ -235,7 +354,7 @@ export default function Composer({ disabled, busy, placeholder, commands, onSend
 
         <div className="composer-hint">
           <span>enter to send · shift+enter for a newline</span>
-          <span>/ for commands</span>
+          <span>/ for commands · @ to refer to your own work</span>
           <span>ctrl+k palette</span>
         </div>
       </div>

@@ -61,7 +61,7 @@ export default function AppShell() {
        are giving it are never more than a glance apart, however long the card
        runs. Done renders its own call to action inside the page instead, so
        there is nothing to dock when the queue is empty. */
-    <Shell current="drill" dock={review.current ? <Controls /> : null} aside={<ReviewRail />}>
+    <Shell current="drill" dock={review.current ? <Controls /> : null} aside={<ReviewRail />} asideLabel="Today">
       <div className="app-scroll">
         <div className="page">
           <Header />

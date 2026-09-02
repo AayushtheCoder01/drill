@@ -151,6 +151,13 @@ export default function ConversationScope() {
 
       <label className="f">What the model can see</label>
       <div className="personagrid">
+        <button
+          className={"personaopt" + (hasSource((s) => s.kind === "today") ? " on" : "")}
+          onClick={() => toggleSource({ kind: "today", days: 1 }, (s) => s.kind === "today")}
+        >
+          <span className="pn">Today</span>
+          <span className="pb">What you reviewed, what you got wrong, what you wrote — the whole day.</span>
+        </button>
         <button className={"personaopt" + (hasSource((s) => s.kind === "weak") ? " on" : "")} onClick={() => toggleSource({ kind: "weak", deckId: null }, (s) => s.kind === "weak")}>
           <span className="pn">Your weak spots</span>
           <span className="pb">The cards you keep failing, across every deck.</span>

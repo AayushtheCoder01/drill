@@ -6,6 +6,7 @@ import { useSheet } from "@/context/SheetContext";
 import Done from "./Done";
 import Icon from "./ui/Icon";
 import CardHtml from "./CardHtml";
+import Working from "./ui/Working";
 
 declare global {
   interface Window {
@@ -162,7 +163,7 @@ export default function Stage() {
               <div className={"verdict " + (marking === "loading" ? "part" : marking === "error" ? "part" : lastMark ? verdictClass(lastMark.verdict) : "part")}>
                 {marking === "loading" && (
                   <div className="vh">
-                    <span className="spin"></span> marking your recall
+                    <Working stages={["reading what you wrote", "comparing it against the card", "deciding what you missed"]} />
                   </div>
                 )}
                 {marking === "error" && (

@@ -51,12 +51,19 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const grade = useCallback(
     (g: Grade) => {
       if (!current) return;
-      store.gradeCard(current, g);
+      /* The attempt goes into the log with the grade. A grade on its own says
+         you got it wrong; the sentence you actually wrote says *how* — which
+         is the difference between a tutor that can only count and one that
+         can read back what you were thinking. */
+      store.gradeCard(current, g, {
+        attempt: lastAttempt || attempt,
+        verdict: lastMark?.verdict
+      });
       const tag = current.def.tag;
       setLastTag(tag);
       resetCard(tag);
     },
-    [current, resetCard]
+    [current, resetCard, attempt, lastAttempt, lastMark]
   );
 
   return (

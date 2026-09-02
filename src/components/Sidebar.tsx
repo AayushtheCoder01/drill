@@ -23,7 +23,9 @@ import SettingsModal from "./settings/SettingsModal";
 import Icon, { type IconName } from "./ui/Icon";
 
 const SECTIONS: { view: View; label: string; icon: IconName }[] = [
+  { view: "home", label: "Home", icon: "home" },
   { view: "drill", label: "Review", icon: "review" },
+  { view: "cards", label: "Cards", icon: "cards" },
   { view: "journal", label: "Journal", icon: "journal" },
   { view: "exam", label: "Exam", icon: "exam" },
   { view: "chat", label: "Chat", icon: "bubble" }
@@ -45,11 +47,13 @@ export default function Sidebar({
   children?: ReactNode;
 }) {
   const db = useDrillStore();
-  const { openDrill, openChat, openJournal, openExam } = useRoute();
+  const { openHome, openDrill, openCards, openChat, openJournal, openExam } = useRoute();
   const [settings, setSettings] = useState(false);
 
   const go: Record<View, () => void> = {
+    home: openHome,
     drill: openDrill,
+    cards: openCards,
     chat: () => openChat(null),
     journal: () => openJournal(),
     exam: () => openExam(null)

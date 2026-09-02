@@ -29,6 +29,8 @@ import type {
   LegacyDBv2,
   LegacyDBv3,
   LegacyDeckV2,
+  LogEntry,
+  MarkResult,
   Note,
   NoteSource,
   Project,
@@ -67,10 +69,12 @@ export const DEFAULT_SETTINGS: Settings = {
   interleave: true,
   effort: "medium",
   autonomy: "assisted",
+  followups: false,
   theme: "night",
   accent: "blue",
   density: "comfortable",
   navCollapsed: false,
+  railCollapsed: false,
   textScale: 1,
   sessionSize: 10
 };
@@ -115,6 +119,9 @@ export function normCard(c: Partial<Card> | null | undefined): Card {
     a: normaliseCardHtml(U.clean(c && c.a))
   };
   if (c && c.sourceRef) out.sourceRef = c.sourceRef;
+  // Preserved when re-normalising an existing card (an edit must not look
+  // like a new card), stamped when one is genuinely new.
+  out.created = (c && c.created) || Date.now();
   return out;
 }
 
@@ -604,7 +611,10 @@ export function addCards(d: Deck, cards: Partial<Card>[]): void {
 }
 
 export function upsertCard(d: Deck, card: Partial<Card>): Card {
-  const nc = normCard(card);
+  // An edit must not look like a new card: whatever the caller passed, the
+  // original creation stamp wins if there is one.
+  const prior = card.id ? d.cards.find((x) => x.id === card.id) : undefined;
+  const nc = normCard(prior ? { ...card, created: card.created ?? prior.created } : card);
   const i = d.cards.findIndex((x) => x.id === nc.id);
   if (i >= 0) d.cards[i] = nc;
   else d.cards.push(nc);
@@ -752,8 +762,21 @@ export function nextDue(): string | null {
   return soonest ? U.fmt((soonest - now) / MIN) : null;
 }
 
+/** How much of a recall attempt is worth keeping. Long enough to be the
+ *  sentence they actually wrote, short enough that a year of them still fits
+ *  in localStorage beside everything else. */
+const ATTEMPT_MAX = 260;
+
+/** What happened around the grade, beyond the grade itself: what they wrote
+ *  from memory and what the marker made of it. Optional — grading without
+ *  recall mode on passes nothing and the entry is as terse as it ever was. */
+export interface GradeContext {
+  attempt?: string;
+  verdict?: MarkResult["verdict"];
+}
+
 /** Record a grade. Returns the new scheduling state. */
-export function gradeCard(o: QueueItem, g: Grade): SRSState {
+export function gradeCard(o: QueueItem, g: Grade, ctx: GradeContext = {}): SRSState {
   const d = o.deck;
   const before = o.st.state || "new";
   if (!d.srs[o.def.id] || !d.srs[o.def.id].reps) d.meta.newToday += 1;
@@ -761,7 +784,11 @@ export function gradeCard(o: QueueItem, g: Grade): SRSState {
   d.meta.reviews += 1;
   d.meta.lastActive = U.today();
   if (d.meta.streak === 0) d.meta.streak = 1;
-  db.log.push({ t: Date.now(), g, s: before, d: d.id });
+  const entry: LogEntry = { t: Date.now(), g, s: before, d: d.id, c: o.def.id };
+  const attempt = (ctx.attempt || "").trim();
+  if (attempt) entry.a = attempt.slice(0, ATTEMPT_MAX);
+  if (ctx.verdict) entry.v = ctx.verdict;
+  db.log.push(entry);
   if (db.log.length > 8000) db.log = db.log.slice(-6000);
   const live = session();
   if (live) live.done += 1;

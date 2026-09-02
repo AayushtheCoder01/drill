@@ -11,6 +11,7 @@ import * as journalStore from "@/services/journalStore";
 import { useToast } from "@/context/ToastContext";
 import type { JournalEntry, JournalSummary } from "@/types/journal";
 import type { Project } from "@/types/core";
+import Working from "../ui/Working";
 
 function FieldBlock({
   label,
@@ -125,7 +126,7 @@ export default function JournalEntryView({
       {error && <div className="err">{error}</div>}
       {busy && (
         <div className="empty">
-          <span className="spin"></span> writing today's entry
+          <Working stages={["reading what you wrote", "finding the shape of the day", "naming what you got stuck on", "writing it up"]} />
         </div>
       )}
 

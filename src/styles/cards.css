@@ -1,0 +1,210 @@
+/* ============================================================================
+ * cards.css — the Cards section.
+ *
+ * Shares the home page's chapter opening (`.home-folio`, `.home-epigraph`,
+ * `.home-rule`, `.home-sec`) rather than inventing a second one: the two are
+ * the same kind of page — read, not operated — and should open identically.
+ * What is here is only the library's own furniture.
+ * ========================================================================== */
+@import "./home.css";
+
+.page.cards {
+  max-width: var(--page-wide);
+  padding-top: var(--s-7);
+  padding-bottom: var(--s-8);
+}
+.cards-head {
+  display: block;
+  margin-bottom: var(--s-6);
+}
+.cards-head h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: var(--t-2xl);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--track-tight);
+  color: var(--ink);
+}
+.cards-head .home-epigraph {
+  margin-left: 0;
+}
+
+/* ------------------------------------------------------------- raw stock -- */
+/* What you wrote today, each line with the one action that matters. Ruled
+   rows, not cards: these are entries in a list, not objects to pick up. */
+.src-list {
+  display: flex;
+  flex-direction: column;
+}
+.src {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.src-txt {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.src-kind {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.src-line {
+  font-family: var(--serif);
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+  color: var(--ink-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.src-acts {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--s-2);
+}
+
+/* --------------------------------------------------------------- tools -- */
+/* Named `cfilter`, not `chip`: style.css already owns `.chip` for the small
+   metadata tags in card headers and chat attachments, and reusing the name
+   would restyle those from three sections away. */
+.cards-tools {
+  display: flex;
+  gap: var(--s-2);
+  align-items: center;
+  margin-bottom: var(--s-3);
+}
+.cards-tools .fi {
+  flex: 1;
+  margin: 0;
+}
+.cfilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-bottom: var(--s-4);
+}
+.cfilter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-1) var(--s-3);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--ink-2);
+  font: 400 var(--t-xs) / 1.6 var(--sans);
+  cursor: pointer;
+  transition: border-color var(--fast), color var(--fast), background var(--fast);
+}
+.cfilter:hover:not(:disabled) {
+  border-color: var(--rule);
+  color: var(--ink);
+}
+.cfilter.on {
+  border-color: var(--accent);
+  background: var(--accent-10);
+  color: var(--accent);
+}
+.cfilter:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.cfilter-n {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+.cfilter.on .cfilter-n {
+  color: inherit;
+}
+.cfilter-sel {
+  padding: var(--s-1) var(--s-3);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--ink-2);
+  font: 400 var(--t-xs) / 1.6 var(--sans);
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------ the list -- */
+/* The front in the reading face at reading size; everything the scheduler
+   knows tucked underneath in the quiet faces. A card is a sentence, so it is
+   set as one. */
+.cardlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cardrow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  width: 100%;
+  text-align: left;
+  padding: var(--s-3) 0;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--rule-soft);
+  cursor: pointer;
+}
+.cardrow:hover {
+  background: var(--surface);
+  box-shadow: -12px 0 0 var(--surface), 12px 0 0 var(--surface);
+}
+.cardrow-q {
+  font-family: var(--serif);
+  font-size: var(--t-read);
+  line-height: var(--lh-snug);
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cardrow-q p {
+  margin: 0;
+  display: inline;
+}
+.cardrow-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  font: 400 var(--t-2xs) / 1 var(--sans);
+  color: var(--ink-3);
+}
+.cardrow-tag {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+/* The state is the one coloured thing in the row, so a scan down the column
+   reads as a column of standings rather than a column of words. */
+.cardrow-state {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+.cardrow-state.due {
+  color: var(--accent);
+}
+.cardrow-state.leech {
+  color: var(--red);
+}
+.cardrow-state.learning {
+  color: var(--green);
+}

@@ -5,12 +5,15 @@ import { useReview } from "@/context/ReviewContext";
 import SheetShell from "../SheetShell";
 import ProposalsBlock from "../ProposalsBlock";
 import type { Card } from "@/types";
+import Working from "../ui/Working";
 
-export default function AIPane() {
+export default function AIPane({ source, sourceLabel }: { source?: string; sourceLabel?: string } = {}) {
   const { close } = useSheet();
   const review = useReview();
-  const [mode, setMode] = useState<"topic" | "notes">("topic");
-  const [src, setSrc] = useState("");
+  // Arriving with a source means someone picked a memory, a journal entry or
+  // a note to turn into cards — so open on the notes tab with it already in.
+  const [mode, setMode] = useState<"topic" | "notes">(source ? "notes" : "topic");
+  const [src, setSrc] = useState(source || "");
   const [n, setN] = useState("10");
   const [focus, setFocus] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,6 +41,7 @@ export default function AIPane() {
   return (
     <SheetShell title="Make cards" sub={r.model ? `${r.backend.label} · ${r.model}` : "no model set"}>
       {!readiness.ok && <div className="note">{readiness.why}</div>}
+      {sourceLabel && <div className="note">Working from {sourceLabel}.</div>}
 
       <div className="tabs">
         <button className={"tab" + (mode === "topic" ? " on" : "")} onClick={() => setMode("topic")}>
@@ -94,7 +98,10 @@ export default function AIPane() {
       <div style={{ marginTop: 18 }}>
         {busy && (
           <div className="empty">
-            <span className="spin"></span> thinking — 10 to 40 seconds
+            <Working
+              stages={["reading your source", "finding the ideas worth a card", "writing them one at a time", "splitting anything that needs an “and”"]}
+              note="usually 10 to 40 seconds"
+            />
           </div>
         )}
         {error && <div className="err">{error}</div>}

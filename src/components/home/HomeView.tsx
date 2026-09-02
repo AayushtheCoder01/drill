@@ -1,0 +1,354 @@
+/* ============================================================================
+ * HomeView — where a session starts and ends.
+ *
+ * Every other section is a place to do one thing. This is the only page that
+ * answers "how is this going": the year of days, the streak, what is waiting,
+ * how far through each deck you are, and what you last touched in every
+ * section.
+ *
+ * It opens the way a front page should — a greeting set in the reading face,
+ * one clear thing to do next, and everything else quiet underneath it.
+ * Nothing here is a control surface for learning; every tile is a door into
+ * the section that owns the work.
+ *
+ * All of it is derived at render time from the stores (START-HERE §2.6),
+ * scoped to the active project the same way everything else is.
+ * ========================================================================== */
+import { useEffect, type ReactNode } from "react";
+import * as store from "@/services/store";
+import * as chatStore from "@/services/chatStore";
+import * as journalStore from "@/services/journalStore";
+import * as examStore from "@/services/examStore";
+import * as memoryStore from "@/services/memoryStore";
+import { useDrillStore } from "@/hooks/useDrillStore";
+import { useStoreSync } from "@/hooks/useStoreSync";
+import { useRoute } from "@/context/RouteContext";
+import { streaks } from "@/lib/activity";
+import { ago } from "@/lib/util";
+import Shell from "../Shell";
+import Icon from "../ui/Icon";
+import ActivityGrid from "./ActivityGrid";
+import HomeRail from "../rail/HomeRail";
+import "@/styles/home.css";
+
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 5) return "Still up";
+  if (h < 12) return "Good morning";
+  if (h < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+/** A number and what it is. No box around it — the figure is the thing and
+ *  the label is its caption; a border would only add a rectangle. */
+function Figure({
+  value,
+  label,
+  note,
+  tone
+}: {
+  value: string | number;
+  label: string;
+  note?: string;
+  tone?: "accent" | "green" | "muted";
+}) {
+  return (
+    <div className={"home-fig" + (tone ? " " + tone : "")}>
+      <div className="home-fig-n">{value}</div>
+      <div className="home-fig-l">{label}</div>
+      {note && <div className="home-fig-note">{note}</div>}
+    </div>
+  );
+}
+
+/** Sentence-case subhead in the reading face, with an optional quiet note on
+ *  the right. Deliberately not the uppercase mono label the panes use: this
+ *  page is read, not operated. */
+function Section({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
+  return (
+    <section className="home-sec">
+      <h3 className="home-sec-h">
+        <span>{title}</span>
+        {note && <span className="home-sec-note">{note}</span>}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+/** One line of the table of contents: the section, a dot leader, and what is
+ *  waiting in it. A book's contents page is the most inviting page it has —
+ *  it is a list of places you could go — so the sections are set as one. */
+function Entry({ label, note, onClick }: { label: string; note: string; onClick: () => void }) {
+  return (
+    <button className="toc-row" onClick={onClick}>
+      <span className="toc-name">{label}</span>
+      <span className="toc-leader" aria-hidden="true" />
+      <span className="toc-note">{note}</span>
+    </button>
+  );
+}
+
+export default function HomeView() {
+  const db = useDrillStore();
+  useStoreSync(chatStore);
+  useStoreSync(journalStore);
+  useStoreSync(examStore);
+  useStoreSync(memoryStore);
+  const { projectId, openDrill, openCards, openChat, openJournal, openExam } = useRoute();
+
+  // The review store is loaded before the app paints; the four IndexedDB
+  // stores are not, and Home is the one page that reads all of them at once.
+  // init() is idempotent, so re-running it on mount just resolves.
+  useEffect(() => {
+    void chatStore.init();
+    void journalStore.init();
+    void examStore.init();
+    void memoryStore.init();
+  }, []);
+
+  const project = db.projects[projectId];
+  const decks = store.decksOf(projectId);
+  const deckIds = new Set(decks.map((d) => d.id));
+
+  /* db.log is global — one line per grade, whatever project it belonged to.
+     Everything on this page is scoped to the project in the sidebar, so the
+     log is filtered the same way before any of it is counted. */
+  const log = db.log.filter((e) => deckIds.has(e.d));
+
+  const s = store.stats();
+  const counts = store.counts();
+  const session = store.session();
+  const { current: streak, longest, activeDays } = streaks(log);
+  const retention = s.rev > 0 ? Math.round((s.ok / s.rev) * 100) : null;
+
+  const cards = decks.reduce((n, d) => n + d.cards.length, 0);
+  const seen = decks.reduce((n, d) => n + d.cards.filter((c) => d.srs[c.id]?.reps).length, 0);
+
+  const journal = journalStore.listForProject(projectId);
+  const exams = examStore.listForProject(projectId);
+  const convos = chatStore
+    .list()
+    .filter((c) => c.projectId === projectId && !c.archived)
+    .sort((a, b) => b.updated - a.updated);
+  const memories = memoryStore.list({ scope: "project", projectId, activeOnly: true });
+
+  /* Average score across finished exams. Unanswered questions are left out
+     rather than counted wrong — an exam you walked away from halfway is not
+     evidence that you failed the half you never saw. */
+  const graded = exams.filter((e) => e.finishedAt);
+  const examAvg = graded.length
+    ? Math.round(
+        (graded.reduce((acc, e) => {
+          const answered = e.questions.filter((q) => q.result);
+          const right = answered.filter((q) => q.result?.verdict === "got").length;
+          return acc + (answered.length ? right / answered.length : 0);
+        }, 0) /
+          graded.length) *
+          100
+      )
+    : null;
+
+  if (!project) return null;
+
+  const today = new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+
+  /* One thing to do next, and always the truest one: what is due, then what
+     is new, then nothing — said plainly rather than dressed up as an
+     achievement. */
+  const fresh = Math.min(counts.newLeft, counts.unseen);
+
+  /* The epigraph says where you stand in one line. It is the only sentence on
+     the page allowed to be about you rather than about the data, which is
+     what makes it worth reading — so it must stay honest: a broken streak is
+     named, not softened. */
+  const epigraph =
+    log.length === 0
+      ? "Nothing written down yet. Every book starts on a blank page."
+      : streak >= 2
+        ? `Day ${streak} without a gap.` + (streak >= longest ? " Your longest run yet." : ` Your best is ${longest}.`)
+        : streak === 1
+          ? "One day in. The second is the one that counts."
+          : s.last7 > 0
+            ? "The thread dropped. Pick it back up today and it barely shows."
+            : `Nothing for a week. ${cards - seen > 0 ? "The cards are still there." : "Start again where you left off."}`;
+  const call =
+    counts.due > 0
+      ? {
+          head: `${counts.due} card${counts.due === 1 ? "" : "s"} due`,
+          sub: "Pick up where you left off.",
+          cta: "Start reviewing"
+        }
+      : fresh > 0
+        ? {
+            head: `${fresh} new card${fresh === 1 ? "" : "s"} ready`,
+            sub: "Nothing is due — this would be new ground.",
+            cta: "Learn something new"
+          }
+        : cards === 0
+          ? {
+              head: "No cards yet",
+              sub: "Make a deck and the rest of this page fills itself in.",
+              cta: "Open Review"
+            }
+          : {
+              head: "You are clear for today",
+              sub: `The next card comes back in ${store.nextDue() || "a while"}.`,
+              cta: "Review anyway"
+            };
+
+  return (
+    <Shell current="home" aside={<HomeRail log={log} projectId={projectId} />} asideLabel="This week">
+      <div className="app-scroll">
+        <div className="page home">
+          <header className="home-hello">
+            <div className="home-folio">
+              {today} · {project.name}
+            </div>
+            <h2>
+              <Icon name="sparkle" size={24} className="home-hello-mark" />
+              {greeting()}
+            </h2>
+            {/* The epigraph. One italic line that says where you stand — the
+                part of a chapter opening that makes you want to read on. */}
+            <p className="home-epigraph">{epigraph}</p>
+            <div className="home-rule" />
+          </header>
+
+          <button className="home-call" onClick={openDrill}>
+            <span className="home-call-txt">
+              <span className="home-call-head">{call.head}</span>
+              <span className="home-call-sub">{call.sub}</span>
+            </span>
+            <span className="home-call-cta">
+              {call.cta}
+              <Icon name="send" size={15} />
+            </span>
+          </button>
+
+          {/* The four numbers that describe a practice, in the order you
+              actually ask them: am I keeping it up, did I do today, what is
+              waiting, is any of it sticking. */}
+          <div className="home-figs">
+            <Figure
+              value={streak}
+              label="day streak"
+              note={streak === 0 ? "none going" : `best ${longest}`}
+              tone={streak > 0 ? "accent" : "muted"}
+            />
+            <Figure
+              value={s.today}
+              label="reviewed today"
+              note={session ? `run ${session.done} of ${session.target}` : "no run set"}
+              tone={s.today > 0 ? "green" : "muted"}
+            />
+            <Figure
+              value={counts.due}
+              label="due now"
+              note={counts.newLeft > 0 ? `${counts.newLeft} new allowed` : "new limit reached"}
+              tone={counts.due === 0 ? "muted" : undefined}
+            />
+            <Figure
+              value={retention === null ? "—" : retention + "%"}
+              label="recall, 30 days"
+              note={
+                retention === null ? "not enough reviews" : `target ${Math.round(store.settings().retention * 100)}%`
+              }
+              tone={retention === null ? "muted" : undefined}
+            />
+          </div>
+
+          <Section title="Activity" note={`${activeDays} active ${activeDays === 1 ? "day" : "days"}`}>
+            <ActivityGrid log={log} />
+          </Section>
+
+          <Section title="Contents">
+            <div className="toc">
+              <Entry
+                label="Review"
+                note={counts.due > 0 ? `${counts.due} waiting` : fresh > 0 ? `${fresh} new to meet` : "clear"}
+                onClick={openDrill}
+              />
+              <Entry
+                label="Cards"
+                note={cards === 0 ? "none written yet" : `${cards} written · ${seen} seen`}
+                onClick={openCards}
+              />
+              <Entry
+                label="Journal"
+                note={
+                  journal.length
+                    ? `${journal.length} ${journal.length === 1 ? "entry" : "entries"} · ${ago(journal[0].updated)}`
+                    : "nothing written yet"
+                }
+                onClick={() => openJournal()}
+              />
+              <Entry
+                label="Exam"
+                note={
+                  exams.length
+                    ? `${exams.length} sat${examAvg !== null ? ` · ${examAvg}% average` : ""}`
+                    : "none sat yet"
+                }
+                onClick={() => openExam(null)}
+              />
+              <Entry
+                label="Chat"
+                note={
+                  convos.length
+                    ? `${convos.length} ${convos.length === 1 ? "thread" : "threads"} · ${ago(convos[0].updated)}`
+                    : "no conversations yet"
+                }
+                onClick={() => openChat(null)}
+              />
+            </div>
+          </Section>
+
+          <Section title="Decks" note={`${seen} of ${cards} cards seen`}>
+            {decks.length === 0 ? (
+              <p className="home-empty">No decks in this project yet — make some from Review.</p>
+            ) : (
+              <ul className="home-decks">
+                {decks.map((d) => {
+                  const total = d.cards.length;
+                  const done = d.cards.filter((c) => d.srs[c.id]?.reps).length;
+                  const pct = total ? Math.round((done / total) * 100) : 0;
+                  return (
+                    <li key={d.id}>
+                      <button className="home-deck" onClick={openDrill} title={`Review ${d.name}`}>
+                        <span className="home-deck-name">{d.name}</span>
+                        <span className="home-deck-bar">
+                          <i style={{ width: pct + "%" }} />
+                        </span>
+                        <span className="home-deck-n">
+                          {done}/{total}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Section>
+
+          <Section title="What has built up">
+            <div className="home-tally">
+              <div>
+                <b>{memories.length}</b> memories held for this project
+              </div>
+              <div>
+                <b>{s.last7}</b> reviews in the last seven days
+              </div>
+              <div>
+                <b>{s.leech}</b> {s.leech === 1 ? "card keeps" : "cards keep"} slipping
+              </div>
+              <div>
+                <b>{journal.filter((e) => e.distilled.at).length}</b> journal entries distilled
+              </div>
+            </div>
+          </Section>
+        </div>
+      </div>
+    </Shell>
+  );
+}

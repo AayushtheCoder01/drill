@@ -24,6 +24,32 @@ export function isAbort(e: unknown): boolean {
   return !!e && typeof e === "object" && (e as { name?: string }).name === "AbortError";
 }
 
+/**
+ * A reply with no text in it, explained.
+ *
+ * Reasoning models are the usual cause: the thinking counts against
+ * max_tokens, so the budget can be gone before the visible answer starts, and
+ * what comes back is an empty `content` with `finish_reason: "length"` and
+ * possibly a full `reasoning` block. Reported as "the model said nothing" it
+ * is unfixable; reported as this it takes one settings change.
+ */
+function emptyReplyError(label: string, finish: string | undefined, reasoning: string): Error {
+  if (finish === "length") {
+    return new Error(
+      label +
+        " hit the token cap before writing an answer" +
+        (reasoning ? " — it spent the whole budget thinking" : "") +
+        ". Pick a model with reasoning off, or a smaller task."
+    );
+  }
+  if (reasoning) {
+    return new Error(
+      label + " returned only its reasoning and no answer. This model needs its reasoning output disabled, or a different model."
+    );
+  }
+  return new Error(label + " returned an empty reply" + (finish ? " (finish_reason: " + finish + ")" : "") + ".");
+}
+
 /** OpenAI-shaped usage blocks, which OpenRouter, OpenAI and most compatible
  *  servers all return under the same key names. */
 function readOpenAIUsage(j: unknown): TokenUsage | undefined {
@@ -164,20 +190,34 @@ function openAICompatible(
         const j = await res.json();
         const u = readOpenAIUsage(j);
         if (u && opts.onUsage) opts.onUsage(u);
-        return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || "";
+        const choice = (j.choices && j.choices[0]) || {};
+        const text = (choice.message && choice.message.content) || "";
+        if (!text) {
+          const reasoning = String((choice.message && (choice.message.reasoning || choice.message.reasoning_content)) || "");
+          throw emptyReplyError(label, choice.finish_reason, reasoning);
+        }
+        return text;
       }
       let out = "";
+      let reasoned = false;
+      let finish: string | undefined;
       let usage: TokenUsage | undefined;
       await readSSE(res, (j) => {
         const u = readOpenAIUsage(j);
         if (u) usage = u;
-        const t = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
-        if (t) {
-          out += t;
-          opts.onToken!(t, out);
+        const choice = j.choices && j.choices[0];
+        if (!choice) return;
+        if (choice.finish_reason) finish = choice.finish_reason;
+        const d = choice.delta;
+        if (!d) return;
+        if (d.reasoning || d.reasoning_content) reasoned = true;
+        if (d.content) {
+          out += d.content;
+          opts.onToken!(d.content, out);
         }
       });
       if (usage && opts.onUsage) opts.onUsage(usage);
+      if (!out) throw emptyReplyError(label, finish, reasoned ? "yes" : "");
       return out;
     },
 
@@ -308,10 +348,12 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
         if (opts.onUsage && j.usage) {
           opts.onUsage({ promptTokens: j.usage.input_tokens || 0, completionTokens: j.usage.output_tokens || 0 });
         }
-        return ((j.content || []) as { type: string; text?: string }[])
+        const text = ((j.content || []) as { type: string; text?: string }[])
           .filter((b) => b.type === "text")
           .map((b) => b.text)
           .join("");
+        if (!text) throw emptyReplyError("Anthropic", j.stop_reason, "");
+        return text;
       }
       let out = "";
       // Anthropic splits usage across two events: input on message_start,
@@ -402,7 +444,9 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
       if (!opts.onToken) {
         const j = await res.json();
         reportOllamaUsage(j);
-        return (j.message && j.message.content) || j.response || "";
+        const text = (j.message && j.message.content) || j.response || "";
+        if (!text) throw emptyReplyError("Ollama", j.done_reason, String((j.message && j.message.thinking) || ""));
+        return text;
       }
       let out = "";
       await readNDJSON(res, (j) => {

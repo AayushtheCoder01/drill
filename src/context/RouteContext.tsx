@@ -7,13 +7,17 @@
  * keeps store.activeProjectId (what the review loop and every pane read
  * synchronously) and the address bar saying the same thing.
  *
+ *   #/p/<id>/home               the dashboard: activity, streak, progress
  *   #/p/<id>/drill              the review loop, project <id> active
+ *   #/p/<id>/cards              every card in the project, browsable
  *   #/p/<id>/chat               chat, no conversation selected
  *   #/p/<id>/chat/<cid>         a conversation
  *   #/p/<id>/journal            today's journal entry
  *   #/p/<id>/journal/<day>      a specific day, "2026-3-14"
  *   #/p/<id>/exam               the exam list / scope builder
  *   #/p/<id>/exam/<eid>         a specific exam, taking it or its report
+ *
+ * A hash with no section at all lands on home — that is what "home" means.
  *
  * Old two-segment links (#/drill, #/chat/<id>, from before projects existed)
  * still resolve — parse() reads them with projectId left blank, and the
@@ -23,7 +27,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import * as store from "@/services/store";
 
-export type View = "drill" | "chat" | "journal" | "exam";
+export type View = "home" | "drill" | "cards" | "chat" | "journal" | "exam";
 
 export interface Route {
   view: View;
@@ -46,7 +50,9 @@ function parse(hash: string): Omit<Route, "projectId"> & { projectId: string } {
   if (rest[0] === "chat") return { view: "chat", projectId, ...blank, conversationId: rest[1] || null };
   if (rest[0] === "journal") return { view: "journal", projectId, ...blank, journalDay: rest[1] || null };
   if (rest[0] === "exam") return { view: "exam", projectId, ...blank, examId: rest[1] || null };
-  return { view: "drill", projectId, ...blank };
+  if (rest[0] === "drill") return { view: "drill", projectId, ...blank };
+  if (rest[0] === "cards") return { view: "cards", projectId, ...blank };
+  return { view: "home", projectId, ...blank };
 }
 
 function serialise(r: Route): string {
@@ -54,7 +60,9 @@ function serialise(r: Route): string {
   if (r.view === "chat") return base + "/chat" + (r.conversationId ? "/" + r.conversationId : "");
   if (r.view === "journal") return base + "/journal" + (r.journalDay ? "/" + r.journalDay : "");
   if (r.view === "exam") return base + "/exam" + (r.examId ? "/" + r.examId : "");
-  return base + "/drill";
+  if (r.view === "drill") return base + "/drill";
+  if (r.view === "cards") return base + "/cards";
+  return base + "/home";
 }
 
 /** A project id from the URL might be stale (deleted, archived, a typo in a
@@ -78,6 +86,8 @@ interface RouteCtx extends Route {
   go: (r: Partial<Route>) => void;
   openChat: (id?: string | null, projectId?: string) => void;
   openDrill: () => void;
+  openHome: () => void;
+  openCards: () => void;
   openJournal: (day?: string | null) => void;
   openExam: (id?: string | null) => void;
   /** Makes a project active and lands on its drill view (or chat, if you're
@@ -130,6 +140,8 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     [go]
   );
   const openDrill = useCallback(() => go({ view: "drill", conversationId: null }), [go]);
+  const openHome = useCallback(() => go({ view: "home", conversationId: null }), [go]);
+  const openCards = useCallback(() => go({ view: "cards", conversationId: null }), [go]);
   const openJournal = useCallback((day?: string | null) => go({ view: "journal", journalDay: day ?? null }), [go]);
   const openExam = useCallback((id?: string | null) => go({ view: "exam", examId: id ?? null }), [go]);
   const switchProject = useCallback(
@@ -141,7 +153,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <Ctx.Provider value={{ ...route, go, openChat, openDrill, openJournal, openExam, switchProject }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ ...route, go, openChat, openDrill, openHome, openCards, openJournal, openExam, switchProject }}>{children}</Ctx.Provider>
   );
 }
 

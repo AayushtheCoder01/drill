@@ -30,7 +30,7 @@ function renderPane(pane: PaneState) {
     case "editor":
       return <EditorPane deckId={pane.deckId} cardId={pane.cardId} />;
     case "ai":
-      return <AIPane />;
+      return <AIPane source={pane.source} sourceLabel={pane.sourceLabel} />;
     case "fix":
       return <FixPane item={pane.item} />;
     case "notes":

@@ -28,7 +28,9 @@ export type IconName =
   | "copy"
   | "send"
   | "stop"
+  | "home"
   | "review"
+  | "cards"
   | "journal"
   | "exam"
   | "bubble";
@@ -72,7 +74,9 @@ const PATHS: Record<IconName, { d: string; fill?: boolean }[]> = {
   /* The four sections. Drawn as the object each one is — a stack of cards,
      an open book, a marked paper, a spoken line — rather than as abstract
      marks, because in the collapsed rail the icon is the only label left. */
+  home: [{ d: "M3.5 10.5 12 3.5l8.5 7" }, { d: "M5.5 9.2V20h13V9.2" }, { d: "M9.8 20v-5.6h4.4V20" }],
   review: [{ d: "M3.5 9.5h12v10.5h-12z" }, { d: "M7 6h12v10.5" }],
+  cards: [{ d: "M7.5 7.5h13v11h-13z" }, { d: "M4.5 5.5h13v1.2" }, { d: "M10.5 11.5h7M10.5 14.5h4" }],
   journal: [
     { d: "M12 6.6c-1.6-1.4-4-2.1-7-2.1v13c3 0 5.4.7 7 2.1 1.6-1.4 4-2.1 7-2.1v-13c-3 0-5.4.7-7 2.1Z" },
     { d: "M12 6.6v13" }

@@ -241,16 +241,59 @@ export async function markRecall(card: Card, attempt: string): Promise<MarkResul
 
 /* ---------------------------------------------------------------- shared JSON parsing */
 
-/** Models wrap JSON in fences, in apologies, in both — same problem as
- *  parseCards, generalised to an object or an array. */
+/**
+ * Get an object or an array out of whatever the model actually sent.
+ *
+ * Four things go wrong in practice, and all four used to surface as the same
+ * useless "did not return usable JSON. It said:" with nothing after the colon:
+ *
+ *   1. a reasoning model emits a <think> scratchpad first (and sometimes
+ *      never closes the tag);
+ *   2. the JSON arrives fenced, in the middle of a sentence rather than at
+ *      the start of the reply;
+ *   3. the reply is empty, because the token cap was spent on reasoning —
+ *      which is a settings problem, not a parsing one;
+ *   4. the JSON is well-formed apart from a trailing comma.
+ *
+ * Each is handled, and each failure now says which one happened.
+ */
 function extractJSON<T>(text: string, opener: "{" | "[" = "{"): T {
   const closer = opener === "{" ? "}" : "]";
   let s = String(text || "").trim();
-  s = s.replace(/^```(?:json)?/i, "").replace(/```\s*$/, "").trim();
+
+  // The scratchpad, closed or not.
+  s = s.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/^[\s\S]*?<\/think>/i, "").trim();
+
+  // A fence anywhere, not only wrapping the whole reply.
+  const fenced = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced) s = fenced[1].trim();
+
+  if (!s) {
+    throw new Error(
+      "The model replied with nothing at all. Usually the token cap was spent before it started writing — " +
+        "common with reasoning models. Try a different model in Settings, or one with reasoning turned off."
+    );
+  }
+
   const a = s.indexOf(opener);
   const b = s.lastIndexOf(closer);
-  if (a < 0 || b < a) throw new Error("The model did not return usable JSON. It said: " + s.slice(0, 220));
-  return JSON.parse(s.slice(a, b + 1)) as T;
+  if (a < 0 || b < a) {
+    throw new Error("The model did not return usable JSON. It said: " + s.slice(0, 220));
+  }
+
+  const body = s.slice(a, b + 1);
+  try {
+    return JSON.parse(body) as T;
+  } catch (e) {
+    // One repair pass: a trailing comma before a closing brace or bracket is
+    // the single most common way a model's JSON is otherwise perfect.
+    try {
+      return JSON.parse(body.replace(/,\s*([}\]])/g, "$1")) as T;
+    } catch {
+      /* fall through to the honest error */
+    }
+    throw new Error("The model's JSON would not parse (" + (e as Error).message + "). It said: " + body.slice(0, 220));
+  }
 }
 
 function strArr(v: unknown): string[] {

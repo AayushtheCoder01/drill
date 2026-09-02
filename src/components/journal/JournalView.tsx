@@ -90,7 +90,7 @@ export default function JournalView() {
   return (
     <Shell
       current="journal"
-      aside={<JournalRail projectId={projectId} onOpenDay={(d) => openJournal(d === today() ? null : d)} />}
+      aside={<JournalRail projectId={projectId} onOpenDay={(d) => openJournal(d === today() ? null : d)} />} asideLabel="Timeline"
     >
       <div className="app-scroll">
         <div className="page">

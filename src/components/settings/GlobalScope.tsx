@@ -87,7 +87,7 @@ export default function GlobalScope() {
       .finally(() => setTesting(false));
   }
 
-  function toggle(key: "recall" | "mark" | "interleave") {
+  function toggle(key: "recall" | "mark" | "interleave" | "followups") {
     store.updateSettings({ [key]: !s[key] });
   }
 
@@ -213,6 +213,12 @@ export default function GlobalScope() {
       <SwitchRow title="Write it before you flip" sub='Free recall beats recognising the answer. Ctrl+Enter checks.' on={s.recall} onToggle={() => toggle("recall")} />
       <SwitchRow title="AI marks what you wrote" sub="Compares your attempt to the card and suggests a grade." on={s.mark} onToggle={() => toggle("mark")} />
       <SwitchRow title="Interleave sections" sub="Avoids two cards from the same section back to back." on={s.interleave} onToggle={() => toggle("interleave")} />
+      <SwitchRow
+        title="Suggest follow-up questions"
+        sub="Costs a second request after every reply. Off at low effort regardless."
+        on={s.followups}
+        onToggle={() => toggle("followups")}
+      />
 
       <div className="srow">
         <span className="grow">

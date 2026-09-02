@@ -28,23 +28,30 @@ function AppearanceSync() {
   return null;
 }
 
-/* Chat, journal and exam all pull in weight the review loop should not pay
+/* Home, chat, journal and exam all pull in weight the review loop should not pay
    for on its first paint (KaTeX/highlight.js for chat; the journal/exam
    views are smaller but still no reason to ship on the daily path) — each is
    its own chunk, lazy-loaded only when its view is actually opened. */
+const HomeView = lazy(() => import("@/components/home/HomeView"));
+const CardsView = lazy(() => import("@/components/cards/CardsView"));
 const ChatView = lazy(() => import("@/components/chat/ChatView"));
 const JournalView = lazy(() => import("@/components/journal/JournalView"));
 const ExamView = lazy(() => import("@/components/exam/ExamView"));
 
+/** Shown twice: while the store loads at cold start, and again for the half
+ *  second a lazy view takes to arrive. Set as a title page rather than a
+ *  spinner — it is the first thing the app ever shows, and a lone grey dot on
+ *  black is a poor first sentence. */
 function LoadingShell() {
   return (
     <div className="app">
       <div className="app-scroll">
-        <div className="page">
-          <div className="msg">
-            <p>
-              <span className="pulse"></span>
-            </p>
+        <div className="boot">
+          <div className="boot-mark">Drill</div>
+          <div className="working-stick" aria-hidden="true">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <i key={i} style={{ animationDelay: i * 0.12 + "s" }} />
+            ))}
           </div>
         </div>
       </div>
@@ -54,6 +61,22 @@ function LoadingShell() {
 
 function Views() {
   const { view } = useRoute();
+
+  if (view === "home") {
+    return (
+      <Suspense fallback={<LoadingShell />}>
+        <HomeView />
+      </Suspense>
+    );
+  }
+
+  if (view === "cards") {
+    return (
+      <Suspense fallback={<LoadingShell />}>
+        <CardsView />
+      </Suspense>
+    );
+  }
 
   if (view === "chat") {
     return (
