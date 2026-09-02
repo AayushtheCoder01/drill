@@ -25,8 +25,10 @@ import { isAbort } from "@/services/ai/backends";
 import { loadPricing, priceFor } from "@/services/pricing";
 import { buildContext } from "@/lib/chatContext";
 import { getPersona } from "@/lib/personas";
+import { budgetFor } from "@/lib/effort";
+import type { Effort } from "@/types/core";
 import { costOf } from "@/lib/tokens";
-import { resolveBackend, resolveModel } from "@/lib/resolveSetting";
+import { resolveBackend, resolveEffort, resolveModel } from "@/lib/resolveSetting";
 import { useRoute } from "./RouteContext";
 import type { Attachment, Conversation, ContextSource, Turn, Usage } from "@/types/chat";
 import type { ChatMessage, Memory } from "@/types";
@@ -52,6 +54,12 @@ interface ChatState {
   setContext: (sources: ContextSource[]) => void;
   clearError: () => void;
   newConversation: (opts?: chatStore.CreateOpts, firstMessage?: string) => void;
+  /** The model chosen on the empty screen, before a conversation exists to
+   *  pin it to. Applied when the first message lazily creates one. */
+  draftModel: string;
+  setDraftModel: (m: string) => void;
+  draftEffort: Effort | "";
+  setDraftEffort: (e: Effort | "") => void;
 }
 
 const Ctx = createContext<ChatState | null>(null);
@@ -67,6 +75,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followups, setFollowups] = useState<string[]>([]);
+  const [draftModel, setDraftModel] = useState("");
+  const [draftEffort, setDraftEffort] = useState<Effort | "">("");
 
   const abortRef = useRef<AbortController | null>(null);
   const followupAbort = useRef<AbortController | null>(null);
@@ -128,13 +138,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   /* ---- assemble the wire messages ---- */
   const buildMessages = useCallback(
     (c: Conversation, upTo: number): { messages: ChatMessage[]; memories: Memory[] } => {
+      const project = store.get().projects[c.projectId];
+      const budget = budgetFor(resolveEffort(c, project).value);
       const persona = c.systemPrompt || getPersona(c.personaId).prompt;
       const lastUser = [...c.turns.slice(0, upTo + 1)].reverse().find((t) => t.role === "user");
       const queryText = lastUser ? chatStore.activeContent(lastUser) : "";
-      const { system, memories } = buildContext(persona, c.context, queryText, c.projectId);
+      const { system, memories } = buildContext(persona, c.context, queryText, c.projectId, budget.memoryLimit);
       const msgs: ChatMessage[] = [];
       if (system) msgs.push({ role: "system", content: system });
-      for (let i = 0; i <= upTo && i < c.turns.length; i++) {
+      /* Effort decides how far back the conversation is replayed. The window
+         is counted from the newest end so the current exchange is always in
+         it — truncating from the front would drop the question being asked. */
+      const first = Math.max(0, Math.min(upTo, c.turns.length - 1) - budget.historyTurns + 1);
+      for (let i = first; i <= upTo && i < c.turns.length; i++) {
         const t = c.turns[i];
         let content = chatStore.activeContent(t);
         if (t.attachments?.length) {
@@ -178,13 +194,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       // "used" should mean here, so it does not record.
       const { messages, memories } = buildMessages(c, upToIndex);
       for (const m of memories) memoryStore.recordUsage(m.id);
+      const budget = budgetFor(resolveEffort(c, store.get().projects[c.projectId]).value);
+      const replyScale = budget.replyScale;
 
       try {
         const full = await AI.chat(
           messages,
           {
             temperature: c.temperature,
-            maxTokens: c.maxTokens,
+            maxTokens: Math.max(256, Math.round(c.maxTokens * replyScale)),
             signal: controller.signal,
             label: "chat",
             onToken: (_t, a) => {
@@ -214,7 +232,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         chatStore.persist(c, true);
 
         void maybeTitle(c);
-        void maybeFollowups(c);
+        /* The one extra request per message, and the reason a single send
+           used to look like two. Gated twice on purpose: turned off wholesale
+           in Settings, and skipped at low effort regardless. */
+        if (budget.followups && store.settings().followups) void maybeFollowups(c);
       } catch (e) {
         if (isAbort(e)) {
           // Keep whatever streamed in before the stop — half an explanation is
@@ -294,7 +315,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     async (text: string, attachments?: Attachment[]) => {
       let c = conversation;
       if (!c) {
-        c = chatStore.create();
+        // A model picked on the empty screen has to survive the conversation
+        // being created here, or choosing one before typing does nothing.
+        c = chatStore.create({
+          ...(draftModel ? { model: draftModel } : {}),
+          ...(draftEffort ? { effort: draftEffort } : {})
+        });
         setConversation(c);
         openChat(c.id);
       }
@@ -436,7 +462,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     update,
     setContext,
     clearError: () => setError(null),
-    newConversation
+    newConversation,
+    draftModel,
+    setDraftModel,
+    draftEffort,
+    setDraftEffort
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

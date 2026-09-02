@@ -13,6 +13,25 @@
  * Sections:  printings · type · scale · motion
  * ========================================================================== */
 
+/* ------------------------------------------------------------ animatable -- */
+/* Two widths that animate: the nav rail's collapse and the instrument rail's
+   fold. Both are driven by a custom property that a `.collapsed`/`.folded`
+   rule overrides — and an *unregistered* custom property is not interpolable,
+   so `transition: width` on a `width: var(--x)` silently refuses to run and
+   leaves the panel stuck at its old size. Registering them with a <length>
+   syntax is what makes the transition legal; the transition then names the
+   custom property itself rather than `width`. */
+@property --nav-w {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 272px;
+}
+@property --rail-cur {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 248px;
+}
+
 /* ---------------------------------------------------------------- night -- */
 /* Warm dark — hue 70 at very low chroma, so it reads as unbleached paper
    seen at night rather than as a neutral-grey app surface. Deliberately not
@@ -167,6 +186,7 @@
   --r-1: 3px;
   --r-2: 6px;
   --r-3: 10px;
+  --r-4: 16px; /* the big soft panel: greeting card, calendar, section tiles */
   --r-full: 999px;
 
   /* The measures a page can be set to. --measure is the prose column: ~64

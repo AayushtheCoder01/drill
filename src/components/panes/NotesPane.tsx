@@ -9,6 +9,7 @@ import SheetShell from "../SheetShell";
 import ProposalsBlock from "../ProposalsBlock";
 import type { Card } from "@/types";
 import Icon from "../ui/Icon";
+import Working from "../ui/Working";
 
 export default function NotesPane({ card }: { card: { tag: string } | null }) {
   const toast = useToast();
@@ -119,7 +120,7 @@ export default function NotesPane({ card }: { card: { tag: string } | null }) {
         {genFor && genError && <div className="err">{genError}</div>}
         {genFor && !genError && !genCards && (
           <div className="empty">
-            <span className="spin"></span> turning it into cards
+            <Working stages={["reading your note", "finding what is worth recalling", "writing the cards"]} />
           </div>
         )}
         {genFor && genCards && (

@@ -36,6 +36,10 @@ export interface Card {
   /** Where this card came from, so a failing card can be traced back to the
    *  day it was learned. Absent for cards written before Phase 2. */
   sourceRef?: { kind: "journal" | "exam" | "chat" | "note" | "manual"; id: string };
+  /** When the card was written, so "what did I make today" is answerable and
+   *  the library can be ordered by age. Stamped by store.normCard; absent on
+   *  cards that predate it, which sort as oldest. */
+  created?: number;
 }
 
 /** FSRS-6 scheduling state for one card. */
@@ -113,6 +117,10 @@ export interface Settings {
   effort: Effort;
   /** How freely memory may be written without being asked. */
   autonomy: Autonomy;
+  /** Whether to spend a second request per message on three suggested
+   *  follow-up questions. Off by default: one message should be one request
+   *  unless you have said otherwise. Also forced off at low effort. */
+  followups: boolean;
   /** Appearance — applied at runtime via lib/theme.ts, not baked into the
    *  stylesheet, so a new option here never needs a CSS release. */
   theme: Theme;
@@ -122,6 +130,10 @@ export interface Settings {
    *  sidebar is a drawer and this is ignored, so a phone never overwrites
    *  what you chose at a desk. */
   navCollapsed: boolean;
+  /** The right-hand instrument panel, folded to its edge. Same idea as
+   *  navCollapsed and remembered the same way — under 1180px the rail is
+   *  gone from the layout entirely and this is ignored. */
+  railCollapsed: boolean;
   /** Multiplier on card/chat reading text only (not UI chrome). 0.9-1.2. */
   textScale: number;
   /** How many cards a session asks for when you start one. A session is a
@@ -153,11 +165,31 @@ export interface Session {
   startedAt: number;
 }
 
+/**
+ * One graded card, as it happened.
+ *
+ * The first four fields are all this ever held, which made the log good for
+ * counting and useless for remembering: you could tell that thirty cards were
+ * reviewed on Tuesday but not *which* ones, so nothing downstream could
+ * answer "what did I get wrong today". The last three close that — they are
+ * optional because every entry written before they existed lacks them, and a
+ * missing card id must degrade to "unknown card", never to a crash.
+ *
+ * Kept deliberately terse. The log is capped at 8000 entries and lives in
+ * localStorage alongside everything else, so `a` is truncated on the way in.
+ */
 export interface LogEntry {
   t: number;
   g: Grade;
   s: CardState;
   d: string;
+  /** Card id. Added 2026-09; absent on older entries. */
+  c?: string;
+  /** What the learner actually wrote when recalling it, truncated. Only
+   *  present when recall mode was on and they typed something. */
+  a?: string;
+  /** The marker's verdict on that attempt, when one was marked. */
+  v?: MarkResult["verdict"];
 }
 
 export interface DrillDB {

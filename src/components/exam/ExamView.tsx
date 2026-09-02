@@ -17,6 +17,7 @@ import TakeExam from "./TakeExam";
 import ExamReport from "./ExamReport";
 import type { Difficulty, Exam } from "@/types/exam";
 import "@/styles/views.css";
+import Working from "../ui/Working";
 
 function ExamDetail({
   exam,
@@ -45,7 +46,7 @@ function ExamDetail({
       </div>
       {extendBusy && (
         <div className="empty">
-          <span className="spin"></span> writing more questions
+          <Working stages={["reading the scope", "choosing what to ask", "writing the questions", "making sure none of them can be guessed"]} />
         </div>
       )}
       {!extendBusy &&
@@ -86,7 +87,7 @@ export default function ExamView() {
   }
 
   return (
-    <Shell current="exam" aside={<ExamRail projectId={projectId} onOpen={(id) => openExam(id)} />}>
+    <Shell current="exam" aside={<ExamRail projectId={projectId} onOpen={(id) => openExam(id)} />} asideLabel="Exams">
       <div className="app-scroll">
         <div className="page">
           {!examId ? (

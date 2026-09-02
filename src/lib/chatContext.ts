@@ -16,6 +16,7 @@ import * as memoryStore from "@/services/memoryStore";
 import * as journalStore from "@/services/journalStore";
 import * as U from "@/lib/util";
 import { retrieve, type RetrievalTrace } from "@/lib/memoryRetrieval";
+import { renderToday } from "@/lib/dayBrief";
 import type { ContextSource } from "@/types/chat";
 import type { Card, Deck, Memory, MemoryScope, SRSState } from "@/types";
 
@@ -189,6 +190,11 @@ export function renderSource(src: ContextSource, queryText = "", opts: RenderOpt
     return parts.length ? parts.join("\n\n") : null;
   }
 
+  if (src.kind === "today") {
+    const block = renderToday(projectId, Math.max(1, src.days || 1));
+    return block;
+  }
+
   if (src.kind === "notes") {
     const notes = (db.notes || []).slice(-Math.min(src.limit || MAX_NOTES, MAX_NOTES)).reverse();
     if (!notes.length) return null;
@@ -225,15 +231,20 @@ export function buildContext(
   persona: string,
   sources: ContextSource[],
   queryText: string,
-  projectId: string
+  projectId: string,
+  /** Cap from the effort budget. Overrides each memory source's own limit,
+   *  which is what makes "low effort" mean something concrete rather than
+   *  being a label. */
+  memoryLimit?: number
 ): BuiltContext {
   const memories: Memory[] = [];
   const blocks = sources
     .map((s) => {
       if (s.kind !== "memory") return renderSource(s, queryText, { projectId });
-      const picked = memoriesForSource(s, queryText, projectId);
+      const capped = memoryLimit == null ? s : { ...s, limit: Math.min(s.limit || 8, memoryLimit) };
+      const picked = memoriesForSource(capped, queryText, projectId);
       memories.push(...picked);
-      return renderSource(s, queryText, { projectId, memories: picked });
+      return renderSource(capped, queryText, { projectId, memories: picked });
     })
     .filter((b): b is string => !!b);
 
@@ -256,6 +267,7 @@ export function describeSource(src: ContextSource): string {
   if (src.kind === "memory") return src.scope === "both" ? "memory" : `memory · ${src.scope}`;
   if (src.kind === "knowledge") return "project files";
   if (src.kind === "journal") return `journal · ${src.days}d`;
+  if (src.kind === "today") return src.days && src.days > 1 ? `today · ${src.days}d` : "today";
   return "insight log";
 }
 

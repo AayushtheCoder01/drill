@@ -6,6 +6,7 @@ import { useReview } from "@/context/ReviewContext";
 import { useToast } from "@/context/ToastContext";
 import SheetShell from "../SheetShell";
 import type { ExampleDeckEntry } from "@/types";
+import Working from "../ui/Working";
 
 export default function ExamplesPane() {
   const { close } = useSheet();
@@ -60,7 +61,7 @@ export default function ExamplesPane() {
     <SheetShell title="Example decks" sub={"from " + base}>
       {!list && !error && (
         <div className="empty">
-          <span className="spin"></span> looking
+          <Working stages={["looking for a worked example", "picking one that actually shows the step"]} />
         </div>
       )}
       {error && <div className="err">{error}</div>}

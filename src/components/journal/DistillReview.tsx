@@ -20,6 +20,7 @@ import type { JournalEntry } from "@/types/journal";
 import type { Project } from "@/types/core";
 import type { Card, MemoryType } from "@/types";
 import Icon from "../ui/Icon";
+import Working from "../ui/Working";
 
 interface MemDraft {
   type: MemoryType;
@@ -94,9 +95,15 @@ export default function DistillReview({ entry, project, onClose }: { entry: Jour
         </div>
         <div className="sheet-body">
           {busy && (
-            <div className="empty">
-              <span className="spin"></span> reading the entry
-            </div>
+            <Working
+              stages={[
+                "reading the entry",
+                "looking for what is durable",
+                "throwing out what the review log already knows",
+                "drafting cards from what you got stuck on",
+                "checking nothing repeats what you already have"
+              ]}
+            />
           )}
           {error && <div className="err">{error}</div>}
 

@@ -728,6 +728,178 @@
   color: var(--ink-3);
 }
 
+/* ---------------------------------------------------- reference picker -- */
+/* The "@" menu. Same shell as the slash menu — one popover, two contents —
+   with a third column, because a reference needs its kind, its name and
+   enough of itself to tell two journal entries apart. */
+.refmenu-head {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: var(--s-3) var(--s-3) var(--s-2);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.refmenu .slashitem .cmd {
+  min-width: 62px;
+  text-transform: uppercase;
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+}
+.refmenu .reflabel {
+  font-family: var(--serif);
+  font-size: var(--t-sm);
+  color: var(--ink);
+  flex: 0 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 46%;
+}
+.refmenu .desc {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+/* ------------------------------------------------------------ model chip -- */
+/* Which model this thread is talking to, in the bar where you are already
+   looking. The dot is the inheritance: hollow follows the default, filled is
+   pinned to this conversation. */
+.modelchip {
+  position: relative;
+}
+.modelchip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  max-width: 220px;
+}
+.modelchip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modelchip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  flex: 0 0 auto;
+  box-shadow: inset 0 0 0 1px var(--ink-3);
+}
+.modelchip-dot.pinned {
+  background: var(--accent);
+  box-shadow: none;
+}
+.modelpop {
+  position: absolute;
+  bottom: calc(100% + var(--s-2));
+  left: 0;
+  width: min(420px, 78vw);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  box-shadow: var(--lift-3);
+  z-index: 50;
+  padding: var(--s-3);
+}
+.modelpop-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: var(--s-3);
+}
+.modelpop-clear {
+  background: none;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.modelpop-list {
+  max-height: 260px;
+  overflow-y: auto;
+  margin-top: var(--s-2);
+}
+.modelpop-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  padding: var(--s-2);
+  border-radius: var(--r-1);
+  cursor: pointer;
+}
+.modelpop-row:hover {
+  background: var(--accent-10);
+  color: var(--ink);
+}
+.modelpop-row.on {
+  color: var(--accent);
+}
+/* The effort menu is the same popover with three tall rows: each option has
+   to say what it costs, or it is the dead dial all over again. */
+.effortlist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.effortrow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: var(--s-3);
+  border-radius: var(--r-2);
+  cursor: pointer;
+}
+.effortrow:hover {
+  background: var(--accent-10);
+}
+.effortrow-n {
+  font-family: var(--serif);
+  font-size: var(--t-md);
+  color: var(--ink);
+  text-transform: capitalize;
+}
+.effortrow-b {
+  font-family: var(--sans);
+  font-size: var(--t-2xs);
+  line-height: var(--lh-snug);
+  color: var(--ink-3);
+}
+.effortrow.on .effortrow-n {
+  color: var(--accent);
+}
+
+.modelpop-empty {
+  font-family: var(--sans);
+  font-size: var(--t-2xs);
+  color: var(--ink-3);
+  padding: var(--s-3) var(--s-2);
+}
+
 /* --------------------------------------------------------- empty state -- */
 .chat-empty {
   flex: 1;

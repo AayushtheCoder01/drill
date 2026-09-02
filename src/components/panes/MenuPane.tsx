@@ -9,7 +9,7 @@ import Item from "../ui/Item";
 
 export default function MenuPane() {
   const { open } = useSheet();
-  const { openChat, openJournal, openExam } = useRoute();
+  const { openCards, openChat, openJournal, openExam } = useRoute();
   useStoreSync(candidates);
   const s = store.stats();
   const db = store.get();
@@ -44,7 +44,7 @@ export default function MenuPane() {
           sub={`${(db.notes || []).length} entries · turn any into cards`}
           onClick={() => open({ name: "notes", card: null })}
         />
-        <Item title="Cards in this deck" sub={`${store.deck().cards.length} cards · edit, add, delete`} onClick={() => open({ name: "library" })} />
+        <Item title="Cards" sub="every card in this project · search, filter, edit" onClick={() => openCards()} />
         <Item
           title="Decks"
           sub={`${nDecks} deck${nDecks > 1 ? "s" : ""}${db.settings.mix ? " · mixing" : ""}`}
@@ -52,7 +52,6 @@ export default function MenuPane() {
         />
         <Item title="Import / export" sub="json in, json out · example decks" onClick={() => open({ name: "io" })} />
         <Item title="Run transcript" sub="what every AI call sent and got back" onClick={() => open({ name: "transcript" })} />
-        <Item title="Settings" sub="backend, key, model, recall, scheduling" onClick={() => open({ name: "settings" })} />
       </div>
     </SheetShell>
   );

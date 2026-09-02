@@ -12,6 +12,7 @@ import ProposalsBlock from "../ProposalsBlock";
 import { useToast } from "@/context/ToastContext";
 import type { Card, Deck } from "@/types";
 import Icon from "../ui/Icon";
+import Working from "../ui/Working";
 
 export default function CardsModal({ source, onClose }: { source: string; onClose: () => void }) {
   const toast = useToast();
@@ -98,7 +99,7 @@ export default function CardsModal({ source, onClose }: { source: string; onClos
           <div style={{ marginTop: 18 }}>
             {busy && (
               <div className="empty">
-                <span className="spin"></span> thinking
+                <Working stages={["reading the conversation", "picking out what is worth keeping", "writing the cards", "cutting the ones that need an “and”"]} />
               </div>
             )}
             {error && <div className="err">{error}</div>}

@@ -12,7 +12,10 @@ export type PaneState =
   | { name: "decks" }
   | { name: "library"; filter?: string; mode?: "leech" }
   | { name: "editor"; deckId: string; cardId: string | null }
-  | { name: "ai" }
+  /** `source` seeds the notes box — how a memory, a journal entry or a note
+   *  becomes cards without retyping it. `sourceLabel` names where it came
+   *  from, so the pane can say so. */
+  | { name: "ai"; source?: string; sourceLabel?: string }
   | { name: "fix"; item: QueueItem }
   | { name: "notes"; card: Card | null }
   | { name: "chat"; card: Card }

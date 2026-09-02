@@ -64,7 +64,19 @@ export type ContextSource =
   /** The project's always-attached files and text. */
   | { kind: "knowledge" }
   /** The last `days` days of journal entries for this project. */
-  | { kind: "journal"; days: number };
+  | { kind: "journal"; days: number }
+  /**
+   * Today, assembled from everywhere at once: what was reviewed and how it
+   * went, the sentences the learner actually wrote when recalling, cards and
+   * memories written, and anything captured in the journal — summarised or
+   * not.
+   *
+   * Every other source is a *category* of thing. This one is a moment, and it
+   * is the source that makes "what did I learn today?" answerable at all: the
+   * journal source only sees entries that have been through the narrative
+   * step, and nothing else in this list has ever seen the review log.
+   */
+  | { kind: "today"; days?: number };
 
 export interface Conversation {
   id: string;

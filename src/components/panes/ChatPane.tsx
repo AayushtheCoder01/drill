@@ -110,7 +110,11 @@ export default function ChatPane({ card }: { card: Card }) {
             </div>
           ) : b.loading ? (
             <div key={i} className="bub a">
-              <span className="spin"></span>
+              <span className="working-stick sm" aria-label="thinking">
+                <i />
+                <i style={{ animationDelay: "0.12s" }} />
+                <i style={{ animationDelay: "0.24s" }} />
+              </span>
             </div>
           ) : b.error ? (
             <div key={i} className="err">

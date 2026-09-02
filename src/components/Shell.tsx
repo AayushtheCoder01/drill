@@ -9,7 +9,7 @@
  *         .app-col           a column
  *           {children}       the section, which owns its own scrolling
  *           .app-dock        optional: the grade bar
- *         <aside .app-rail>  optional: the instrument panel
+ *         <aside .app-rail>  optional: the instrument panel, foldable
  *
  * The sidebar, the dock and the rail are all siblings of the scroll
  * container, never inside it, which is what makes it impossible to scroll the
@@ -27,7 +27,9 @@ import Icon from "./ui/Icon";
 const MOBILE = "(max-width: 900px)";
 
 const TITLES: Record<View, string> = {
+  home: "Home",
   drill: "Review",
+  cards: "Cards",
   journal: "Journal",
   exam: "Exam",
   chat: "Chat"
@@ -38,6 +40,7 @@ export default function Shell({
   sidebar,
   dock,
   aside,
+  asideLabel = "Panel",
   children
 }: {
   current: View;
@@ -45,9 +48,14 @@ export default function Shell({
   sidebar?: ReactNode;
   /** Docked below the scroll area — the grade bar. */
   dock?: ReactNode;
-  /** The right-hand instrument panel. Hidden below 1180px, where the reading
-   *  column needs the width more than the readouts do. */
+  /** The right-hand instrument panel. Foldable to a narrow edge — the state
+   *  lives in Settings.railCollapsed, so it holds across sections and
+   *  reloads. Hidden entirely below 1180px, where the reading column needs
+   *  the width more than the readouts do. */
   aside?: ReactNode;
+  /** What the folded rail's tab says. Shell cannot know what is in the panel,
+   *  and a tab reading "Today" beside a card library is worse than no tab. */
+  asideLabel?: string;
   children: ReactNode;
 }) {
   const db = useDrillStore();
@@ -72,6 +80,11 @@ export default function Shell({
      drawer, and Settings.navCollapsed is left alone so the two devices do
      not overwrite each other's preference. */
   const collapsed = !mobile && !!db.settings.navCollapsed;
+  const railFolded = !!db.settings.railCollapsed;
+
+  const toggleRail = useCallback(() => {
+    store.updateSettings({ railCollapsed: !store.settings().railCollapsed });
+  }, []);
 
   const toggle = useCallback(() => {
     if (window.matchMedia(MOBILE).matches) setDrawer((v) => !v);
@@ -83,13 +96,16 @@ export default function Shell({
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
         e.preventDefault();
         toggle();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        toggleRail();
       } else if (e.key === "Escape" && drawer) {
         setDrawer(false);
       }
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [toggle, drawer]);
+  }, [toggle, toggleRail, drawer]);
 
   return (
     <div className={"app" + (collapsed ? " nav-collapsed" : "")}>
@@ -124,7 +140,24 @@ export default function Shell({
             )}
           </div>
 
-          {aside && <aside className="app-rail">{aside}</aside>}
+          {/* Folded, the rail keeps its edge and its handle rather than
+              vanishing: a panel that disappears without trace is a panel you
+              forget you can bring back. */}
+          {aside && (
+            <aside className={"app-rail" + (railFolded ? " folded" : "")}>
+              <button
+                className="iconbtn rail-toggle"
+                onClick={toggleRail}
+                title={railFolded ? "Show the panel  (ctrl + j)" : "Hide the panel  (ctrl + j)"}
+                aria-label={railFolded ? "Show the panel" : "Hide the panel"}
+                aria-expanded={!railFolded}
+              >
+                <Icon name="chevron" size={14} className={"rail-chev" + (railFolded ? " flip" : "")} />
+                <span className="rail-tab">{asideLabel}</span>
+              </button>
+              {!railFolded && <div className="rail-body">{aside}</div>}
+            </aside>
+          )}
         </div>
       </div>
     </div>

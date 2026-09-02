@@ -1,0 +1,403 @@
+/* ============================================================================
+ * home.css — the home page.
+ *
+ * The shell, the rail vocabulary and every control come from style.css; this
+ * is only the dashboard's own structure. Loaded lazily with HomeView, so none
+ * of it ships to the review loop's first paint.
+ *
+ * The register is different from the panes on purpose. A pane is an
+ * instrument: uppercase mono labels, tight rows, everything within a thumb's
+ * reach. This page is read — so it is set like the opening of a chapter.
+ * Serif for anything with words in it, sentence case throughout, one
+ * emphasis (the thing to do next), and space between the blocks rather than
+ * borders around them.
+ * ========================================================================== */
+
+.page.home {
+  max-width: var(--page-wide);
+  padding-top: var(--s-7);
+  padding-bottom: var(--s-8);
+}
+
+/* --------------------------------------------------------------- opening -- */
+/* A chapter opening: folio, title, epigraph, rule. The same four parts, in
+   the same order, that the front of a printed chapter has had for centuries —
+   and the reason this page reads as somewhere you have arrived rather than a
+   dashboard you have loaded.
+   style.css sets a bare `header { display: flex }` for the review chapter
+   head; this one stacks. */
+.home-hello {
+  display: block;
+  margin-bottom: var(--s-6);
+}
+.home-folio {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: var(--s-4);
+}
+.home-hello h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: var(--t-2xl);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--track-tight);
+  color: var(--ink);
+}
+.home-hello-mark {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+/* Set in italic at the reading size and indented to the title's text, so it
+   hangs off the greeting the way an epigraph hangs off a chapter number. */
+.home-epigraph {
+  margin: var(--s-3) 0 0 calc(24px + var(--s-3));
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: var(--t-read);
+  line-height: var(--lh-snug);
+  color: var(--ink-2);
+  max-width: var(--measure);
+}
+/* A double rule — thick over thin — the way a chapter head is closed off. */
+.home-rule {
+  margin-top: var(--s-5);
+  border-top: 2px solid var(--rule);
+  border-bottom: 1px solid var(--rule-soft);
+  height: 3px;
+}
+
+/* ---------------------------------------------------------- what is next -- */
+/* The one emphasised object on the page. Everything below is reference; this
+   is the thing you came to do, so it is the only element that gets a filled
+   surface and a full-width target. */
+.home-call {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-5);
+  width: 100%;
+  text-align: left;
+  padding: var(--s-5);
+  margin-bottom: var(--s-7);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-4);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background var(--fast), border-color var(--fast), box-shadow var(--fast);
+}
+.home-call:hover {
+  background: var(--surface-2);
+  border-color: var(--accent-45);
+  box-shadow: var(--lift-2);
+}
+.home-call-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+.home-call-head {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: var(--t-lg);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--track-tight);
+}
+.home-call-sub {
+  font: 400 var(--t-sm) / var(--lh-snug) var(--sans);
+  color: var(--ink-3);
+}
+.home-call-cta {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 500 var(--t-sm) / 1 var(--sans);
+}
+@media (max-width: 620px) {
+  .home-call {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s-4);
+  }
+  .home-call-cta {
+    justify-content: center;
+  }
+}
+
+/* --------------------------------------------------------------- figures -- */
+/* Four numbers on one line, unboxed, dropping to two columns before they
+   crowd. Set in the reading face: a number is the one piece of chrome worth
+   making handsome, and tabular figures keep it from twitching. */
+.home-figs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s-5);
+  margin-bottom: var(--s-8);
+}
+@media (max-width: 720px) {
+  .home-figs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-5) var(--s-4);
+  }
+}
+.home-fig-n {
+  font: 400 var(--t-2xl) / var(--lh-tight) var(--serif);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--track-tight);
+  color: var(--ink);
+}
+.home-fig-l {
+  margin-top: var(--s-1);
+  font: 400 var(--t-xs) / var(--lh-snug) var(--sans);
+  color: var(--ink-2);
+}
+.home-fig-note {
+  margin-top: 2px;
+  font: 400 var(--t-2xs) / var(--lh-snug) var(--sans);
+  color: var(--ink-3);
+}
+.home-fig.accent .home-fig-n {
+  color: var(--accent);
+}
+.home-fig.green .home-fig-n {
+  color: var(--green);
+}
+.home-fig.muted .home-fig-n {
+  color: var(--ink-3);
+}
+
+/* -------------------------------------------------------------- sections -- */
+.home-sec {
+  margin-bottom: var(--s-7);
+}
+.home-sec-h {
+  display: flex;
+  padding-bottom: var(--s-2);
+  border-bottom: 1px solid var(--rule-soft);
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin: 0 0 var(--s-4);
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: var(--t-md);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--track-tight);
+  color: var(--ink);
+}
+.home-sec-note {
+  font: 400 var(--t-2xs) / 1 var(--sans);
+  letter-spacing: 0;
+  color: var(--ink-3);
+}
+.home-empty {
+  font: 400 var(--t-sm) / var(--lh-snug) var(--sans);
+  color: var(--ink-3);
+  margin: 0;
+}
+/* Section rules are hairlines under the subhead, not boxes around content.
+   The calendar sits straight on the page. */
+
+/* -------------------------------------------------------- activity grid -- */
+/* A year of days that never scrolls: 53 fractional columns of square cells,
+   so the whole calendar fits whatever width the page has. */
+.act-months {
+  display: grid;
+  gap: 3px;
+  margin-bottom: var(--s-2);
+}
+.act-month {
+  font: 400 var(--t-2xs) / 1 var(--sans);
+  color: var(--ink-3);
+  grid-row: 1;
+  white-space: nowrap;
+}
+.act-grid {
+  display: grid;
+  grid-template-rows: repeat(7, auto);
+  gap: 3px;
+}
+.act-cell {
+  aspect-ratio: 1;
+  min-width: 0;
+  border-radius: 2px;
+  background: var(--rule-soft);
+  display: block;
+}
+/* Four steps of the accent, scaled against the busiest day in the window, so
+   the grid reads the same whether you do five cards a day or five hundred. */
+.act-cell[data-level="1"] {
+  background: var(--accent-25);
+}
+.act-cell[data-level="2"] {
+  background: var(--accent-45);
+}
+.act-cell[data-level="3"] {
+  background: color-mix(in oklab, var(--accent) 72%, transparent);
+}
+.act-cell[data-level="4"] {
+  background: var(--accent);
+}
+.act-cell.future {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--rule-soft);
+}
+.act-legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+  font: 400 var(--t-2xs) / 1 var(--sans);
+  color: var(--ink-3);
+}
+.act-key {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.act-key-cell {
+  width: 10px;
+  height: 10px;
+  aspect-ratio: auto;
+  flex: 0 0 auto;
+}
+
+/* ------------------------------------------------------------- contents -- */
+/* A contents page: name, dot leader, what is waiting. Boxes were the wrong
+   idea here — the house rule is rules, not boxes, and a border-plus-fill is
+   reserved for things you can pick up. A list of places you could go is the
+   most inviting page a book has, so it is set as one. */
+.toc {
+  display: flex;
+  flex-direction: column;
+}
+.toc-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  width: 100%;
+  padding: var(--s-3) 0;
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink);
+}
+.toc-name {
+  font-family: var(--serif);
+  font-size: var(--t-lg);
+  font-weight: 400;
+  letter-spacing: var(--track-tight);
+  color: var(--ink);
+  transition: color var(--fast);
+  flex: 0 0 auto;
+}
+.toc-row:hover .toc-name {
+  color: var(--accent);
+}
+/* The leader. A dotted bottom border on a growing span, lifted off the
+   baseline so the dots sit where a compositor would set them. */
+.toc-leader {
+  flex: 1 1 auto;
+  min-width: var(--s-5);
+  align-self: center;
+  border-bottom: 1px dotted var(--rule);
+  transform: translateY(2px);
+}
+.toc-note {
+  flex: 0 0 auto;
+  font: 400 var(--t-xs) / 1 var(--sans);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.toc-row:hover .toc-note {
+  color: var(--ink-2);
+}
+
+/* ----------------------------------------------------------------- decks -- */
+.home-decks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.home-deck {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px auto;
+  align-items: center;
+  gap: var(--s-4);
+  width: 100%;
+  text-align: left;
+  padding: var(--s-3) 0;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--rule-soft);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: color var(--fast);
+}
+.home-deck:hover {
+  color: var(--ink);
+}
+.home-deck-name {
+  font: 400 var(--t-sm) / var(--lh-snug) var(--sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-deck-bar {
+  height: var(--s-1);
+  border-radius: var(--r-full);
+  background: var(--rule-soft);
+  overflow: hidden;
+}
+.home-deck-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--med) var(--ease);
+}
+.home-deck-n {
+  font: 400 var(--t-2xs) / 1 var(--sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+@media (max-width: 560px) {
+  .home-deck {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .home-deck-bar {
+    display: none;
+  }
+}
+
+/* ----------------------------------------------------------------- tally -- */
+.home-tally {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--s-3) var(--s-5);
+  font: 400 var(--t-sm) / var(--lh-snug) var(--sans);
+  color: var(--ink-3);
+}
+.home-tally b {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: var(--t-md);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  margin-right: 5px;
+}
