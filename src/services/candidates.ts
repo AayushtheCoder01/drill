@@ -7,9 +7,10 @@
  * just removes it. Nothing lingers once actioned — this is a tray, not a log.
  * ========================================================================== */
 import * as U from "@/lib/util";
+import * as store from "./store";
 import * as memoryStore from "./memoryStore";
 import { idbAll, idbDelete, idbPut, STORE_CAND } from "./idb";
-import type { Memory, MemoryCandidate, MemoryOrigin, MemoryScope, MemoryType } from "@/types";
+import type { Autonomy, Memory, MemoryCandidate, MemoryOrigin, MemoryScope, MemoryType } from "@/types";
 
 let items: MemoryCandidate[] = [];
 let loaded = false;
@@ -58,9 +59,40 @@ export interface ProposeInput {
   text: string;
   origin?: MemoryOrigin | null;
   supersedes?: string | null;
+  /** True when the learner said this outright and the model only transcribed
+   *  it. Under "assisted" autonomy these commit without review. */
+  stated?: boolean;
 }
 
-export function propose(drafts: ProposeInput[]): MemoryCandidate[] {
+/**
+ * How freely a proposal is allowed to commit itself, resolved for the project
+ * it belongs to. Project policy beats the global default; both were editable,
+ * persisted and read by nothing until now.
+ *
+ *   manual    everything waits in the tray, always
+ *   assisted  the default — things the learner *stated* commit directly,
+ *             things the model inferred wait to be looked at
+ *   auto      everything commits, tray stays empty
+ */
+function autonomyFor(projectId: string | null): Autonomy {
+  const project = projectId ? store.projects()[projectId] : null;
+  return project?.memoryPolicy?.autonomy || store.settings().autonomy || "assisted";
+}
+
+/**
+ * `stated` marks a draft the learner said outright and the model only
+ * transcribed. That is the one kind trusted to save itself under "assisted",
+ * because there is nothing to second-guess: they said it.
+ */
+export interface ProposeResult {
+  /** Committed straight to memory by the autonomy policy. */
+  committed: Memory[];
+  /** Waiting in the tray to be looked at. */
+  queued: MemoryCandidate[];
+}
+
+export function propose(drafts: ProposeInput[]): ProposeResult {
+  const direct: MemoryCandidate[] = [];
   const made = drafts
     .filter((d) => d.text && d.text.trim())
     .map(
@@ -73,13 +105,39 @@ export function propose(drafts: ProposeInput[]): MemoryCandidate[] {
         createdAt: Date.now(),
         origin: d.origin || null,
         supersedes: d.supersedes || null,
+        stated: !!d.stated,
         status: "pending"
       })
     );
-  items.push(...made);
-  for (const c of made) void idbPut(STORE_CAND, c).catch(() => undefined);
+  /* Split by policy rather than pushing everything into the tray. A tray you
+     have to empty by hand after every distil is the hassle "auto" exists to
+     remove — and under "manual" nothing should ever commit behind your back. */
+  const queued: MemoryCandidate[] = [];
+  for (const c of made) {
+    const mode = autonomyFor(c.projectId);
+    const commits = mode === "auto" || (mode === "assisted" && c.stated);
+    if (commits) direct.push(c);
+    else queued.push(c);
+  }
+
+  const committed: Memory[] = [];
+  for (const c of direct) {
+    committed.push(
+      memoryStore.create({
+        scope: c.scope,
+        projectId: c.projectId,
+        type: c.type,
+        text: c.text,
+        source: c.stated ? "stated" : "proposed",
+        origin: c.origin
+      })
+    );
+  }
+
+  items.push(...queued);
+  for (const c of queued) void idbPut(STORE_CAND, c).catch(() => undefined);
   if (made.length) notify();
-  return made;
+  return { committed, queued };
 }
 
 function drop(id: string): void {

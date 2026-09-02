@@ -319,10 +319,29 @@
   transform: translateY(2px);
 }
 .toc-note {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
   font: 400 var(--t-xs) / 1 var(--sans);
   color: var(--ink-3);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* On a phone the leader is the first thing to go: a dot leader two
+   characters wide is decoration, and the name and its note need the room. */
+@media (max-width: 560px) {
+  .toc-leader {
+    display: none;
+  }
+  .toc-note {
+    margin-left: auto;
+  }
+  .toc-name {
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 .toc-row:hover .toc-note {
   color: var(--ink-2);

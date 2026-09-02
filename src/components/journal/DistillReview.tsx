@@ -69,11 +69,17 @@ export default function DistillReview({ entry, project, onClose }: { entry: Jour
       toast("Nothing selected");
       return;
     }
-    const made = candidates.propose(
+    const { committed, queued } = candidates.propose(
       chosen.map((m) => ({ scope: "project" as const, projectId: project.id, type: m.type, text: m.text, origin: null }))
     );
-    journalStore.markDistilled(entry, made.map((m) => m.id), []);
-    toast(`${made.length} memor${made.length === 1 ? "y" : "ies"} sent to the tray for review`);
+    journalStore.markDistilled(entry, [...committed, ...queued].map((m) => m.id), []);
+    /* What happened depends on the project's autonomy policy, so say which —
+       "sent to the tray" when nothing went to the tray is how a user learns
+       to distrust the messages. */
+    const parts: string[] = [];
+    if (committed.length) parts.push(`${committed.length} saved to memory`);
+    if (queued.length) parts.push(`${queued.length} waiting in the tray`);
+    toast(parts.join(" · ") || "Nothing to save");
     setMemDrafts([]);
     setMemDone(true);
   }
@@ -87,8 +93,8 @@ export default function DistillReview({ entry, project, onClose }: { entry: Jour
     >
       <div className="sheet-inner">
         <div className="sheet-head">
-          <h3>Distill</h3>
-          <span className="sub">{entry.day}</span>
+          <h3>Memory and cards</h3>
+          <span className="sub">from {entry.day}</span>
           <button className="iconbtn" onClick={onClose} aria-label="Close">
             <Icon name="close" />
           </button>

@@ -155,6 +155,10 @@ export interface MemoryCandidate {
   origin: MemoryOrigin | null;
   /** Id of the memory the model believes this replaces. */
   supersedes: string | null;
+  /** True when the learner stated this outright rather than the model
+   *  inferring it. Under "assisted" autonomy these commit without review —
+   *  see services/candidates.propose. */
+  stated?: boolean;
   status: "pending" | "accepted" | "rejected";
 }
 

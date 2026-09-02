@@ -21,6 +21,10 @@ import type { ContextSource } from "@/types/chat";
 import type { Card, Deck, Memory, MemoryScope, SRSState } from "@/types";
 
 const MAX_CARDS = 60;
+/** The weak-spots block rides on every message of every thread that has it
+ *  attached, so it is a shortlist, not an inventory. Twenty is about as many
+ *  gaps as one answer could usefully aim at. */
+const MAX_WEAK = 20;
 const MAX_NOTES = 25;
 const MAX_JOURNAL_ENTRIES = 14;
 
@@ -167,15 +171,31 @@ export function renderSource(src: ContextSource, queryText = "", opts: RenderOpt
   }
 
   if (src.kind === "weak") {
-    const decks = src.deckId ? [db.decks[src.deckId]].filter(Boolean) : Object.values(db.decks);
-    const parts: string[] = [];
-    for (const d of decks) {
-      const weak = weakCards(d);
-      if (weak.length) parts.push(deckBlock(d, weak, `Cards from "${d.name}" the learner is struggling with most:`));
-    }
-    if (!parts.length) return null;
+    /* store.decksOf(projectId), not Object.values(db.decks). Every other
+       source is scoped to the project; this one read the whole database, so a
+       chat about one subject quietly shipped another project's cards to the
+       model — a leak, and at up to sixty cards a deck, most of the bill. */
+    const decks = src.deckId ? [db.decks[src.deckId]].filter(Boolean) : store.decksOf(projectId);
+
+    /* Ranked across the project and cut once, rather than sixty per deck.
+       Weak spots are a shortlist — the cards actually costing you time — not
+       an inventory. */
+    const scored: { d: Deck; c: Card }[] = [];
+    for (const d of decks) for (const c of weakCards(d)) scored.push({ d, c });
+    scored.sort((a, b) => {
+      const sa = a.d.srs[a.c.id];
+      const sb = b.d.srs[b.c.id];
+      const leech = Number(store.isLeech(sb)) - Number(store.isLeech(sa));
+      if (leech) return leech;
+      return (sb?.lapses || 0) - (sa?.lapses || 0);
+    });
+    const top = scored.slice(0, MAX_WEAK);
+    if (!top.length) return null;
+
     return (
-      parts.join("\n\n") +
+      "Cards this learner is struggling with most, across the project:\n" +
+      top.map(({ d, c }) => cardLine(c, d.srs[c.id])).join("\n") +
+      (scored.length > top.length ? `\n…and ${scored.length - top.length} more not listed.` : "") +
       "\n\nWhen it is relevant, aim your explanations at these gaps rather than at the topic in general."
     );
   }
@@ -196,7 +216,13 @@ export function renderSource(src: ContextSource, queryText = "", opts: RenderOpt
   }
 
   if (src.kind === "notes") {
-    const notes = (db.notes || []).slice(-Math.min(src.limit || MAX_NOTES, MAX_NOTES)).reverse();
+    /* Project-scoped, for the same reason weak spots is: db.notes holds every
+       project's insight log, and a note about one subject has no business in
+       a chat about another. */
+    const notes = store
+      .notesOf(projectId)
+      .slice(-Math.min(src.limit || MAX_NOTES, MAX_NOTES))
+      .reverse();
     if (!notes.length) return null;
     const lines = notes.map((n) => `- (${n.tag || "note"}, ${U.ago(n.t)}) ${n.text}`);
     return (
@@ -241,16 +267,37 @@ export function buildContext(
   const blocks = sources
     .map((s) => {
       if (s.kind !== "memory") return renderSource(s, queryText, { projectId });
-      const capped = memoryLimit == null ? s : { ...s, limit: Math.min(s.limit || 8, memoryLimit) };
+      /* Three caps, smallest wins: the source's own limit, the effort budget,
+         and the project's memory policy — which was editable, persisted, and
+         read by nothing at all before this. */
+      const policy = store.get().projects[projectId]?.memoryPolicy;
+      const policyCap =
+        s.scope === "global"
+          ? policy?.maxGlobalInjected
+          : s.scope === "project"
+            ? policy?.maxProjectInjected
+            : (policy?.maxGlobalInjected || 0) + (policy?.maxProjectInjected || 0) || undefined;
+      const limit = Math.min(
+        ...[s.limit || 8, memoryLimit, policyCap].filter((n): n is number => typeof n === "number" && n > 0)
+      );
+      const capped = { ...s, limit };
       const picked = memoriesForSource(capped, queryText, projectId);
       memories.push(...picked);
       return renderSource(capped, queryText, { projectId, memories: picked });
     })
     .filter((b): b is string => !!b);
 
-  if (!blocks.length) return { system: persona, memories };
+  /* Project.goals is documented as "injected verbatim as the project header on
+     every turn" and was, in fact, read by exactly one function — the journal
+     writer. It is the most useful sentence available about someone, so it
+     goes first, above everything derived. */
+  const goals = store.get().projects[projectId]?.goals?.trim();
+  const header = goals ? `What this learner is working toward, in their own words: ${goals}` : "";
+
+  if (!blocks.length && !header) return { system: persona, memories };
   const context =
     "=== CONTEXT ON THIS LEARNER ===\n" +
+    (header ? header + (blocks.length ? "\n\n" : "") : "") +
     blocks.join("\n\n") +
     "\n=== END CONTEXT ===\n\n" +
     "Use this to pitch your answers correctly. Do not recite it back at them or mention that you were " +

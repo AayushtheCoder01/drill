@@ -73,6 +73,16 @@
   display: flex;
   gap: var(--s-2);
 }
+@media (max-width: 560px) {
+  .src {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s-2);
+  }
+  .src-acts {
+    justify-content: flex-end;
+  }
+}
 
 /* --------------------------------------------------------------- tools -- */
 /* Named `cfilter`, not `chip`: style.css already owns `.chip` for the small
@@ -80,12 +90,16 @@
    would restyle those from three sections away. */
 .cards-tools {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--s-2);
   align-items: center;
   margin-bottom: var(--s-3);
 }
+/* The search box keeps a usable width and takes the whole row on a phone
+   rather than squeezing the two buttons off the edge. */
 .cards-tools .fi {
-  flex: 1;
+  flex: 1 1 12rem;
+  min-width: 0;
   margin: 0;
 }
 .cfilters {

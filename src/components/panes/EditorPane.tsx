@@ -8,13 +8,17 @@ import SheetShell from "../SheetShell";
 import CardHtml from "../CardHtml";
 
 export default function EditorPane({ deckId, cardId }: { deckId: string; cardId: string | null }) {
-  const { open } = useSheet();
+  const { close } = useSheet();
   const review = useReview();
   const toast = useToast();
 
+  /* A deck can vanish under an open sheet — deleted from Decks, or the last
+     deck removed while the Cards page had its editor queued. Reading through
+     an undefined deck used to throw, which the sheet's ErrorGuard turned into
+     the panel silently disappearing. Saying so is better than vanishing. */
   const deck = store.get().decks[deckId];
-  const c = cardId ? deck.cards.find((x) => x.id === cardId) || null : null;
-  const s = c ? deck.srs[c.id] : null;
+  const c = cardId && deck ? deck.cards.find((x) => x.id === cardId) || null : null;
+  const s = c && deck ? deck.srs[c.id] : null;
 
   const [tag, setTag] = useState(c ? c.tag : "General");
   const [q, setQ] = useState(c ? c.q : "");
@@ -29,7 +33,10 @@ export default function EditorPane({ deckId, cardId }: { deckId: string; cardId:
     store.upsertCard(deck, nc);
     toast(c ? "Saved" : "Card added");
     review.refresh();
-    open({ name: "library" });
+    // Back to wherever you opened it from. It used to jump to the deck-scoped
+    // Library sheet, which since the Cards section exists is both redundant
+    // and the wrong destination when you arrived from anywhere else.
+    close();
   }
 
   function del() {
@@ -37,8 +44,16 @@ export default function EditorPane({ deckId, cardId }: { deckId: string; cardId:
     if (!window.confirm("Delete this card?")) return;
     store.deleteCard(deck, c.id);
     review.refresh();
-    open({ name: "library" });
+    close();
     toast("Deleted");
+  }
+
+  if (!deck) {
+    return (
+      <SheetShell title="Card" sub="deck missing">
+        <div className="empty">That deck no longer exists — it was probably deleted while this was open.</div>
+      </SheetShell>
+    );
   }
 
   return (
@@ -74,8 +89,8 @@ export default function EditorPane({ deckId, cardId }: { deckId: string; cardId:
         <button className="btn pri" onClick={save}>
           Save
         </button>
-        <button className="btn sm" onClick={() => open({ name: "library" })}>
-          Back
+        <button className="btn sm" onClick={close}>
+          Cancel
         </button>
         {c && (
           <button className="btn sm danger" onClick={del}>

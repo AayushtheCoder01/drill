@@ -200,16 +200,26 @@ export default function JournalEntryView({
         </>
       )}
 
+      {/* "Distill" meant nothing to anyone who had not read the source. A verb
+          with no object is a bad button, so the button says what it produces
+          and a line underneath says where the two piles go. */}
       <div className="btnrow" style={{ marginTop: 6 }}>
         <button className="btn" disabled={busy || !rawText.trim()} onClick={generate}>
           {s ? "Regenerate" : "Write today's entry"}
         </button>
         {s && (
           <button className="btn pri" onClick={onDistill} disabled={busy}>
-            Distill
+            Turn this into memory and cards
           </button>
         )}
       </div>
+      {s && (
+        <div className="hintline" style={{ marginTop: 10 }}>
+          Reads this entry and proposes two things: <b>memories</b> — what is durable about how you think and what you
+          have settled on, which the tutor sees in every future chat — and <b>cards</b>, weighted toward what you got
+          stuck on. Nothing is saved without you choosing it.
+        </div>
+      )}
     </div>
   );
 }

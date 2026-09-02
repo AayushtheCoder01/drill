@@ -96,7 +96,10 @@ export default function Shell({
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
         e.preventDefault();
         toggle();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") {
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "\\") {
+        /* Not ctrl+J: chat already binds that to "new conversation", so both
+           handlers fired and folding the panel also started a new thread.
+           Backslash is unbound in Chrome and reads as a divider. */
         e.preventDefault();
         toggleRail();
       } else if (e.key === "Escape" && drawer) {
@@ -148,7 +151,7 @@ export default function Shell({
               <button
                 className="iconbtn rail-toggle"
                 onClick={toggleRail}
-                title={railFolded ? "Show the panel  (ctrl + j)" : "Hide the panel  (ctrl + j)"}
+                title={railFolded ? "Show the panel  (ctrl + \)" : "Hide the panel  (ctrl + \)"}
                 aria-label={railFolded ? "Show the panel" : "Hide the panel"}
                 aria-expanded={!railFolded}
               >
