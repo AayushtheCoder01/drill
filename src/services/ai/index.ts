@@ -13,6 +13,9 @@ import * as U from "@/lib/util";
 import * as CFG from "@/lib/config";
 import * as store from "@/services/store";
 import * as transcript from "@/services/transcript";
+import * as usageLog from "@/services/usageLog";
+import { loadPricing, priceForModel } from "@/services/pricing";
+import { costOf } from "@/lib/tokens";
 import { BACKENDS, BACKEND_ORDER, isAbort } from "./backends";
 import type {
   BackendType,
@@ -90,16 +93,42 @@ export function chat(messages: ChatMessage[], opts: ChatOpts = {}, override?: Ov
     }
   };
 
+  /* Kicked off, not awaited: the catalogue is memoised and cached for a day,
+     so by the time a reply lands it has almost always resolved and the call
+     can be priced. A call that beats it just records tokens without cost. */
+  void loadPricing();
+
+  const label = opts.label || "chat";
+
+  /* The ledger is a bystander — a failure here must never take down an AI
+     call that otherwise worked. */
+  const meter = (failed: boolean) => {
+    try {
+      usageLog.add({
+        at: started,
+        backend: r.type,
+        model: r.model,
+        label,
+        usage,
+        cost: costOf(usage, priceForModel(r.type, r.model)),
+        failed
+      });
+    } catch {
+      /* ignore */
+    }
+  };
+
   return r.backend.chat(messages, wrapped, r).then(
     (res) => {
-      transcript.record({ at: started, label: opts.label || "chat", model: r.model, messages, response: res, error: null, usage, elapsedMs: Date.now() - started });
+      transcript.record({ at: started, label, model: r.model, messages, response: res, error: null, usage, elapsedMs: Date.now() - started });
+      meter(false);
       return res;
     },
     (err: unknown) => {
       if (!isAbort(err)) {
         transcript.record({
           at: started,
-          label: opts.label || "chat",
+          label,
           model: r.model,
           messages,
           response: null,
@@ -107,6 +136,7 @@ export function chat(messages: ChatMessage[], opts: ChatOpts = {}, override?: Ov
           usage,
           elapsedMs: Date.now() - started
         });
+        meter(true);
       }
       throw err;
     }

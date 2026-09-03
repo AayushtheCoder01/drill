@@ -6,6 +6,7 @@ import * as memoryStore from "@/services/memoryStore";
 import * as candidates from "@/services/candidates";
 import * as journalStore from "@/services/journalStore";
 import * as examStore from "@/services/examStore";
+import * as usageLog from "@/services/usageLog";
 import * as storage from "@/services/storage";
 import { applyAppearance } from "@/lib/theme";
 import { useDrillStore } from "@/hooks/useDrillStore";
@@ -131,6 +132,7 @@ export default function App() {
         void candidates.init();
         void journalStore.init();
         void examStore.init();
+        void usageLog.init();
         // Ask the browser not to evict us. Chrome usually grants it silently,
         // Firefox prompts, Safari decides for itself — a refusal is normal and
         // only means the export in Import/export matters more.
@@ -141,6 +143,21 @@ export default function App() {
         setError(e.message);
         setStatus("error");
       });
+  }, []);
+
+  /* The usage ledger writes on a debounce, and unlike conversations it is
+     written from every view, not just chat — so the flush lives here rather
+     than in ChatContext, which only mounts for one of them. */
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") usageLog.flushAll();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", usageLog.flushAll);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", usageLog.flushAll);
+    };
   }, []);
 
   if (status === "error") {

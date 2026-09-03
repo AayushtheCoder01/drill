@@ -51,11 +51,26 @@ function emptyReplyError(label: string, finish: string | undefined, reasoning: s
 }
 
 /** OpenAI-shaped usage blocks, which OpenRouter, OpenAI and most compatible
- *  servers all return under the same key names. */
+ *  servers all return under the same key names. The *_details sub-objects are
+ *  optional and absent on most compatible servers; missing means zero. */
 function readOpenAIUsage(j: unknown): TokenUsage | undefined {
-  const u = (j as { usage?: { prompt_tokens?: number; completion_tokens?: number } })?.usage;
+  const u = (
+    j as {
+      usage?: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        prompt_tokens_details?: { cached_tokens?: number };
+        completion_tokens_details?: { reasoning_tokens?: number };
+      };
+    }
+  )?.usage;
   if (!u) return undefined;
-  return { promptTokens: u.prompt_tokens || 0, completionTokens: u.completion_tokens || 0 };
+  return {
+    promptTokens: u.prompt_tokens || 0,
+    completionTokens: u.completion_tokens || 0,
+    cachedPromptTokens: u.prompt_tokens_details?.cached_tokens || 0,
+    reasoningTokens: u.completion_tokens_details?.reasoning_tokens || 0
+  };
 }
 
 /* ---------------------------------------------------------------- shared */
@@ -346,7 +361,13 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
       if (!opts.onToken) {
         const j = await res.json();
         if (opts.onUsage && j.usage) {
-          opts.onUsage({ promptTokens: j.usage.input_tokens || 0, completionTokens: j.usage.output_tokens || 0 });
+          opts.onUsage({
+            promptTokens: j.usage.input_tokens || 0,
+            completionTokens: j.usage.output_tokens || 0,
+            /* Anthropic reports cache reads and writes separately, and neither
+               is included in input_tokens. Both are prompt-side work. */
+            cachedPromptTokens: (j.usage.cache_read_input_tokens || 0) + (j.usage.cache_creation_input_tokens || 0)
+          });
         }
         const text = ((j.content || []) as { type: string; text?: string }[])
           .filter((b) => b.type === "text")
@@ -360,10 +381,12 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
       // output on message_delta.
       let promptTokens = 0;
       let completionTokens = 0;
+      let cachedPromptTokens = 0;
       await readSSE(res, (j) => {
         if (j.type === "message_start" && j.message?.usage) {
           promptTokens = j.message.usage.input_tokens || 0;
           completionTokens = j.message.usage.output_tokens || 0;
+          cachedPromptTokens = (j.message.usage.cache_read_input_tokens || 0) + (j.message.usage.cache_creation_input_tokens || 0);
         }
         if (j.type === "message_delta" && j.usage) {
           completionTokens = j.usage.output_tokens || completionTokens;
@@ -373,7 +396,7 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
           opts.onToken!(j.delta.text, out);
         }
       });
-      if (opts.onUsage && (promptTokens || completionTokens)) opts.onUsage({ promptTokens, completionTokens });
+      if (opts.onUsage && (promptTokens || completionTokens)) opts.onUsage({ promptTokens, completionTokens, cachedPromptTokens });
       return out;
     },
 

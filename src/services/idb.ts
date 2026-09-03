@@ -15,6 +15,7 @@
  *   journal         daily entries: raw capture + generated narrative (v3)
  *   rollups         weekly period summaries (v3)
  *   exams           generated, gradeable question sets (v3)
+ *   usage           one row per day of token spend, by backend/model/feature (v4)
  *
  * Memory (and now journal/exams) live here rather than in the localStorage
  * database for the same reason transcripts do: they grow without a natural
@@ -22,8 +23,9 @@
  * ========================================================================== */
 
 const DB_NAME = "drill-chat";
-/** v2 added memories and candidates. v3 adds journal, rollups and exams. */
-const DB_VERSION = 3;
+/** v2 added memories and candidates. v3 added journal, rollups and exams.
+ *  v4 adds the usage ledger. */
+const DB_VERSION = 4;
 export const STORE_CONV = "conversations";
 export const STORE_META = "meta";
 export const STORE_MEM = "memories";
@@ -31,6 +33,7 @@ export const STORE_CAND = "candidates";
 export const STORE_JOURNAL = "journal";
 export const STORE_ROLLUPS = "rollups";
 export const STORE_EXAMS = "exams";
+export const STORE_USAGE = "usage";
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -71,6 +74,13 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_EXAMS)) {
         const s = db.createObjectStore(STORE_EXAMS, { keyPath: "id" });
         s.createIndex("projectId", "projectId");
+      }
+      if (!db.objectStoreNames.contains(STORE_USAGE)) {
+        /* Keyed by day, so a day's spend accumulates into one record rather
+           than one row per call. `at` is the day's start in epoch ms, which
+           is what range queries filter on — day strings are for display. */
+        const s = db.createObjectStore(STORE_USAGE, { keyPath: "day" });
+        s.createIndex("at", "at");
       }
     };
     req.onsuccess = () => resolve(req.result);

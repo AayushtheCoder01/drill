@@ -2396,3 +2396,79 @@ a {
   margin: var(--s-6) auto 0;
   max-width: var(--measure);
 }
+
+/* ------------------------------------------------------------- usage ----- */
+/* Settings → Usage. A ruled column like .list, but each row carries a share
+   bar, so the rows are stacked rather than centred on one line. */
+.usage-total {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-4) 0 var(--s-5);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.usage-total-cost {
+  font-family: var(--serif);
+  font-size: var(--t-2xl);
+  line-height: var(--lh-tight);
+  color: var(--ink);
+}
+.usage-total-sub {
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  color: var(--ink-3);
+  line-height: 1.55;
+}
+.usage-rows {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--rule-soft);
+  margin-bottom: var(--s-5);
+}
+.usage-row {
+  padding: var(--s-3) var(--s-2);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.usage-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+.usage-name {
+  font-family: var(--sans);
+  font-weight: 500;
+  font-size: var(--t-sm);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-cost {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+  flex: none;
+}
+/* The bar is a share of the group's largest row, not an absolute scale —
+   it exists to rank, and the numbers beside it carry the magnitude. */
+.usage-bar {
+  height: var(--s-1);
+  margin: var(--s-2) 0;
+  border-radius: var(--r-full);
+  background: var(--rule-soft);
+  overflow: hidden;
+}
+.usage-bar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  transition: width var(--med) var(--ease);
+}
+.usage-meta {
+  font-family: var(--sans);
+  font-size: var(--t-2xs);
+  color: var(--ink-3);
+  line-height: 1.5;
+}

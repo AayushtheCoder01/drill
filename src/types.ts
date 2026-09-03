@@ -281,6 +281,12 @@ export interface ChatMessage {
 export interface TokenUsage {
   promptTokens: number;
   completionTokens: number;
+  /** Of promptTokens, how many were served from the provider's prompt cache.
+   *  Reported for display only — cache pricing is a per-vendor multiplier the
+   *  catalogue does not expose, so costing it would be guesswork. */
+  cachedPromptTokens?: number;
+  /** Of completionTokens, how many went on reasoning rather than the answer. */
+  reasoningTokens?: number;
   cost?: number;
 }
 

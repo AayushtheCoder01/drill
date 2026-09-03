@@ -8,8 +8,9 @@ import { useState } from "react";
 import * as store from "@/services/store";
 import GlobalScope from "./GlobalScope";
 import ProjectScope from "./ProjectScope";
+import UsageScope from "./UsageScope";
 
-type Tab = "global" | "project";
+type Tab = "global" | "project" | "usage";
 
 export default function GlobalProjectTabs({ initialTab = "global" }: { initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -24,8 +25,13 @@ export default function GlobalProjectTabs({ initialTab = "global" }: { initialTa
         <button className={"tab" + (tab === "project" ? " on" : "")} onClick={() => setTab("project")}>
           Project
         </button>
+        <button className={"tab" + (tab === "usage" ? " on" : "")} onClick={() => setTab("usage")}>
+          Usage
+        </button>
       </div>
-      {tab === "global" ? <GlobalScope /> : <ProjectScope projectId={projectId} />}
+      {tab === "global" && <GlobalScope />}
+      {tab === "project" && <ProjectScope projectId={projectId} />}
+      {tab === "usage" && <UsageScope />}
     </>
   );
 }

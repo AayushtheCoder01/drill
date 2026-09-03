@@ -20,16 +20,18 @@
 import * as store from "./store";
 import * as chatStore from "./chatStore";
 import * as journalStore from "./journalStore";
+import * as usageLog from "./usageLog";
 import * as memoryStore from "./memoryStore";
 import * as candidates from "./candidates";
 import * as examStore from "./examStore";
 import * as U from "@/lib/util";
-import { idbAll, idbBulkPut, idbClear, STORE_CAND, STORE_CONV, STORE_EXAMS, STORE_JOURNAL, STORE_MEM, STORE_ROLLUPS } from "./idb";
+import { idbAll, idbBulkPut, idbClear, STORE_CAND, STORE_CONV, STORE_EXAMS, STORE_JOURNAL, STORE_MEM, STORE_ROLLUPS, STORE_USAGE } from "./idb";
 import { CURRENT_DB_VERSION, dbVersionOf } from "@/lib/migrate";
 import type { BackupSummary, DrillDB, FullBackup, LegacyDBv2, LegacyDBv3, Memory, MemoryCandidate } from "@/types";
 import type { Conversation } from "@/types/chat";
 import type { JournalEntry, PeriodRollup } from "@/types/journal";
 import type { Exam } from "@/types/exam";
+import type { UsageDay } from "./usageLog";
 
 const KIND = "drill-full-backup";
 
@@ -41,13 +43,16 @@ export async function collect(): Promise<FullBackup> {
   chatStore.flushAll();
   store.saveNow();
 
-  const [conversations, memories, memCandidates, journal, rollups, exams] = await Promise.all([
+  usageLog.flushAll();
+
+  const [conversations, memories, memCandidates, journal, rollups, exams, usage] = await Promise.all([
     idbAll<Conversation>(STORE_CONV).catch(() => [] as Conversation[]),
     idbAll<Memory>(STORE_MEM).catch(() => [] as Memory[]),
     idbAll<MemoryCandidate>(STORE_CAND).catch(() => [] as MemoryCandidate[]),
     idbAll<JournalEntry>(STORE_JOURNAL).catch(() => [] as JournalEntry[]),
     idbAll<PeriodRollup>(STORE_ROLLUPS).catch(() => [] as PeriodRollup[]),
-    idbAll<Exam>(STORE_EXAMS).catch(() => [] as Exam[])
+    idbAll<Exam>(STORE_EXAMS).catch(() => [] as Exam[]),
+    idbAll<UsageDay>(STORE_USAGE).catch(() => [] as UsageDay[])
   ]);
 
   return {
@@ -61,7 +66,8 @@ export async function collect(): Promise<FullBackup> {
     candidates: memCandidates,
     journal,
     rollups,
-    exams
+    exams,
+    usage
   };
 }
 
@@ -113,7 +119,8 @@ export function parse(text: string): FullBackup {
     candidates: Array.isArray(b.candidates) ? b.candidates : [],
     journal: Array.isArray(b.journal) ? b.journal : [],
     rollups: Array.isArray(b.rollups) ? b.rollups : [],
-    exams: Array.isArray(b.exams) ? b.exams : []
+    exams: Array.isArray(b.exams) ? b.exams : [],
+    usage: Array.isArray(b.usage) ? b.usage : []
   };
 }
 
@@ -161,7 +168,8 @@ export async function restoreEverything(b: FullBackup): Promise<BackupSummary> {
     idbClear(STORE_CAND),
     idbClear(STORE_JOURNAL),
     idbClear(STORE_ROLLUPS),
-    idbClear(STORE_EXAMS)
+    idbClear(STORE_EXAMS),
+    idbClear(STORE_USAGE)
   ]);
   await Promise.all([
     idbBulkPut(STORE_CONV, b.conversations),
@@ -169,9 +177,17 @@ export async function restoreEverything(b: FullBackup): Promise<BackupSummary> {
     idbBulkPut(STORE_CAND, b.candidates),
     idbBulkPut(STORE_JOURNAL, b.journal),
     idbBulkPut(STORE_ROLLUPS, b.rollups),
-    idbBulkPut(STORE_EXAMS, b.exams)
+    idbBulkPut(STORE_EXAMS, b.exams),
+    idbBulkPut(STORE_USAGE, b.usage)
   ]);
-  await Promise.all([chatStore.rebuildIndex(), memoryStore.reload(), candidates.reload(), journalStore.reload(), examStore.reload()]);
+  await Promise.all([
+    chatStore.rebuildIndex(),
+    memoryStore.reload(),
+    candidates.reload(),
+    journalStore.reload(),
+    examStore.reload(),
+    usageLog.reload()
+  ]);
 
   return summarise(b);
 }

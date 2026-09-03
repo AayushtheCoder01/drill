@@ -201,6 +201,8 @@ export interface FullBackup {
   journal: unknown[];
   rollups: unknown[];
   exams: unknown[];
+  /** Absent in backups written before the usage ledger existed. */
+  usage: unknown[];
 }
 
 /** What a backup contains, for the confirmation shown before restoring. */
