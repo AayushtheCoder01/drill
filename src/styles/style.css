@@ -175,15 +175,28 @@ hr {
   flex-direction: column;
   gap: var(--s-6);
 }
-.rail-toggle {
+/* Open, this is the only way to shut the panel, so it has to read as a
+   control rather than as a smudge. At 0.6 opacity a 14px chevron on the
+   rail's own background was the same problem already fixed for the folded
+   edge below — full strength, its own surface, and a hit target big enough
+   to aim at. */
+/* Composed through the --btn-* variables rather than raw background/border,
+   and qualified with .iconbtn so it outranks the .iconbtn rules further down
+   the file — a bare .rail-toggle loses to them on source order, which is
+   exactly the "renders unstyled" trap CONTRIBUTING warns about. */
+.iconbtn.rail-toggle {
   position: absolute;
   top: var(--s-3);
   right: var(--s-2);
   z-index: 2;
-  opacity: 0.6;
+  --btn-bg: var(--surface);
+  --btn-edge: var(--rule-soft);
+  --btn-fg: var(--ink-2);
 }
-.rail-toggle:hover {
-  opacity: 1;
+.iconbtn.rail-toggle:hover {
+  --btn-bg: var(--surface-2);
+  --btn-edge: var(--ink-3);
+  --btn-fg: var(--accent);
 }
 /* Folded, the whole 34px edge becomes the handle, and it has to *look* like
    one: at 0.6 opacity a 14px chevron on a dark strip is invisible, which is
@@ -234,7 +247,17 @@ hr {
 .rail-body > .rail-group:first-child {
   margin-top: var(--s-4);
 }
+/* The old cutoff was 1180px, which sounds generous and is not: a 1707px
+   laptop screen at Windows' default 150% scaling is 1131 CSS px, so on a very
+   common machine the rail — and the handle that brings it back — could never
+   be shown at all, even maximised. It now hides only below 1000px, and gives
+   up some of its own width first so the reading column keeps its measure. */
 @media (max-width: 1180px) {
+  .app-rail {
+    --rail-w: 13rem;
+  }
+}
+@media (max-width: 1000px) {
   .app-rail {
     display: none;
   }

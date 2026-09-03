@@ -648,6 +648,12 @@
   align-items: center;
   gap: var(--s-2);
   padding: var(--s-1) var(--s-2) var(--s-2) var(--s-3);
+  /* The model and effort chips do not shrink, and Send is pushed right by
+     margin-left:auto — so on a narrow screen the row ran off the edge and
+     took Send with it. Wrapping puts Send on its own line instead, still
+     right-aligned, rather than off the side of the phone. */
+  flex-wrap: wrap;
+  row-gap: var(--s-1);
 }
 .cbtn {
   font-size: var(--t-2xs);
