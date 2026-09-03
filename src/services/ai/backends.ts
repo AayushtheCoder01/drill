@@ -16,7 +16,8 @@
  * ever grows a backend, this is the file that would move server-side: keep
  * the same BackendDef shape and swap fetch() targets for calls to your API.
  * ========================================================================== */
-import type { AIContext, BackendDef, BackendType, ChatMessage, ChatOpts, TokenUsage } from "@/types";
+import { CHAT_ACTIONS, type ChatActionId } from "@/lib/chatActions";
+import type { AIContext, BackendDef, BackendType, ChatMessage, ChatOpts, Citation, TokenUsage } from "@/types";
 
 /** True for the exception fetch throws when an AbortSignal fires. Callers
  *  treat this as "the user stopped it", not as a failure to report. */
@@ -59,6 +60,7 @@ function readOpenAIUsage(j: unknown): TokenUsage | undefined {
       usage?: {
         prompt_tokens?: number;
         completion_tokens?: number;
+        cost?: number;
         prompt_tokens_details?: { cached_tokens?: number };
         completion_tokens_details?: { reasoning_tokens?: number };
       };
@@ -69,8 +71,53 @@ function readOpenAIUsage(j: unknown): TokenUsage | undefined {
     promptTokens: u.prompt_tokens || 0,
     completionTokens: u.completion_tokens || 0,
     cachedPromptTokens: u.prompt_tokens_details?.cached_tokens || 0,
-    reasoningTokens: u.completion_tokens_details?.reasoning_tokens || 0
+    reasoningTokens: u.completion_tokens_details?.reasoning_tokens || 0,
+    /* OpenRouter reports what it actually charged. That figure includes web
+       search fees, which no tokens-times-price sum can see, so it wins over
+       the reconstructed one wherever it is present. */
+    reportedCost: typeof u.cost === "number" ? u.cost : undefined
   };
+}
+
+/** Apply the caller's requested actions, filtered to what this backend can
+ *  do. Unsupported ones are dropped rather than sent — the composer disables
+ *  the chip, this is the belt to that braces. */
+function applyActions(body: Record<string, unknown>, want: ChatActionId[] | undefined, can: ChatActionId[] | undefined): void {
+  if (!want?.length || !can?.length) return;
+  for (const id of want) {
+    if (!can.includes(id)) continue;
+    CHAT_ACTIONS[id]?.apply(body);
+  }
+}
+
+/** OpenAI-shaped citation annotations, as OpenRouter returns them for a
+ *  web-search reply. Tolerant about where they hang: the annotations array
+ *  appears on the completed message, and on streamed deltas for some
+ *  engines, so both paths funnel through here. */
+function readCitations(node: unknown): Citation[] {
+  const list = (node as { annotations?: unknown[] })?.annotations;
+  if (!Array.isArray(list)) return [];
+  const out: Citation[] = [];
+  for (const raw of list) {
+    const a = raw as { type?: string; url_citation?: Record<string, unknown> };
+    const c = a?.url_citation;
+    if (!c || typeof c.url !== "string") continue;
+    out.push({
+      url: c.url,
+      title: typeof c.title === "string" && c.title.trim() ? c.title : c.url,
+      content: typeof c.content === "string" ? c.content : undefined,
+      start: typeof c.start_index === "number" ? c.start_index : undefined,
+      end: typeof c.end_index === "number" ? c.end_index : undefined
+    });
+  }
+  return out;
+}
+
+/** Same source twice is one source. Keeps first-seen order, which is the
+ *  order the model referred to them in. */
+function dedupeCitations(list: Citation[]): Citation[] {
+  const seen = new Set<string>();
+  return list.filter((c) => (seen.has(c.url) ? false : (seen.add(c.url), true)));
 }
 
 /* ---------------------------------------------------------------- shared */
@@ -170,7 +217,8 @@ async function readNDJSON(res: Response, onObj: (j: any) => void): Promise<void>
  *  all speak this. Only the headers and the default host differ. */
 function openAICompatible(
   label: string,
-  headerFn: (ctx: AIContext) => Record<string, string>
+  headerFn: (ctx: AIContext) => Record<string, string>,
+  supports?: ChatActionId[]
 ): Pick<BackendDef, "chat" | "listModels"> {
   return {
     async chat(messages: ChatMessage[], opts: ChatOpts, ctx: AIContext): Promise<string> {
@@ -182,8 +230,10 @@ function openAICompatible(
         stream: !!opts.onToken
       };
       if (opts.maxTokens) body.max_tokens = opts.maxTokens;
-      // Streamed responses omit usage unless it is asked for explicitly.
-      if (opts.onToken) body.stream_options = { include_usage: true };
+      /* Actions the caller asked for, filtered to what this backend can
+         actually do. `stream_options: {include_usage:true}` used to be set
+         here; OpenRouter deprecated it and returns usage unconditionally. */
+      applyActions(body, opts.actions, supports);
 
       let res: Response;
       try {
@@ -206,6 +256,10 @@ function openAICompatible(
         const u = readOpenAIUsage(j);
         if (u && opts.onUsage) opts.onUsage(u);
         const choice = (j.choices && j.choices[0]) || {};
+        if (opts.onCitations) {
+          const cites = dedupeCitations(readCitations(choice.message));
+          if (cites.length) opts.onCitations(cites);
+        }
         const text = (choice.message && choice.message.content) || "";
         if (!text) {
           const reasoning = String((choice.message && (choice.message.reasoning || choice.message.reasoning_content)) || "");
@@ -217,12 +271,19 @@ function openAICompatible(
       let reasoned = false;
       let finish: string | undefined;
       let usage: TokenUsage | undefined;
+      /* Where citations arrive in a stream is not documented and differs by
+         search engine, so every plausible carrier is read and the result is
+         deduped by url. Missing them entirely would silently drop the whole
+         point of a web-search reply. */
+      let cites: Citation[] = [];
       await readSSE(res, (j) => {
         const u = readOpenAIUsage(j);
         if (u) usage = u;
+        cites = cites.concat(readCitations(j));
         const choice = j.choices && j.choices[0];
         if (!choice) return;
         if (choice.finish_reason) finish = choice.finish_reason;
+        cites = cites.concat(readCitations(choice.message), readCitations(choice.delta));
         const d = choice.delta;
         if (!d) return;
         if (d.reasoning || d.reasoning_content) reasoned = true;
@@ -232,6 +293,7 @@ function openAICompatible(
         }
       });
       if (usage && opts.onUsage) opts.onUsage(usage);
+      if (opts.onCitations && cites.length) opts.onCitations(dedupeCitations(cites));
       if (!out) throw emptyReplyError(label, finish, reasoned ? "yes" : "");
       return out;
     },
@@ -280,7 +342,12 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
     defaultBaseUrl: "https://openrouter.ai/api/v1",
     defaultModel: "anthropic/claude-sonnet-4.5",
     note: "One key, every model. Has free models on the list too.",
-    ...openAICompatible("OpenRouter", (ctx) => {
+    /* The only backend that can search: OpenRouter runs it server-side and
+       injects the results into the prompt, so it stays one request. */
+    supports: ["web"],
+    ...openAICompatible(
+      "OpenRouter",
+      (ctx) => {
       /* OpenRouter wants an origin it can attribute the call to. */
       const ref = window.location.origin && window.location.origin !== "null" ? window.location.origin : "http://localhost";
       return {
@@ -290,7 +357,9 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
         "X-Title": "Drill",
         ...ctx.headers
       };
-    })
+      },
+      ["web"]
+    )
   } as BackendDef,
 
   openai: {

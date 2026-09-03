@@ -7,7 +7,8 @@
  * somewhere else", and the second is served by branching into a new
  * conversation instead of an invisible tree node.
  * ========================================================================== */
-import type { BackendType, TokenUsage } from "@/types";
+import type { BackendType, Citation, TokenUsage } from "@/types";
+import type { ChatActionId } from "@/lib/chatActions";
 import type { Effort, MemoryScope } from "@/types/core";
 
 /** Re-exported so chat code has one import for its own vocabulary. */
@@ -49,6 +50,8 @@ export interface Variant {
   createdAt: number;
   /** Present when this reply saved something to memory. */
   saved?: SavedMemory;
+  /** Sources a web-search reply drew on. */
+  citations?: Citation[];
 }
 
 export interface Turn {
@@ -127,6 +130,10 @@ export interface Conversation {
   /** Index of the last turn already folded into memory by a wrap-up, so
    *  running wrap-up again covers only what has been said since. */
   rolledUpThrough: number;
+  /** Extra capabilities switched on for this thread — web search, and
+   *  whatever follows it. Per conversation, not global: one thread wanting
+   *  the live web should not turn it on for every other. */
+  actions: ChatActionId[];
 }
 
 /** The sidebar reads these without loading full transcripts. */

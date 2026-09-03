@@ -7,6 +7,7 @@
  * the review side of the app.
  * ========================================================================== */
 import type { Autonomy, Effort, Note, Project } from "@/types/core";
+import type { ChatActionId } from "@/lib/chatActions";
 
 export type { Autonomy, Effort, Note, Project } from "@/types/core";
 export type {
@@ -287,6 +288,11 @@ export interface TokenUsage {
   cachedPromptTokens?: number;
   /** Of completionTokens, how many went on reasoning rather than the answer. */
   reasoningTokens?: number;
+  /** What the provider says it actually charged, when it says so. Preferred
+   *  over anything reconstructed from a price table: it is the real number,
+   *  and it includes non-token fees like web search that a tokens-times-price
+   *  calculation cannot see. */
+  reportedCost?: number;
   cost?: number;
 }
 
@@ -302,6 +308,23 @@ export interface ChatOpts {
   /** What kind of operation this is — "journal", "distill", "exam", "chat"…
    *  Recorded on the run transcript so "what is it doing" has an answer. */
   label?: string;
+  /** Extra capabilities to switch on for this call (web search, and whatever
+   *  follows it). Silently ignored by a backend that does not support one —
+   *  the composer is what stops you asking in the first place. */
+  actions?: ChatActionId[];
+  /** Sources the backend cited, reported once when the reply is complete. */
+  onCitations?: (c: Citation[]) => void;
+}
+
+/** One source a web-search-backed reply drew on. `start`/`end` are character
+ *  offsets into the reply text, when the backend reports them. */
+export interface Citation {
+  url: string;
+  title: string;
+  /** The excerpt the search engine extracted. May be long. */
+  content?: string;
+  start?: number;
+  end?: number;
 }
 
 /** Resolved backend + credentials for one call. */
@@ -321,6 +344,9 @@ export interface BackendDef {
   defaultBaseUrl: string;
   defaultModel: string;
   note: string;
+  /** Which chat actions this backend can actually perform. Absent means none
+   *  — see lib/chatActions.ts. */
+  supports?: ChatActionId[];
   chat(messages: ChatMessage[], opts: ChatOpts, ctx: AIContext): Promise<string>;
   listModels(ctx: AIContext): Promise<string[]>;
 }

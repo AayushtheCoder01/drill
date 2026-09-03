@@ -12,6 +12,7 @@ import * as chatStore from "@/services/chatStore";
 import * as store from "@/services/store";
 import * as AI from "@/services/ai";
 import * as memoryCapture from "@/services/memoryCapture";
+import ActionChips from "./ActionChips";
 import { poolFor } from "@/lib/memoryBrief";
 import type { ChatMessage } from "@/types";
 import { useChat } from "@/context/ChatContext";
@@ -452,6 +453,12 @@ export default function ChatView() {
             <>
               <ModelChip conversation={c} draftModel={chat.draftModel} onDraftModel={chat.setDraftModel} />
               <EffortChip conversation={c} draftEffort={chat.draftEffort} onDraftEffort={chat.setDraftEffort} />
+              <ActionChips
+                active={c?.actions || []}
+                backend={c?.backend}
+                model={c?.model || chat.draftModel}
+                onChange={(actions) => chat.update({ actions })}
+              />
             </>
           }
           seed={seed}

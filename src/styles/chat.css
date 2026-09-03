@@ -1319,3 +1319,59 @@
 .msave-foot.warn {
   color: var(--amber);
 }
+
+/* ------------------------------------------------------------- sources -- */
+/* Where a web-search reply got its answer. A list under the reply, not
+   markers woven into the prose — the offsets arrive after the markdown is
+   rendered, and splicing generated HTML is forbidden. */
+.sources {
+  margin-top: var(--s-4);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--rule-soft);
+}
+.sources-head {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: var(--s-2);
+}
+.sources-list {
+  margin: 0;
+  padding-left: var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.sources-list li {
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+  color: var(--ink-3);
+}
+.sources-list a {
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.sources-list a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.sources-host {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+  margin-left: var(--s-2);
+}
+
+/* An action chip reads as a switch: off is the same ghost button as its
+   neighbours, on is tinted so the state is visible without a label change. */
+.cbtn.actchip.on {
+  --btn-bg: var(--accent-10);
+  --btn-edge: var(--accent-45);
+  --btn-fg: var(--accent);
+}
+.cbtn.actchip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

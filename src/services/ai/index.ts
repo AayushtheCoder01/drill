@@ -111,7 +111,10 @@ export function chat(messages: ChatMessage[], opts: ChatOpts = {}, override?: Ov
         model: r.model,
         label,
         usage,
-        cost: costOf(usage, priceForModel(r.type, r.model)),
+        /* The provider's own figure first. It is what was actually charged,
+           and it is the only one that includes non-token fees — a web search
+           costs about $0.007 that no tokens-times-price sum can account for. */
+        cost: usage?.reportedCost ?? costOf(usage, priceForModel(r.type, r.model)),
         failed
       });
     } catch {

@@ -32,7 +32,7 @@ import { costOf } from "@/lib/tokens";
 import { resolveBackend, resolveEffort, resolveModel } from "@/lib/resolveSetting";
 import { useRoute } from "./RouteContext";
 import type { Attachment, Conversation, ContextSource, Turn, Usage } from "@/types/chat";
-import type { ChatMessage, Memory } from "@/types";
+import type { ChatMessage, Citation, Memory } from "@/types";
 
 interface ChatState {
   conversation: Conversation | null;
@@ -182,6 +182,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       const started = Date.now();
       let usage: Usage | undefined;
+      let citations: Citation[] | undefined;
       let acc = "";
 
       // Build the prompt once and record usage against exactly what went into
@@ -206,12 +207,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             maxTokens: Math.max(256, Math.round(c.maxTokens * replyScale)),
             signal: controller.signal,
             label: "chat",
+            actions: c.actions,
             onToken: (_t, a) => {
               acc = a;
               setStreaming(a);
             },
+            onCitations: (cs) => {
+              citations = cs;
+            },
             onUsage: (u) => {
-              usage = { ...u, cost: costOf(u, priceFor(c.model)) };
+              /* What the provider says it charged beats what we can
+                 reconstruct: it is the real figure, and it includes web
+                 search fees that tokens-times-price cannot see. */
+              usage = { ...u, cost: u.reportedCost ?? costOf(u, priceFor(c.model)) };
             }
           },
           { backend: c.backend, model: c.model }
@@ -239,7 +247,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           usage,
           elapsed: Date.now() - started,
           createdAt: Date.now(),
-          saved
+          saved,
+          citations
         });
         targetTurn.active = targetTurn.variants.length - 1;
         targetTurn.error = undefined;

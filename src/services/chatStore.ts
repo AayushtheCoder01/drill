@@ -173,6 +173,7 @@ function repair(c: Conversation): Conversation {
   if (c.effort === undefined) c.effort = "";
   if (!Array.isArray(c.pinnedAttachments)) c.pinnedAttachments = [];
   if (typeof c.rolledUpThrough !== "number") c.rolledUpThrough = 0;
+  if (!Array.isArray(c.actions)) c.actions = [];
   return c;
 }
 
@@ -244,7 +245,8 @@ export function create(opts: CreateOpts = {}): Conversation {
     pinnedAttachments: [],
     turns: [],
     usage: { promptTokens: 0, completionTokens: 0 },
-    rolledUpThrough: 0
+    rolledUpThrough: 0,
+    actions: []
   };
   cache.set(c.id, c);
   persist(c, true);
