@@ -20,6 +20,7 @@ import {
 import * as store from "@/services/store";
 import * as chatStore from "@/services/chatStore";
 import * as memoryStore from "@/services/memoryStore";
+import * as memoryCapture from "@/services/memoryCapture";
 import * as AI from "@/services/ai";
 import { isAbort } from "@/services/ai/backends";
 import { loadPricing, priceFor } from "@/services/pricing";
@@ -216,15 +217,29 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           { backend: c.backend, model: c.model }
         );
 
-        const content = full || acc;
-        if (!content.trim()) throw new Error("The model returned an empty reply.");
+        const raw = full || acc;
+        if (!raw.trim()) throw new Error("The model returned an empty reply.");
+
+        /* Pull any save-to-memory block out of the markdown *before* it is
+           stored or rendered. Stripping rendered HTML instead would be an
+           injection bug waiting to happen. */
+        const { cleaned, items } = memoryCapture.parseReply(raw);
+        const content = cleaned || raw;
+
+        let saved;
+        if (items) {
+          const result = memoryCapture.capture(items, { conversationId: c.id, turnId: targetTurn.id });
+          memoryCapture.logToJournal(result, "Saved from chat");
+          saved = memoryCapture.summarise(result);
+        }
 
         targetTurn.variants.push({
           content,
           model: c.model,
           usage,
           elapsed: Date.now() - started,
-          createdAt: Date.now()
+          createdAt: Date.now(),
+          saved
         });
         targetTurn.active = targetTurn.variants.length - 1;
         targetTurn.error = undefined;

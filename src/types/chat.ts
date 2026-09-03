@@ -27,6 +27,18 @@ export interface Attachment {
   text: string;
 }
 
+/** What a save-to-memory request did, recorded on the turn that caused it so
+ *  the result is still there after a reload. Compact on purpose: the live
+ *  state of a queued item is read back from the candidate tray, not frozen
+ *  here, so accepting one elsewhere does not leave this block lying. */
+export interface SavedMemory {
+  committed: { id: string; text: string; type: string }[];
+  queued: { id: string; text: string; type: string; supersedes: string | null }[];
+  /** Dropped as duplicates — shown so "nothing saved" never looks like a bug. */
+  skipped: { text: string; existingText: string }[];
+  atCap: boolean;
+}
+
 /** One generation of an assistant turn, or one edit of a user turn. */
 export interface Variant {
   content: string;
@@ -35,6 +47,8 @@ export interface Variant {
   /** ms spent streaming, for the "12.4s · 830 tok" footer */
   elapsed?: number;
   createdAt: number;
+  /** Present when this reply saved something to memory. */
+  saved?: SavedMemory;
 }
 
 export interface Turn {

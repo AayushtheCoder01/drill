@@ -11,6 +11,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as chatStore from "@/services/chatStore";
 import * as store from "@/services/store";
 import * as AI from "@/services/ai";
+import * as memoryCapture from "@/services/memoryCapture";
+import { poolFor } from "@/lib/memoryBrief";
+import type { ChatMessage } from "@/types";
 import { useChat } from "@/context/ChatContext";
 import { useRoute } from "@/context/RouteContext";
 import { useToast } from "@/context/ToastContext";
@@ -126,6 +129,60 @@ export default function ChatView() {
     toast("Exported");
   }, [c, toast]);
 
+  /**
+   * The deliberate save. Unlike the natural-language path — which rides along
+   * in a normal reply for free — this is its own extraction pass, so it fires
+   * whether or not the model noticed you asking.
+   *
+   * Only turns since `rolledUpThrough` are sent, so running it twice does not
+   * re-mine the same conversation.
+   */
+  const rememberConversation = useCallback(async () => {
+    if (!c) return;
+    const fresh = c.turns.slice(c.rolledUpThrough || 0);
+    if (!fresh.length) {
+      toast("Nothing new since the last save");
+      return;
+    }
+
+    toast("Reading the conversation…");
+    try {
+      const msgs = fresh
+        .filter((t) => t.variants.length)
+        .map((t) => ({ role: t.role, content: markdownToText(chatStore.activeContent(t)) }) as ChatMessage);
+
+      const known = poolFor("both", c.projectId).map((m) => m.text);
+      const items = await AI.wrapUp(msgs, known);
+
+      if (!items.length) {
+        c.rolledUpThrough = c.turns.length;
+        chatStore.persist(c, true);
+        toast("Nothing durable worth keeping — memory left alone");
+        return;
+      }
+
+      const lastTurn = c.turns[c.turns.length - 1];
+      const result = memoryCapture.capture(items, { conversationId: c.id, turnId: lastTurn?.id || "" });
+      memoryCapture.logToJournal(result, "Saved from chat");
+
+      /* Hang the outcome on the last assistant turn so it renders inline, the
+         same as the natural-language path. */
+      const target = [...c.turns].reverse().find((t) => t.role === "assistant" && t.variants.length);
+      if (target) {
+        const v = target.variants[target.active];
+        v.saved = memoryCapture.merge(v.saved, memoryCapture.summarise(result));
+      }
+
+      c.rolledUpThrough = c.turns.length;
+      chatStore.persist(c, true);
+
+      const n = result.committed.length + result.queued.length;
+      toast(n ? `${n} to memory` : "Already knew all of that");
+    } catch (e) {
+      toast((e as Error).message || "Could not read the conversation");
+    }
+  }, [c, toast]);
+
   /* ----------------------------------------------------- slash commands -- */
 
   const commands: SlashCommand[] = useMemo(
@@ -221,6 +278,11 @@ export default function ChatView() {
           }
           saveNote(chatStore.activeContent(last));
         }
+      },
+      {
+        cmd: "/remember",
+        desc: "Save what this conversation is worth remembering",
+        run: () => void rememberConversation()
       },
       {
         cmd: "/export",

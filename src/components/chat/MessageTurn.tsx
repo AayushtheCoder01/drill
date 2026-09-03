@@ -7,6 +7,7 @@
  * ========================================================================== */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { renderMarkdown, markdownToText } from "@/lib/markdown";
+import MemorySaved from "./MemorySaved";
 import { formatCost, formatTokens } from "@/lib/tokens";
 import * as chatStore from "@/services/chatStore";
 import { useToast } from "@/context/ToastContext";
@@ -184,6 +185,7 @@ export default function MessageTurn({
         <div className="turn-body" ref={bodyRef}>
           <span dangerouslySetInnerHTML={{ __html: html }} />
           {streaming && <span className="caret" />}
+          {!streaming && variant?.saved && <MemorySaved saved={variant.saved} />}
         </div>
       )}
 

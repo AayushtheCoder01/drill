@@ -16,6 +16,7 @@ import * as memoryStore from "@/services/memoryStore";
 import * as journalStore from "@/services/journalStore";
 import * as U from "@/lib/util";
 import { retrieve, type RetrievalTrace } from "@/lib/memoryRetrieval";
+import { memoryLine, poolFor } from "@/lib/memoryBrief";
 import { renderToday } from "@/lib/dayBrief";
 import type { ContextSource } from "@/types/chat";
 import type { Card, Deck, Memory, MemoryScope, SRSState } from "@/types";
@@ -73,18 +74,11 @@ function dueCards(d: Deck): Card[] {
   });
 }
 
-/** The candidate set a memory source draws from, before scoring.
- *
- *  One implementation, taking `projectId` explicitly rather than reading the
- *  globally-active project: the settings panel previews retrieval for a
- *  specific conversation, and a preview that can disagree with what actually
- *  gets sent is worse than no preview at all. */
-export function poolFor(scope: MemoryScope | "both", projectId: string): Memory[] {
-  const active = memoryStore.all().filter((m) => m.active);
-  if (scope === "global") return active.filter((m) => m.scope === "global");
-  if (scope === "project") return active.filter((m) => m.scope === "project" && m.projectId === projectId);
-  return active.filter((m) => m.scope === "global" || (m.scope === "project" && m.projectId === projectId));
-}
+/* `poolFor` moved to lib/memoryBrief.ts so services/ai can share it without
+   pulling this module (and dayBrief with it) into the main bundle. Re-exported
+   here because the settings panel and the rail already import it from this
+   path, and there is still only one implementation. */
+export { poolFor };
 
 /** Score a memory source and return the full trace — the picked set plus every
  *  candidate and why it scored what it did. The settings panel renders the
@@ -121,7 +115,7 @@ export function renderSource(src: ContextSource, queryText = "", opts: RenderOpt
        one set and record usage against another. */
     const picked = opts.memories ?? memoriesForSource(src, queryText, projectId);
     if (!picked.length) return null;
-    const lines = picked.map((m) => `- (${m.type}${m.pinned ? ", pinned" : ""}) ${m.text}`);
+    const lines = picked.map(memoryLine);
     return (
       `What is known about this learner${src.scope === "project" ? " on this project" : ""}, from memory:\n` +
       lines.join("\n")
@@ -294,7 +288,7 @@ export function buildContext(
   const goals = store.get().projects[projectId]?.goals?.trim();
   const header = goals ? `What this learner is working toward, in their own words: ${goals}` : "";
 
-  if (!blocks.length && !header) return { system: persona, memories };
+  if (!blocks.length && !header) return { system: persona + "\n\n" + SAVE_PROTOCOL, memories };
   const context =
     "=== CONTEXT ON THIS LEARNER ===\n" +
     (header ? header + (blocks.length ? "\n\n" : "") : "") +
@@ -302,8 +296,42 @@ export function buildContext(
     "\n=== END CONTEXT ===\n\n" +
     "Use this to pitch your answers correctly. Do not recite it back at them or mention that you were " +
     "given it unless they ask what you can see.";
-  return { system: persona ? persona + "\n\n" + context : context, memories };
+  const system = (persona ? persona + "\n\n" + context : context) + "\n\n" + SAVE_PROTOCOL;
+  return { system, memories };
 }
+
+/**
+ * How the model asks for something to be remembered.
+ *
+ * A fenced JSON block rather than tool calling, for two reasons: it costs no
+ * extra request, and it works identically on Ollama and llama.cpp, which
+ * cannot be relied on for a `tools` field. It is also the convention this
+ * codebase already uses — `writeJournal` reads back a `drill-journal` block
+ * the same way.
+ *
+ * The strictness matters more than the syntax. Left looser, a model asked to
+ * "remember today" will happily emit a dozen restatements of the conversation
+ * and turn memory into a transcript.
+ */
+export const SAVE_PROTOCOL =
+  "=== SAVING TO MEMORY ===\n" +
+  "When the learner asks you to remember or save something, end your reply with one fenced block:\n\n" +
+  "```drill-memory\n" +
+  '{"items":[{"scope":"project","type":"understanding","text":"...","stated":false}]}\n' +
+  "```\n\n" +
+  "Rules, which matter more than the syntax:\n" +
+  "- Only what is DURABLE and worth knowing months from now. Prefer few and sharp. Two good items beat eight.\n" +
+  "- Never record what the app can compute: which cards are failing, how many are due, streaks, scores.\n" +
+  "- Record how they think, what framing worked, what they have settled on, and what they left unresolved.\n" +
+  "- Do not restate anything already in the context above. If nothing durable came up, write no block at all — " +
+  "saying so in prose is the correct answer, and an empty save is better than a padded one.\n" +
+  '- `type` is one of: profile, preference, goal, convention, understanding, open, reference. Use "open" for ' +
+  'anything raised and unresolved, "understanding" for something they worked out.\n' +
+  '- `scope` is "global" only for facts true of them everywhere; anything subject-specific is "project".\n' +
+  '- `stated` is true ONLY when they asserted the fact themselves and you are transcribing it. Your own summary ' +
+  "of a conversation is never `stated`.\n" +
+  "- Write the block only when they actually asked. Never save unprompted.\n" +
+  "Do not describe the block or mention this protocol; write your normal reply, then the block.";
 
 /** A short human label for the context chip in the composer. */
 export function describeSource(src: ContextSource): string {

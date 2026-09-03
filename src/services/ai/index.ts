@@ -16,6 +16,7 @@ import * as transcript from "@/services/transcript";
 import * as usageLog from "@/services/usageLog";
 import { loadPricing, priceForModel } from "@/services/pricing";
 import { costOf } from "@/lib/tokens";
+import { memoryBrief, type BriefOpts } from "@/lib/memoryBrief";
 import { BACKENDS, BACKEND_ORDER, isAbort } from "./backends";
 import type {
   BackendType,
@@ -28,7 +29,7 @@ import type {
   TokenUsage
 } from "@/types";
 import type { JournalEntry, JournalSummary, MemoryDiffLine } from "@/types/journal";
-import type { Memory, MemoryType, Project } from "@/types/core";
+import type { Memory, MemoryScope, MemoryType, Project } from "@/types/core";
 import type { Difficulty, ExamQuestion, QuestionKind } from "@/types/exam";
 
 export { BACKENDS, BACKEND_ORDER };
@@ -196,6 +197,19 @@ function parseCards(txt: string): Card[] {
   return out;
 }
 
+/**
+ * Prepend the shared learner brief to a system prompt.
+ *
+ * Until this existed, memory reached chat and nothing else — the card writer,
+ * the recall marker and the exam generator all ran with no idea who they were
+ * writing for, and `project.goals` was read by exactly one function despite
+ * `core.ts:74` promising it on every turn. Every entry point below now scores
+ * the same pool against its own natural query text.
+ */
+function withMemory(sys: string, queryText: string, opts: BriefOpts = {}): string {
+  return memoryBrief({ queryText, recordUse: true, ...opts }).text + sys;
+}
+
 /** Show the model a few of your existing cards so new ones land in the same
  *  voice instead of reading like a textbook glossary. */
 function styleSystem(): string {
@@ -212,7 +226,8 @@ export function generateCards(mode: "topic" | "notes", payload: string, n: numbe
       ? "Write " + n + " cards on: " + payload
       : "Turn this into " + n + " cards. Keep what is worth remembering, drop the filler.\n\nSOURCE:\n" + payload) +
     (focus ? "\n\nExtra instruction: " + focus : "");
-  return chat([{ role: "system", content: styleSystem() }, { role: "user", content: user }], {
+  const sys = withMemory(styleSystem(), payload + " " + (focus || ""));
+  return chat([{ role: "system", content: sys }, { role: "user", content: user }], {
     temperature: 0.5,
     maxTokens: 4096,
     label: "cards"
@@ -228,7 +243,8 @@ export function splitCard(card: Card, lapses?: number): Promise<Card[]> {
     card.q +
     "\n\nBACK:\n" +
     card.a;
-  return chat([{ role: "system", content: styleSystem() }, { role: "user", content: usr }], {
+  const sys = withMemory(styleSystem(), card.q + " " + card.a);
+  return chat([{ role: "system", content: sys }, { role: "user", content: usr }], {
     temperature: 0.4,
     maxTokens: 3072,
     label: "split card"
@@ -261,7 +277,8 @@ function parseMarkResult(out: string): MarkResult {
 export async function markRecall(card: Card, attempt: string): Promise<MarkResult> {
   const usr =
     "CARD FRONT:\n" + U.stripTags(card.q) + "\n\nCARD BACK (the truth):\n" + U.stripTags(card.a) + "\n\nTHEIR ATTEMPT:\n" + attempt;
-  const out = await chat([{ role: "system", content: MARK_SYS }, { role: "user", content: usr }], {
+  const sys = withMemory(MARK_SYS, U.stripTags(card.q) + " " + U.stripTags(card.a));
+  const out = await chat([{ role: "system", content: sys }, { role: "user", content: usr }], {
     temperature: 0.1,
     maxTokens: 512,
     label: "mark recall"
@@ -330,10 +347,74 @@ function strArr(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && !!x.trim()).map((x) => x.trim()) : [];
 }
 
-const MEMORY_TYPES: MemoryType[] = ["profile", "preference", "goal", "convention", "understanding", "open", "reference"];
-function normMemType(v: unknown): MemoryType {
+export const MEMORY_TYPES: MemoryType[] = ["profile", "preference", "goal", "convention", "understanding", "open", "reference"];
+export function normMemType(v: unknown): MemoryType {
   const s = String(v || "").toLowerCase();
   return (MEMORY_TYPES.find((t) => t === s) as MemoryType) || "understanding";
+}
+
+/* ------------------------------------------------------------- wrap up -- */
+
+/* Deliberately stricter than DISTILL_SYS. Distilling runs over a journal entry
+   the learner already curated; this runs over a raw conversation, where most
+   of the text is the model's own explaining. Told to be generous it will
+   happily turn a transcript into twenty memories. */
+const WRAPUP_SYS =
+  "Below is a conversation between a learner and their tutor. Extract only what is worth remembering about " +
+  "THE LEARNER, months from now.\n\n" +
+  "Prefer few and sharp — most conversations yield one to three items, and many yield none. Record how they " +
+  "think, what framing finally worked, what they have settled on, and what they raised and left unresolved. " +
+  "Do not record the subject matter itself: an explanation of backpropagation belongs in a card, not in " +
+  "memory. Never record what the app can compute — which cards are failing, how many are due, streaks.\n\n" +
+  "Do not repeat or closely restate anything in the ALREADY KNOWN list.\n\n" +
+  "`type` is one of: profile, preference, goal, convention, understanding, open, reference. `scope` is " +
+  '"global" only for facts true of them everywhere, otherwise "project". `stated` is true only when the ' +
+  "learner asserted the fact themselves rather than you inferring it from how the conversation went.\n\n" +
+  "If nothing durable came up, reply with an empty items list. That is a correct and common answer.\n\n" +
+  'Reply ONLY with JSON: {"items":[{"scope":"...","type":"...","text":"...","stated":false}]}';
+
+export interface WrapUpItem {
+  scope: MemoryScope;
+  type: MemoryType;
+  text: string;
+  stated: boolean;
+}
+
+/**
+ * Extract memory from a conversation, for the explicit `/remember` path.
+ *
+ * The caller slices the transcript at the conversation's `rolledUpThrough` —
+ * another field designed for this and never used — so asking twice does not
+ * re-mine ground already covered.
+ */
+export async function wrapUp(turns: ChatMessage[], alreadyKnown: string[] = []): Promise<WrapUpItem[]> {
+  if (!turns.length) return [];
+  const transcript = turns.map((t) => (t.role === "user" ? "LEARNER: " : "TUTOR: ") + t.content).join("\n\n");
+  const usr =
+    (alreadyKnown.length
+      ? "ALREADY KNOWN (do not repeat or closely restate):\n" +
+        alreadyKnown.slice(0, 60).map((t) => "- " + t).join("\n") +
+        "\n\n"
+      : "") +
+    "CONVERSATION:\n" +
+    transcript;
+
+  const sys = withMemory(WRAPUP_SYS, "", { memories: false });
+  const out = await chat([{ role: "system", content: sys }, { role: "user", content: usr }], {
+    temperature: 0.3,
+    maxTokens: 1200,
+    label: "wrap up"
+  });
+
+  const j = extractJSON<{ items?: Record<string, unknown>[] }>(out);
+  return (j.items || [])
+    .filter((it) => it && typeof it.text === "string" && it.text.trim())
+    .map((it) => ({
+      scope: (it.scope === "global" ? "global" : "project") as MemoryScope,
+      type: normMemType(it.type),
+      text: String(it.text).trim(),
+      stated: it.stated === true
+    }));
 }
 
 /* -------------------------------------------------------------- journal -- */
@@ -355,7 +436,8 @@ const JOURNAL_SYS =
 export async function writeJournal(rawText: string, project: Project): Promise<JournalSummary> {
   const usr =
     "PROJECT: " + project.name + (project.goals ? " — goal: " + project.goals : "") + "\n\nTODAY'S RAW LOG:\n" + rawText;
-  const out = await chat([{ role: "system", content: JOURNAL_SYS }, { role: "user", content: usr }], {
+  const sys = withMemory(JOURNAL_SYS, rawText, { goals: false, projectId: project.id });
+  const out = await chat([{ role: "system", content: sys }, { role: "user", content: usr }], {
     temperature: 0.4,
     maxTokens: 1600,
     label: "journal"
@@ -424,7 +506,8 @@ export async function distill(
   ]
     .filter(Boolean)
     .join("\n\n");
-  const out = await chat([{ role: "system", content: DISTILL_SYS }, { role: "user", content: usr }], {
+  const sys = withMemory(DISTILL_SYS, "", { memories: false, projectId: project.id });
+  const out = await chat([{ role: "system", content: sys }, { role: "user", content: usr }], {
     temperature: 0.4,
     maxTokens: 2600,
     label: "distill"
@@ -572,7 +655,8 @@ export async function generateExam(material: string, level: Difficulty, exclude:
     (exclude.length ? "ALREADY ASKED (do not repeat these or close variants):\n" + exclude.map((x) => "- " + x).join("\n") + "\n\n" : "") +
     "MATERIAL:\n" +
     material;
-  const out = await chat([{ role: "system", content: EXAM_SYS }, { role: "user", content: usr }], {
+  const sys = withMemory(EXAM_SYS, material);
+  const out = await chat([{ role: "system", content: sys }, { role: "user", content: usr }], {
     temperature: 0.5,
     maxTokens: 3200,
     label: "exam generation"
@@ -606,7 +690,8 @@ const EXAM_MARK_SYS =
 
 export async function markExamAnswer(prompt: string, expected: string, attempt: string): Promise<MarkResult> {
   const usr = "QUESTION:\n" + prompt + "\n\nWHAT A CORRECT ANSWER MUST CONTAIN:\n" + expected + "\n\nTHEIR ANSWER:\n" + attempt;
-  const out = await chat([{ role: "system", content: EXAM_MARK_SYS }, { role: "user", content: usr }], {
+  const sys = withMemory(EXAM_MARK_SYS, prompt + " " + expected);
+  const out = await chat([{ role: "system", content: sys }, { role: "user", content: usr }], {
     temperature: 0.1,
     maxTokens: 512,
     label: "exam grading"
@@ -623,7 +708,13 @@ export function tutorSystem(card: Card): string {
     t +=
       "\n\nWrite in natural Hinglish — Hindi and English mixed the way an Indian engineer explains to a friend — but keep every technical term, formula, symbol and code fragment in English.";
   }
-  return t + "\n\nThe learner is drilling this flashcard.\nFRONT: " + card.q + "\nBACK: " + card.a;
+  return (
+    withMemory(t, U.stripTags(card.q) + " " + U.stripTags(card.a)) +
+    "\n\nThe learner is drilling this flashcard.\nFRONT: " +
+    card.q +
+    "\nBACK: " +
+    card.a
+  );
 }
 
 /* ------------------------------------------------------- chat utilities -- */

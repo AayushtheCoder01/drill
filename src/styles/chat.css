@@ -1242,3 +1242,74 @@
 .hljs-emphasis {
   font-style: italic;
 }
+
+/* ------------------------------------------------------- saved to memory -- */
+/* What a "remember this" did, under the reply that caused it. Ruled rows like
+   .list rather than a boxed card — this is a receipt, not a panel. */
+.msave {
+  margin-top: var(--s-4);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--rule-soft);
+}
+.msave-head {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: var(--s-2);
+}
+.msave-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--rule-soft);
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+  color: var(--ink-2);
+}
+.msave-row:last-child {
+  border-bottom: none;
+}
+.msave-row.muted {
+  color: var(--ink-3);
+}
+.msave-mark {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  color: var(--ink-3);
+  flex: none;
+  width: var(--s-3);
+}
+.msave-mark.on {
+  color: var(--green);
+}
+.msave-text {
+  flex: 1;
+  min-width: 0;
+}
+.msave-note {
+  color: var(--ink-3);
+  font-size: var(--t-xs);
+}
+.msave-type {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+  flex: none;
+}
+.msave-acts {
+  display: flex;
+  gap: var(--s-1);
+  flex: none;
+}
+.msave-foot {
+  font-size: var(--t-xs);
+  color: var(--ink-3);
+  margin-top: var(--s-2);
+  line-height: 1.5;
+}
+.msave-foot.warn {
+  color: var(--amber);
+}
