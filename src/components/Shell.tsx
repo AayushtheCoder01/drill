@@ -155,7 +155,7 @@ export default function Shell({
                 aria-label={railFolded ? "Show the panel" : "Hide the panel"}
                 aria-expanded={!railFolded}
               >
-                <Icon name="chevron" size={14} className={"rail-chev" + (railFolded ? " flip" : "")} />
+                <Icon name="chevron" size={14} className="rail-chev" />
                 <span className="rail-tab">{asideLabel}</span>
               </button>
               {!railFolded && <div className="rail-body">{aside}</div>}

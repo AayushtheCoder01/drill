@@ -15,6 +15,13 @@
  * Note the difference from conversation context, which is standing policy
  * attached to every message in the thread. A reference is for the sentence
  * you are writing now.
+ *
+ * The composer earns its height. At rest it is one line - the box and Send,
+ * nothing else - because on a laptop window this bar was 172px of a 522px
+ * screen and the transcript above it had barely half the page to read in.
+ * The tool row (model, effort, actions, attach) and the key hints appear
+ * once the composer has focus or something in it, which is exactly when they
+ * are worth their room and never while you are reading.
  * ========================================================================== */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as U from "@/lib/util";
@@ -74,12 +81,15 @@ export default function Composer({ disabled, busy, placeholder, commands, refere
     }
   }, [seed?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* autosize */
+  /* Autosize. An empty box is left at its one-row default rather than
+     measured: Chrome counts a wrapped *placeholder* in scrollHeight, so on a
+     narrow screen the composer opened two lines tall before a single
+     character had been typed. */
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 300) + "px";
+    if (text) el.style.height = Math.min(el.scrollHeight, 220) + "px";
   }, [text]);
 
   const slashQuery = useMemo(() => {
@@ -247,6 +257,10 @@ export default function Composer({ disabled, busy, placeholder, commands, refere
   }
 
   const attachedTokens = attachments.reduce((n, a) => n + estimateTokens(a.text), 0);
+  /* Focus alone opens the tool row (CSS :focus-within); this keeps it open
+     once there is something to send, so it does not shut under your hands
+     when you tab away mid-draft. */
+  const armed = !!text || attachments.length > 0;
 
   return (
     <div className="composer">
@@ -282,9 +296,9 @@ export default function Composer({ disabled, busy, placeholder, commands, refere
           </div>
         )}
 
-        <div className="composer-box">
+        <div className={"composer-box" + (armed ? " armed" : "")}>
           {attachments.length > 0 && (
-            <div className="att-row" style={{ padding: "10px 12px 0" }}>
+            <div className="att-row">
               {attachments.map((a) => (
                 <span key={a.id} className="att-chip">
                   📎 {a.name}
@@ -296,30 +310,54 @@ export default function Composer({ disabled, busy, placeholder, commands, refere
             </div>
           )}
 
-          <textarea
-            ref={ref}
-            rows={1}
-            value={text}
-            disabled={disabled}
-            placeholder={placeholder || "Ask anything — / for commands"}
-            onChange={(e) => {
-              setText(e.target.value);
-              setCaret(e.target.selectionStart ?? e.target.value.length);
-              setRefOff(false);
-            }}
-            onKeyUp={(e) => setCaret((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
-            onClick={(e) => setCaret((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
-            onKeyDown={onKeyDown}
-            onPaste={onPaste}
-            onDrop={(e) => {
-              if (e.dataTransfer.files.length) {
-                e.preventDefault();
-                void addFiles(e.dataTransfer.files);
-              }
-            }}
-          />
+          {/* Send sits beside the box rather than under it, which is the whole
+              reason an empty composer is one line tall. */}
+          <div className="composer-row">
+            <textarea
+              ref={ref}
+              rows={1}
+              value={text}
+              disabled={disabled}
+              placeholder={placeholder || "Ask anything — / for commands"}
+              onChange={(e) => {
+                setText(e.target.value);
+                setCaret(e.target.selectionStart ?? e.target.value.length);
+                setRefOff(false);
+              }}
+              onKeyUp={(e) => setCaret((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
+              onClick={(e) => setCaret((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
+              onKeyDown={onKeyDown}
+              onPaste={onPaste}
+              onDrop={(e) => {
+                if (e.dataTransfer.files.length) {
+                  e.preventDefault();
+                  void addFiles(e.dataTransfer.files);
+                }
+              }}
+            />
+            {busy ? (
+              <button className="csend stop" onClick={onStop} title="Stop generating" aria-label="Stop generating">
+                <Icon name="stop" size={12} />
+                <span>Stop</span>
+              </button>
+            ) : (
+              <button
+                className="csend"
+                onClick={submit}
+                disabled={disabled || (!text.trim() && !attachments.length)}
+                title="Send  (enter)"
+                aria-label="Send"
+              >
+                <Icon name="send" size={14} />
+                <span>Send</span>
+              </button>
+            )}
+          </div>
 
-          <div className="composer-bar">
+          {/* Opened by focus or by having something to send. Kept mounted
+              either way: a chip that unmounted on blur would close its own
+              popover the moment you clicked into it. */}
+          <div className="composer-tools">
             {tools}
             <button className="cbtn ghost" onClick={() => fileRef.current?.click()} title="Attach a text file">
               📎
@@ -335,27 +373,16 @@ export default function Composer({ disabled, busy, placeholder, commands, refere
                 e.target.value = "";
               }}
             />
-            {attachedTokens > 0 && (
-              <span className="composer-hint" style={{ margin: 0 }}>
-                ~{attachedTokens.toLocaleString()} tok attached
+            {attachedTokens > 0 && <span className="composer-hint">~{attachedTokens.toLocaleString()} tok attached</span>}
+            {/* The hint strip used to stand under the box for ever: three
+                lines, 47px, instructions you had read on your first day. One
+                line now, and only while there is nothing typed. */}
+            {!text && (
+              <span className="composer-hint keys">
+                enter sends · shift+enter newline · / and @
               </span>
             )}
-            {busy ? (
-              <button className="csend stop" onClick={onStop}>
-                ■ Stop
-              </button>
-            ) : (
-              <button className="csend" onClick={submit} disabled={disabled || (!text.trim() && !attachments.length)}>
-                Send
-              </button>
-            )}
           </div>
-        </div>
-
-        <div className="composer-hint">
-          <span>enter to send · shift+enter for a newline</span>
-          <span>/ for commands · @ to refer to your own work</span>
-          <span>ctrl+k palette</span>
         </div>
       </div>
     </div>

@@ -237,11 +237,19 @@ hr {
   white-space: nowrap;
   color: inherit;
 }
-/* The chevron points at what the click will do: left to open, right to shut. */
+/* The chevron points at what the click will do: left to open, right to shut.
+   The folded state is read off the rail rather than carried on the icon as a
+   second class: it was `.rail-chev.flip`, and `.flip` is *also* the review
+   loop's show-the-answer button — 100% wide, bordered, 16px of padding — so
+   the folded chevron inherited a button skin, its 14px drawing was padded
+   down to nothing, and the closed rail showed an empty box with no arrow in
+   it. One state, one owner, and no bare word in the global namespace. */
 .rail-chev {
+  flex: 0 0 auto;
   transform: rotate(-90deg);
+  transition: transform var(--med) var(--ease);
 }
-.rail-chev.flip {
+.app-rail.folded .rail-chev {
   transform: rotate(90deg);
 }
 .rail-body > .rail-group:first-child {
@@ -996,7 +1004,9 @@ header {
   flex-direction: column;
   gap: var(--s-2);
 }
-.flip {
+/* Scoped to the grade bar it belongs to. Unscoped, `.flip` is a word any
+   component might reach for as a modifier, and one of them did. */
+.controls .flip {
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--rule);
@@ -1009,11 +1019,11 @@ header {
   cursor: pointer;
   transition: background var(--fast), border-color var(--fast);
 }
-.flip:hover {
+.controls .flip:hover {
   background: var(--surface-2);
   border-color: var(--ink-3);
 }
-.flip .hint {
+.controls .flip .hint {
   display: block;
   font-family: var(--mono);
   font-size: var(--t-3xs);

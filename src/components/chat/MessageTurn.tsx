@@ -4,6 +4,12 @@
  * The action row is where this stops being a generic chat client: any reply
  * can become flashcards, an insight-log entry, or the root of a new
  * conversation without leaving the thread.
+ *
+ * A long reply also gets a contents. Drill hides every scrollbar in the app
+ * on purpose, which leaves a two-thousand-word answer looking exactly like a
+ * two-hundred-word one until you have scrolled through it — so a book's
+ * answer to that problem is borrowed directly: how long this is, what is in
+ * it, and a way to turn straight to the part you wanted.
  * ========================================================================== */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { renderMarkdown, markdownToText } from "@/lib/markdown";
@@ -14,6 +20,9 @@ import * as chatStore from "@/services/chatStore";
 import { useToast } from "@/context/ToastContext";
 import type { Turn } from "@/types/chat";
 import Icon from "../ui/Icon";
+
+/* One selector, used to build the contents and to jump within it. */
+const HEADINGS = "h1, h2, h3";
 
 interface Props {
   turn: Turn;
@@ -50,6 +59,10 @@ export default function MessageTurn({
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
+  /* Shut by default: the summary line is the useful part at a glance, and a
+     five-line list unfolding above every long answer would cost more reading
+     height than it gives back. */
+  const [tocOpen, setTocOpen] = useState(false);
 
   const isUser = turn.role === "user";
   const streaming = streamingText != null;
@@ -57,6 +70,31 @@ export default function MessageTurn({
   const variant = turn.variants[turn.active];
 
   const html = useMemo(() => (isUser ? "" : renderMarkdown(content)), [content, isUser]);
+
+  /* Read off the rendered HTML rather than the markdown source, so the list
+     and the headings it scrolls to are the same query over the same tree and
+     cannot drift apart. Not while streaming: the outline would be rebuilt on
+     every token and would grow under the reader's hand. */
+  const outline = useMemo(() => {
+    if (isUser || streaming || !html) return null;
+    const tpl = document.createElement("template");
+    tpl.innerHTML = html;
+    const heads = Array.from(tpl.content.querySelectorAll(HEADINGS)).map((h) => ({
+      level: Number(h.tagName[1]),
+      text: (h.textContent || "").trim()
+    }));
+    const words = (tpl.content.textContent || "").trim().split(/\s+/).filter(Boolean).length;
+    return { heads, words, minutes: Math.max(1, Math.round(words / 220)) };
+  }, [html, isUser, streaming]);
+
+  const hasToc = !!outline && outline.heads.length >= 3;
+
+  /* By index, against the live DOM — the same selector the outline was built
+     from, so item n is heading n however the markdown was written. */
+  function jump(i: number) {
+    const el = bodyRef.current?.querySelectorAll(HEADINGS)[i] as HTMLElement | undefined;
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   /* Code-block copy buttons are rendered as raw HTML by the markdown pipeline,
      so their clicks are picked up here by delegation rather than by React. */
@@ -146,6 +184,30 @@ export default function MessageTurn({
             </span>
           ))}
         </div>
+      )}
+
+      {hasToc && !editing && (
+        <nav className={"turn-toc" + (tocOpen ? " open" : "")}>
+          <button className="turn-toc-head" onClick={() => setTocOpen((v) => !v)} aria-expanded={tocOpen}>
+            <Icon name="chevron" size={11} className="turn-toc-chev" />
+            <span>Contents</span>
+            <span className="turn-toc-meta">
+              {outline!.heads.length} sections · {outline!.words.toLocaleString()} words · {outline!.minutes} min
+            </span>
+          </button>
+          {tocOpen && (
+            <ol className="turn-toc-list">
+              {outline!.heads.map((h, i) => (
+                <li key={i} data-level={h.level}>
+                  <button onClick={() => jump(i)}>
+                    <span className="n">{i + 1}</span>
+                    <span className="t">{h.text}</span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+        </nav>
       )}
 
       {editing ? (
