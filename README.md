@@ -246,6 +246,17 @@ Point `baseUrl` at the `/v1` root. The key is optional.
 
 ### Keyboard
 
+Press `?` anywhere for this list in the app.
+
+**Anywhere**
+
+| Key | Does |
+| --- | ---- |
+| `ctrl` + `b` | show or hide the navigation |
+| `ctrl` + `\` | show or hide the right-hand panel |
+| `?` | keyboard shortcuts |
+| `esc` | close what's open, or leave the box you're typing in |
+
 **Review**
 
 | Key | Does |

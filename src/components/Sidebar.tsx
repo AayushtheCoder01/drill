@@ -22,7 +22,6 @@ import { useRoute, type View } from "@/context/RouteContext";
 import { applyAppearance } from "@/lib/theme";
 import ProjectSwitcher from "./ProjectSwitcher";
 import SettingsModal from "./settings/SettingsModal";
-import ShortcutsModal from "./ui/ShortcutsModal";
 import Icon, { type IconName } from "./ui/Icon";
 
 const SECTIONS: { view: View; label: string; icon: IconName }[] = [
@@ -40,6 +39,7 @@ export default function Sidebar({
   open,
   onToggle,
   onNavigate,
+  onShortcuts,
   children
 }: {
   current: View;
@@ -47,13 +47,15 @@ export default function Sidebar({
   open: boolean;
   onToggle: () => void;
   onNavigate: () => void;
+  /** Shell owns the cheatsheet, so opening it from here and opening it with
+   *  "?" cannot put two of them on the screen at once. */
+  onShortcuts: () => void;
   children?: ReactNode;
 }) {
   const db = useDrillStore();
   useStoreSync(journalStore);
   const { openHome, openDrill, openCards, openChat, openJournal, openExam } = useRoute();
   const [settings, setSettings] = useState(false);
-  const [shortcuts, setShortcuts] = useState(false);
 
   const dueCount = store.counts().due;
   const unrolledCount = journalStore.unrolledEntries(db.activeProjectId).length;
@@ -146,7 +148,7 @@ export default function Sidebar({
         </button>
         <button
           className="nav-item"
-          onClick={() => setShortcuts(true)}
+          onClick={onShortcuts}
           title="Keyboard shortcuts (?)"
           aria-label="Keyboard shortcuts"
         >
@@ -160,7 +162,6 @@ export default function Sidebar({
       </div>
 
       {settings && <SettingsModal onClose={() => setSettings(false)} />}
-      {shortcuts && <ShortcutsModal onClose={() => setShortcuts(false)} />}
     </aside>
   );
 }

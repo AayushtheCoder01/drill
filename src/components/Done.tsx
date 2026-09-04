@@ -49,7 +49,7 @@ export default function Done() {
         </p>
       </div>
       <div className="controls">
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-2)", width: "100%" }}>
+        <div className="done-acts">
           {!total || c.unseen > 0 ? (
             <button className="btn pri wide" onClick={() => open({ name: "ai" })}>
               <Icon name="sparkle" /> Make cards with AI
@@ -59,7 +59,7 @@ export default function Done() {
               <Icon name="journal" /> Log an insight from today
             </button>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--s-2)", width: "100%" }}>
+          <div className="done-acts-row">
             <button className="btn" onClick={openCards}>
               <Icon name="cards" size={15} /> Library
             </button>

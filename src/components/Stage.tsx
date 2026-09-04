@@ -129,9 +129,9 @@ export default function Stage() {
 
         {!revealed && recall && (
           <div className="recall">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "var(--s-1)" }}>
-              <label style={{ margin: 0 }}>Write it from memory first</label>
-              <span style={{ fontSize: "var(--t-3xs)", color: "var(--ink-3)", display: "flex", alignItems: "center", gap: "3px" }}>
+            <div className="recall-head">
+              <label>Write it from memory first</label>
+              <span className="recall-hint">
                 <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to check
               </span>
             </div>

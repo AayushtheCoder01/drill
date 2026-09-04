@@ -10,7 +10,7 @@
  * so a year always fits: the squares get smaller on a narrow window, and a
  * scrollbar never appears under the calendar to be dragged.
  * ========================================================================== */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { grid, monthLabels, type DayCell } from "@/lib/activity";
 import type { LogEntry } from "@/types";
 
@@ -26,7 +26,25 @@ function title(c: DayCell): string {
 }
 
 export default function ActivityGrid({ log, weeks = 53 }: { log: LogEntry[]; weeks?: number }) {
+  /* One readout, not two. The cells used to carry a `title` as well, so the
+     browser drew its own tooltip on top of this one a second later - the same
+     sentence twice, in two different type styles. */
   const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
+
+  /* The tip is positioned in viewport coordinates, measured once on enter, so
+     anything that moves the grid underneath would leave it behind. Nothing
+     re-measures on scroll: at this size the honest thing is to drop it. */
+  useEffect(() => {
+    if (!tip) return;
+    const drop = () => setTip(null);
+    window.addEventListener("scroll", drop, { passive: true, capture: true });
+    window.addEventListener("resize", drop, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", drop, { capture: true });
+      window.removeEventListener("resize", drop);
+    };
+  }, [tip]);
+
   const cols = grid(log, weeks);
   const months = monthLabels(cols);
   const total = log.length;
@@ -57,33 +75,13 @@ export default function ActivityGrid({ log, weeks = 53 }: { log: LogEntry[]; wee
                 const rect = e.currentTarget.getBoundingClientRect();
                 setTip({ x: rect.left + rect.width / 2, y: rect.top - 8, text: title(c) });
               }}
-              title={title(c)}
             />
           ))
         )}
       </div>
 
       {tip && (
-        <div
-          className="act-tip"
-          style={{
-            position: "fixed",
-            left: tip.x,
-            top: tip.y,
-            transform: "translate(-50%, -100%)",
-            pointerEvents: "none",
-            zIndex: 100,
-            background: "var(--surface)",
-            border: "1px solid var(--rule)",
-            color: "var(--ink)",
-            fontSize: "var(--t-3xs)",
-            fontFamily: "var(--sans)",
-            padding: "3px 8px",
-            borderRadius: "var(--r-1)",
-            boxShadow: "var(--lift-2)",
-            whiteSpace: "nowrap"
-          }}
-        >
+        <div className="act-tip" style={{ left: tip.x, top: tip.y }} role="status">
           {tip.text}
         </div>
       )}

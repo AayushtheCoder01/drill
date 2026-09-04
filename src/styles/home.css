@@ -283,6 +283,23 @@
   box-shadow: inset 0 0 0 1px var(--rule-soft);
   cursor: default;
 }
+/* Positioned in viewport coordinates by ActivityGrid, which sets only left and
+   top - everything that is a look rather than a measurement lives here. */
+.act-tip {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  z-index: 100;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  box-shadow: var(--lift-2);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--t-3xs);
+  padding: 3px var(--s-2);
+  white-space: nowrap;
+}
 .act-legend {
   display: flex;
   align-items: center;

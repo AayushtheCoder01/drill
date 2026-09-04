@@ -47,6 +47,22 @@ export default function ProjectSwitcher({ variant = "bar" }: { variant?: "bar" |
     | { type: "archive"; id: string; name: string }
   >(null);
 
+  /* Escape closes the dialog, the way it closes every other modal in the app.
+     The menu's own Escape handler above only runs while the menu is open, and
+     opening a dialog closes it — so without this the dialogs were the one
+     surface the key did nothing on. Stops at the dialog rather than falling
+     through to Shell, which would close the navigation drawer underneath. */
+  useEffect(() => {
+    if (!dialog) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setDialog(null);
+    }
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [dialog]);
+
   function pick(id: string) {
     setOpen(false);
     if (id !== activeP.id) switchProject(id);
@@ -176,8 +192,8 @@ function NewProjectModal({ onCancel, onCreate }: { onCancel: () => void; onCreat
   const [name, setName] = useState("");
   return (
     <div className="sheet" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div className="panel-inner" style={{ maxWidth: "26rem" }}>
-        <div className="sheet-head" style={{ padding: "var(--s-3) 0 var(--s-2)" }}>
+      <div className="panel-inner proj-dialog">
+        <div className="sheet-head">
           <h3>New Project</h3>
           <button className="iconbtn" onClick={onCancel} aria-label="Close">
             <Icon name="close" />
@@ -188,7 +204,7 @@ function NewProjectModal({ onCancel, onCreate }: { onCancel: () => void; onCreat
             e.preventDefault();
             onCreate(name);
           }}
-          style={{ display: "flex", flexDirection: "column", gap: "var(--s-4)", marginTop: "var(--s-3)" }}
+          className="proj-form"
         >
           <div className="fi">
             <label className="f">Project Name</label>
@@ -201,7 +217,7 @@ function NewProjectModal({ onCancel, onCreate }: { onCancel: () => void; onCreat
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div className="btnrow" style={{ justifyContent: "flex-end", marginTop: "var(--s-2)" }}>
+          <div className="btnrow end">
             <button type="button" className="btn sm" onClick={onCancel}>
               Cancel
             </button>
@@ -230,8 +246,8 @@ function EditProjectModal({
 
   return (
     <div className="sheet" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div className="panel-inner" style={{ maxWidth: "30rem" }}>
-        <div className="sheet-head" style={{ padding: "var(--s-3) 0 var(--s-2)" }}>
+      <div className="panel-inner proj-dialog wide">
+        <div className="sheet-head">
           <h3>Edit Project</h3>
           <button className="iconbtn" onClick={onCancel} aria-label="Close">
             <Icon name="close" />
@@ -242,7 +258,7 @@ function EditProjectModal({
             e.preventDefault();
             onSave(name, blurb, goals);
           }}
-          style={{ display: "flex", flexDirection: "column", gap: "var(--s-4)", marginTop: "var(--s-3)" }}
+          className="proj-form"
         >
           <div className="fi">
             <label className="f">Project Name</label>
@@ -272,7 +288,7 @@ function EditProjectModal({
               onChange={(e) => setGoals(e.target.value)}
             />
           </div>
-          <div className="btnrow" style={{ justifyContent: "flex-end", marginTop: "var(--s-2)" }}>
+          <div className="btnrow end">
             <button type="button" className="btn sm" onClick={onCancel}>
               Cancel
             </button>
@@ -297,22 +313,22 @@ function ArchiveProjectModal({
 }) {
   return (
     <div className="sheet" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div className="panel-inner" style={{ maxWidth: "26rem" }}>
-        <div className="sheet-head" style={{ padding: "var(--s-3) 0 var(--s-2)" }}>
+      <div className="panel-inner proj-dialog">
+        <div className="sheet-head">
           <h3>Archive Project</h3>
           <button className="iconbtn" onClick={onCancel} aria-label="Close">
             <Icon name="close" />
           </button>
         </div>
-        <div style={{ marginTop: "var(--s-3)", color: "var(--ink-2)", fontSize: "var(--t-sm)", lineHeight: "var(--lh-snug)" }}>
+        <div className="proj-confirm">
           <p>
             Archive <strong>{name}</strong>?
           </p>
-          <p style={{ marginTop: "var(--s-2)", color: "var(--ink-3)", fontSize: "var(--t-xs)" }}>
+          <p className="s">
             Its decks, journals, and chats stay safe. You can unarchive or switch back any time.
           </p>
         </div>
-        <div className="btnrow" style={{ justifyContent: "flex-end", marginTop: "var(--s-5)" }}>
+        <div className="btnrow end">
           <button type="button" className="btn sm" onClick={onCancel}>
             Cancel
           </button>

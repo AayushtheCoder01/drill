@@ -1,49 +1,68 @@
 /* ============================================================================
  * ShortcutsModal — the cheatsheet for every key binding in Drill.
  *
- * Opened with '?' or from the sidebar. Organized by section: Global, Review,
- * Chat and Editing, so muscle memory is easy to learn.
+ * Opened with "?" or from the sidebar, and owned by Shell so there is exactly
+ * one of it however it was opened.
+ *
+ * Every row here is a promise, so every row is checked against the handler
+ * that implements it: Shell (the frame), AppShell (the review loop),
+ * ChatView and Composer (chat), Stage/TakeExam/CaptureBox (the writing
+ * boxes). A cheatsheet that lists a key nothing listens for is worse than no
+ * cheatsheet — you press it, nothing happens, and now you distrust the rest
+ * of the list too.
  * ========================================================================== */
 import Icon from "./Icon";
 
 interface ShortcutGroup {
   title: string;
+  note?: string;
   items: { keys: string[]; desc: string }[];
 }
 
+/* "Ctrl" throughout, and the handlers all accept metaKey too, so the same row
+   reads correctly on a Mac without the modal having to know which it is. */
+const MOD = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
+
 const SHORTCUTS: ShortcutGroup[] = [
   {
-    title: "Global & Navigation",
+    title: "Anywhere",
     items: [
-      { keys: ["Ctrl", "B"], desc: "Toggle navigation sidebar" },
-      { keys: ["Ctrl", "\\"], desc: "Toggle right instrument panel" },
-      { keys: ["?"], desc: "Show keyboard shortcuts" },
-      { keys: ["Esc"], desc: "Close drawer, modal or clear input" }
+      { keys: [MOD, "B"], desc: "Show or hide the navigation" },
+      { keys: [MOD, "\\"], desc: "Show or hide the right-hand panel" },
+      { keys: ["?"], desc: "This list" },
+      { keys: ["Esc"], desc: "Close what is open, or leave the box you are typing in" }
     ]
   },
   {
-    title: "Review & Drill",
+    title: "Review",
+    note: "While the card has the page — not while you are typing in the recall box.",
     items: [
-      { keys: ["Space"], desc: "Show answer (or check recall)" },
-      { keys: ["Ctrl", "Enter"], desc: "Check recall from memory box" },
-      { keys: ["1"], desc: "Grade Again" },
-      { keys: ["2"], desc: "Grade Hard" },
-      { keys: ["3"], desc: "Grade Good" },
-      { keys: ["4"], desc: "Grade Easy" },
-      { keys: ["G"], desc: "Go deeper (chat on current card)" },
-      { keys: ["N"], desc: "Log insight from card" },
-      { keys: ["S"], desc: "View review statistics" }
+      { keys: ["Space"], desc: "Turn the card over" },
+      { keys: ["1"], desc: "Again" },
+      { keys: ["2"], desc: "Hard" },
+      { keys: ["3"], desc: "Good" },
+      { keys: ["4"], desc: "Easy" },
+      { keys: ["G"], desc: "Go deeper — open this card in chat" },
+      { keys: ["N"], desc: "Log an insight" },
+      { keys: ["S"], desc: "Statistics" }
     ]
   },
   {
-    title: "Chat & AI Tutor",
+    title: "Chat",
     items: [
-      { keys: ["Ctrl", "K"], desc: "Open command palette" },
-      { keys: ["Ctrl", "J"], desc: "Start new conversation" },
-      { keys: ["/"], desc: "Trigger slash commands in composer" },
-      { keys: ["@"], desc: "Attach deck, note or journal reference" },
-      { keys: ["Ctrl", "Enter"], desc: "Send message" }
+      { keys: [MOD, "K"], desc: "Command palette" },
+      { keys: [MOD, "J"], desc: "New conversation" },
+      { keys: ["Enter"], desc: "Send" },
+      { keys: ["Shift", "Enter"], desc: "New line instead of sending" },
+      { keys: ["/"], desc: "Commands — at the start of an empty message" },
+      { keys: ["@"], desc: "Point at a deck, note, card or journal entry" },
+      { keys: ["Esc"], desc: "Clear the message you are writing" }
     ]
+  },
+  {
+    title: "Writing boxes",
+    note: "The recall box, an edited message, an exam answer, the journal capture.",
+    items: [{ keys: [MOD, "Enter"], desc: "Commit it — check, save, or submit" }]
   }
 ];
 
@@ -54,43 +73,36 @@ export default function ShortcutsModal({ onClose }: { onClose: () => void }) {
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Keyboard shortcuts"
     >
-      <div className="sheet-inner" style={{ maxWidth: "34rem" }}>
+      <div className="sheet-inner keys-sheet">
         <div className="sheet-head">
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Icon name="keyboard" size={18} style={{ color: "var(--accent)" }} />
-            <h3>Keyboard Shortcuts</h3>
-          </div>
+          <Icon name="keyboard" size={17} className="keys-head-icon" />
+          <h3>Keyboard shortcuts</h3>
           <button className="iconbtn" onClick={onClose} aria-label="Close">
             <Icon name="close" />
           </button>
         </div>
-        <div className="sheet-body" style={{ display: "flex", flexDirection: "column", gap: "var(--s-5)" }}>
+        <div className="sheet-body keys-body">
           {SHORTCUTS.map((g) => (
-            <div key={g.title}>
+            <section key={g.title} className="keys-group">
               <div className="label">{g.title}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-2)" }}>
-                {g.items.map((item, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "var(--s-1) 0",
-                      borderBottom: "1px solid var(--rule-soft)"
-                    }}
-                  >
-                    <span style={{ fontSize: "var(--t-sm)", color: "var(--ink)" }}>{item.desc}</span>
-                    <span style={{ display: "inline-flex", gap: "4px" }}>
+              {g.note && <p className="keys-note">{g.note}</p>}
+              <dl className="keys-list">
+                {g.items.map((item) => (
+                  <div key={item.keys.join("+") + item.desc} className="keys-row">
+                    <dt>{item.desc}</dt>
+                    <dd>
                       {item.keys.map((k) => (
                         <kbd key={k}>{k}</kbd>
                       ))}
-                    </span>
+                    </dd>
                   </div>
                 ))}
-              </div>
-            </div>
+              </dl>
+            </section>
           ))}
         </div>
       </div>

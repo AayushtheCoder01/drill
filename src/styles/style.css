@@ -38,29 +38,20 @@
 html {
   font-size: 16px;
 }
-/* Sleek, auto-fading scrollbars. Nearly invisible at rest so they never crowd
-   the reading column, but providing clear spatial orientation when scrolling
-   long prose, code blocks, or card lists. */
+/* No visible scrollbars anywhere. Everything still scrolls - wheel, trackpad,
+   keys, touch - but nothing in the app is wide or long enough to need a bar
+   to drag, and a permanent grey slider down the side of a reading column is
+   the loudest thing on the page. Where the length of a scroll actually is
+   worth knowing, a readout says so on purpose: chat's ReadProgress rule under
+   the conversation head. */
 * {
-  scrollbar-width: thin;
-  scrollbar-color: var(--rule-soft) transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 *::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
-*::-webkit-scrollbar-thumb {
-  background: var(--rule-soft);
-  border-radius: var(--r-full);
-}
-*:hover::-webkit-scrollbar-thumb {
-  background: var(--rule);
-}
-*::-webkit-scrollbar-thumb:hover {
-  background: var(--ink-3);
+  width: 0;
+  height: 0;
+  display: none;
 }
 html,
 body {
@@ -1251,6 +1242,18 @@ header {
   }
 }
 
+.done-acts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  width: 100%;
+}
+.done-acts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-2);
+  width: 100%;
+}
 .done-msg {
   display: flex;
   flex-direction: column;
@@ -1579,6 +1582,44 @@ header {
   gap: var(--s-2);
   flex-wrap: wrap;
   margin-top: var(--s-1);
+}
+/* Confirm on the right, where a dialog puts it. */
+.btnrow.end {
+  justify-content: flex-end;
+  margin-top: var(--s-4);
+}
+
+/* The project dialogs that replaced window.prompt(). Qualified with
+   .panel-inner because that class sets its own max-width further down the
+   sheet section, and an equally specific selector there would win on order. */
+.panel-inner.proj-dialog {
+  max-width: 26rem;
+}
+.panel-inner.proj-dialog.wide {
+  max-width: 30rem;
+}
+.proj-dialog .sheet-head {
+  padding: 0 0 var(--s-2);
+}
+.proj-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  margin-top: var(--s-4);
+}
+.proj-confirm {
+  margin-top: var(--s-4);
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+}
+.proj-confirm p {
+  margin: 0;
+}
+.proj-confirm p.s {
+  margin-top: var(--s-2);
+  color: var(--ink-3);
+  font-size: var(--t-xs);
 }
 
 /* Quiet buttons: text only, tracked caps. Card actions and turn actions. */
@@ -1928,6 +1969,56 @@ a {
 .sheet-head .iconbtn {
   align-self: center;
 }
+/* ----------------------------------------------------- keyboard cheatsheet -- */
+.keys-sheet {
+  max-width: 34rem;
+}
+.keys-head-icon {
+  color: var(--accent);
+  align-self: center;
+  flex: 0 0 auto;
+}
+.keys-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+}
+.keys-note {
+  margin: calc(var(--s-1) * -1) 0 var(--s-2);
+  font-size: var(--t-2xs);
+  color: var(--ink-3);
+  max-width: var(--measure);
+}
+.keys-list {
+  margin: 0;
+}
+/* A description and its keys on one line, with a hairline between rows rather
+   than a box around each: the list is read down the left edge, and the keys
+   are looked up on the right. */
+.keys-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.keys-row:last-child {
+  border-bottom: 0;
+}
+.keys-row dt {
+  font-size: var(--t-sm);
+  color: var(--ink);
+  min-width: 0;
+}
+.keys-row dd {
+  margin: 0;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .sheet-body,
 .drawer-body {
   padding: var(--s-5);
@@ -2030,6 +2121,27 @@ a {
   margin-top: var(--s-5);
   padding-top: var(--s-4);
   border-top: 1px solid var(--rule-soft);
+}
+/* The label and its key hint share a line, so the hint reads as part of the
+   instruction rather than as a second instruction. */
+.recall-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-3);
+  margin-bottom: var(--s-2);
+}
+/* Qualified past `.recall label` below, which is equally specific and later. */
+.recall .recall-head label {
+  margin-bottom: 0;
+}
+.recall-hint {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
 }
 .recall label {
   font-family: var(--mono);

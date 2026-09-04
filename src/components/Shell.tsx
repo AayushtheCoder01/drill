@@ -138,6 +138,7 @@ export default function Shell({
         open={drawer}
         onToggle={toggle}
         onNavigate={() => setDrawer(false)}
+        onShortcuts={() => setShortcuts(true)}
       >
         {sidebar}
       </Sidebar>
@@ -151,7 +152,7 @@ export default function Shell({
           </button>
           <div className="topbar-title-wrap">
             <span className="topbar-title">{TITLES[current]}</span>
-            {activeProject && <span className="topbar-sub">· {activeProject.name}</span>}
+            <span className="topbar-sub">· {activeProject.name}</span>
           </div>
           <div className="topbar-acts">
             <button

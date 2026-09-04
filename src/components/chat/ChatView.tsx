@@ -35,6 +35,7 @@ import ConversationSettings from "./ConversationSettings";
 import CommandPalette, { type PaletteAction } from "./CommandPalette";
 import CardsModal from "./CardsModal";
 import ChatEmpty from "./ChatEmpty";
+import ReadProgress from "./ReadProgress";
 import ModelChip from "./ModelChip";
 import EffortChip from "./EffortChip";
 
@@ -56,7 +57,6 @@ export default function ChatView() {
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const pinnedToBottom = useRef(true);
-  const readRef = useRef<HTMLElement | null>(null);
 
   const c = chat.conversation;
 
@@ -73,42 +73,30 @@ export default function ChatView() {
     void chatStore.init();
   }, []);
 
-  /* How far through the thread you are, as a hairline under the head.
-     Every scrollbar in the app is hidden by design, which reads well and
-     costs you the one thing a scrollbar was actually telling you: whether
-     there are three more paragraphs below or thirty. This gives that back
-     without putting a scrollbar in the reading column. */
-  const syncRead = useCallback(() => {
-    const el = scrollRef.current;
-    const rule = readRef.current;
-    if (!el || !rule) return;
-    const max = el.scrollHeight - el.clientHeight;
-    // Nothing to scroll is nothing to report — an always-full bar over a
-    // three-line answer would be a lie in the shape of a readout.
-    rule.style.transform = `scaleX(${max > 24 ? Math.min(1, el.scrollTop / max) : 0})`;
-  }, []);
-
   /* Follow the stream only while the reader is already at the bottom —
      yanking the viewport while someone is reading further up is the single
-     most irritating thing a chat UI can do. */
+     most irritating thing a chat UI can do.
+
+     How far through the thread you are is ReadProgress' job, and it watches
+     this same element itself. */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const onScroll = () => {
       pinnedToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-      syncRead();
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, [conversationId, syncRead]);
+    // turns.length, not just the id: a conversation opened straight from its
+    // URL renders once with nothing loaded, and an empty one renders ChatEmpty
+    // instead, so on that first pass there is no scroll container to listen to
+    // and the id alone would never bring the effect back.
+  }, [conversationId, c?.turns.length]);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (el && pinnedToBottom.current) el.scrollTop = el.scrollHeight;
-    // The thread just got longer or shorter, so the fraction moved even if
-    // nobody scrolled.
-    syncRead();
-  }, [chat.streaming, c?.turns.length, conversationId, syncRead]);
+  }, [chat.streaming, c?.turns.length, conversationId]);
 
   /* ---------------------------------------------------------- shortcuts -- */
   useEffect(() => {
@@ -414,9 +402,11 @@ export default function ChatView() {
           </div>
         )}
 
-        <div className="readrule" aria-hidden="true">
-          <i ref={readRef} />
-        </div>
+        <ReadProgress
+          scrollRef={scrollRef}
+          busy={chat.busy}
+          resyncKey={`${conversationId || ""}:${c?.turns.length ?? 0}`}
+        />
 
         {!c || c.turns.length === 0 ? (
           <ChatEmpty

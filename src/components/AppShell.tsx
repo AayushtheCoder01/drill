@@ -37,11 +37,16 @@ export default function AppShell() {
         return;
       }
       if (e.key === " " || e.key === "Enter") {
-        if (!review.revealed && review.current) e.preventDefault();
-        // reveal is triggered inside ReviewCard/Controls via their own key
-        // handling on the textarea; the global case (no recall box focused)
-        // is handled by Controls' flip button receiving the click event
-        // synthetically isn't possible here, so ReviewCard listens itself.
+        // Space is the review loop's primary key, so it has to do the primary
+        // thing. It used to only preventDefault here and leave the reveal to a
+        // component that no longer exists, which left the most-pressed key in
+        // the app bound to nothing at all. The recall box has its own
+        // ctrl+enter for the same job, and is excluded above by the INPUT /
+        // TEXTAREA guard, so there is no conflict between the two.
+        if (!review.revealed && review.current) {
+          e.preventDefault();
+          review.reveal();
+        }
       } else if (review.revealed && ["1", "2", "3", "4"].indexOf(e.key) >= 0) {
         review.grade((parseInt(e.key, 10)) as 1 | 2 | 3 | 4);
       } else if (e.key === "g" && review.revealed && review.current) {
