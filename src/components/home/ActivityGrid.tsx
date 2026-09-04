@@ -10,6 +10,7 @@
  * so a year always fits: the squares get smaller on a narrow window, and a
  * scrollbar never appears under the calendar to be dragged.
  * ========================================================================== */
+import { useState } from "react";
 import { grid, monthLabels, type DayCell } from "@/lib/activity";
 import type { LogEntry } from "@/types";
 
@@ -25,13 +26,14 @@ function title(c: DayCell): string {
 }
 
 export default function ActivityGrid({ log, weeks = 53 }: { log: LogEntry[]; weeks?: number }) {
+  const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
   const cols = grid(log, weeks);
   const months = monthLabels(cols);
   const total = log.length;
   const track = { gridTemplateColumns: `repeat(${weeks}, minmax(0, 1fr))` };
 
   return (
-    <div className="act">
+    <div className="act" onMouseLeave={() => setTip(null)}>
       <div className="act-months" style={track}>
         {months.map((m) => (
           <span key={m.col} className="act-month" style={{ gridColumnStart: m.col + 1 }}>
@@ -51,11 +53,40 @@ export default function ActivityGrid({ log, weeks = 53 }: { log: LogEntry[]; wee
               className={"act-cell" + (c.future ? " future" : "")}
               data-level={c.future ? undefined : c.level}
               style={{ gridColumn: ci + 1, gridRow: ri + 1 }}
+              onMouseEnter={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setTip({ x: rect.left + rect.width / 2, y: rect.top - 8, text: title(c) });
+              }}
               title={title(c)}
             />
           ))
         )}
       </div>
+
+      {tip && (
+        <div
+          className="act-tip"
+          style={{
+            position: "fixed",
+            left: tip.x,
+            top: tip.y,
+            transform: "translate(-50%, -100%)",
+            pointerEvents: "none",
+            zIndex: 100,
+            background: "var(--surface)",
+            border: "1px solid var(--rule)",
+            color: "var(--ink)",
+            fontSize: "var(--t-3xs)",
+            fontFamily: "var(--sans)",
+            padding: "3px 8px",
+            borderRadius: "var(--r-1)",
+            boxShadow: "var(--lift-2)",
+            whiteSpace: "nowrap"
+          }}
+        >
+          {tip.text}
+        </div>
+      )}
 
       <div className="act-legend">
         <span>{total.toLocaleString()} reviews in the last year</span>

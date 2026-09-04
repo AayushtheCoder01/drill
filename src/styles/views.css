@@ -65,17 +65,19 @@
 }
 .jrnl-drop {
   border: 1px dashed var(--rule);
-  border-radius: var(--r-2);
+  border-radius: var(--r-3);
   text-align: center;
-  padding: var(--s-4) var(--s-3);
+  padding: var(--s-5) var(--s-4);
   color: var(--ink-3);
   font-size: var(--t-xs);
-  transition: border-color var(--fast), background var(--fast), color var(--fast);
+  background: var(--surface);
+  transition: border-color var(--fast), background var(--fast), color var(--fast), transform var(--fast);
 }
 .jrnl-drop:hover {
-  border-color: var(--accent-45);
+  border-color: var(--accent);
   background: var(--accent-05);
-  color: var(--accent);
+  color: var(--ink);
+  transform: translateY(-1px);
 }
 
 .jrnl-narrative {
@@ -86,6 +88,11 @@
   margin: 0 0 var(--s-5);
   max-width: var(--measure);
   text-wrap: pretty;
+  padding: var(--s-4);
+  background: var(--surface);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-3);
+  box-shadow: var(--lift-1);
 }
 .jrnl-field {
   margin-bottom: var(--s-5);
@@ -156,6 +163,9 @@
   text-transform: uppercase;
   color: var(--ink-3);
   margin-bottom: var(--s-3);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
 }
 /* An exam question is read, so it is set in the reading face — the same
    size and leading a card question gets, because it is the same job. */
@@ -172,16 +182,29 @@
 }
 .exam-report-score {
   text-align: center;
-  padding: var(--s-5) 0 var(--s-6);
-  border-bottom: 1px solid var(--rule);
-  margin-bottom: var(--s-5);
+  padding: var(--s-6) var(--s-4);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-3);
+  background: var(--surface);
+  box-shadow: var(--lift-2);
+  margin-bottom: var(--s-6);
 }
 .exam-report-score .bignum {
-  font-size: 3rem;
+  font-size: 3.2rem;
+  font-family: var(--serif);
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: var(--track-tight);
+  display: block;
 }
 .exam-qrow {
   border-bottom: 1px solid var(--rule-soft);
-  padding: var(--s-4) var(--s-1);
+  padding: var(--s-4) var(--s-2);
+  border-radius: var(--r-2);
+  transition: background var(--fast);
+}
+.exam-qrow:hover {
+  background: var(--surface);
 }
 .exam-qrow .eqh {
   display: flex;

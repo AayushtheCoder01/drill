@@ -129,7 +129,12 @@ export default function Stage() {
 
         {!revealed && recall && (
           <div className="recall">
-            <label>Write it from memory first</label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "var(--s-1)" }}>
+              <label style={{ margin: 0 }}>Write it from memory first</label>
+              <span style={{ fontSize: "var(--t-3xs)", color: "var(--ink-3)", display: "flex", alignItems: "center", gap: "3px" }}>
+                <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to check
+              </span>
+            </div>
             <textarea
               placeholder="what do you actually remember? one or two lines is fine"
               value={attempt}
@@ -139,13 +144,14 @@ export default function Stage() {
             <div className="rr">
               {hasMicSupport && (
                 <button
-                  className={"mic" + (micOn ? " on" : "")}
-                  title={micOn ? "Stop dictating" : "Dictate"}
-                  aria-label={micOn ? "Stop dictating" : "Dictate"}
+                  className={"mic" + (micOn ? " on recording" : "")}
+                  title={micOn ? "Stop dictating" : "Dictate with microphone"}
+                  aria-label={micOn ? "Stop dictating" : "Dictate with microphone"}
                   aria-pressed={micOn}
                   onClick={toggleMic}
                 >
                   <Icon name="mic" size={15} />
+                  {micOn && <span className="mic-pulse" aria-hidden="true" />}
                 </button>
               )}
             </div>
@@ -155,7 +161,7 @@ export default function Stage() {
         {revealed && (
           <>
             <div className="divider"></div>
-            <div ref={answerRef}>
+            <div ref={answerRef} className="card-answer-reveal">
               <CardHtml className="a" html={o.def.a} />
             </div>
 
@@ -190,18 +196,18 @@ export default function Stage() {
 
             <div className="cardacts">
               <button className="linkbtn" onClick={() => open({ name: "chat", card: o.def })}>
-                <Icon name="sparkle" size={12} /> Go deeper
+                <Icon name="sparkle" size={13} /> Go deeper
               </button>
               <button className="linkbtn" onClick={() => open({ name: "editor", deckId: o.deck.id, cardId: o.def.id })}>
-                Edit
+                <Icon name="pencil" size={13} /> Edit
               </button>
               {store.isLeech(o.st) ? (
                 <button className="linkbtn danger" onClick={() => open({ name: "fix", item: o })}>
-                  Rewrite this card
+                  <Icon name="refresh" size={13} /> Rewrite this card
                 </button>
               ) : (
                 <button className="linkbtn" onClick={() => open({ name: "notes", card: o.def })}>
-                  Log insight
+                  <Icon name="journal" size={13} /> Log insight
                 </button>
               )}
             </div>

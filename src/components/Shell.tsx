@@ -21,7 +21,9 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import * as store from "@/services/store";
 import { useDrillStore } from "@/hooks/useDrillStore";
 import type { View } from "@/context/RouteContext";
+import { applyAppearance } from "@/lib/theme";
 import Sidebar from "./Sidebar";
+import ShortcutsModal from "./ui/ShortcutsModal";
 import Icon from "./ui/Icon";
 
 const MOBILE = "(max-width: 900px)";
@@ -60,6 +62,7 @@ export default function Shell({
 }) {
   const db = useDrillStore();
   const [drawer, setDrawer] = useState(false);
+  const [shortcuts, setShortcuts] = useState(false);
   const [mobile, setMobile] = useState(
     () => typeof window !== "undefined" && window.matchMedia(MOBILE).matches
   );
@@ -91,8 +94,22 @@ export default function Shell({
     else store.updateSettings({ navCollapsed: !store.settings().navCollapsed });
   }, []);
 
+  const night = db.settings.theme !== "day";
+  const flipTheme = useCallback(() => {
+    store.updateSettings({ theme: night ? "day" : "night" });
+    applyAppearance(store.settings());
+  }, [night]);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT") {
+        if (e.key === "?" && !e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          setShortcuts((v) => !v);
+          return;
+        }
+      }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
         e.preventDefault();
         toggle();
@@ -102,13 +119,16 @@ export default function Shell({
            Backslash is unbound in Chrome and reads as a divider. */
         e.preventDefault();
         toggleRail();
-      } else if (e.key === "Escape" && drawer) {
-        setDrawer(false);
+      } else if (e.key === "Escape") {
+        if (shortcuts) setShortcuts(false);
+        else if (drawer) setDrawer(false);
       }
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [toggle, toggleRail, drawer]);
+  }, [toggle, toggleRail, drawer, shortcuts]);
+
+  const activeProject = store.activeProject();
 
   return (
     <div className={"app" + (collapsed ? " nav-collapsed" : "")}>
@@ -129,7 +149,28 @@ export default function Shell({
           <button className="iconbtn" onClick={toggle} aria-label="Open navigation" aria-expanded={drawer}>
             <Icon name="panel" />
           </button>
-          <span className="topbar-title">{TITLES[current]}</span>
+          <div className="topbar-title-wrap">
+            <span className="topbar-title">{TITLES[current]}</span>
+            {activeProject && <span className="topbar-sub">· {activeProject.name}</span>}
+          </div>
+          <div className="topbar-acts">
+            <button
+              className="iconbtn"
+              onClick={flipTheme}
+              title={night ? "Day printing" : "Night printing"}
+              aria-label="Toggle theme"
+            >
+              <Icon name={night ? "sun" : "moon"} size={16} />
+            </button>
+            <button
+              className="iconbtn"
+              onClick={() => setShortcuts(true)}
+              title="Keyboard shortcuts (?)"
+              aria-label="Shortcuts"
+            >
+              <Icon name="keyboard" size={16} />
+            </button>
+          </div>
         </div>
 
         <div className="app-body">
@@ -151,7 +192,7 @@ export default function Shell({
               <button
                 className="iconbtn rail-toggle"
                 onClick={toggleRail}
-                title={railFolded ? "Show the panel  (ctrl + \)" : "Hide the panel  (ctrl + \)"}
+                title={railFolded ? "Show the panel  (ctrl + \\)" : "Hide the panel  (ctrl + \\)"}
                 aria-label={railFolded ? "Show the panel" : "Hide the panel"}
                 aria-expanded={!railFolded}
               >
@@ -163,6 +204,8 @@ export default function Shell({
           )}
         </div>
       </div>
+
+      {shortcuts && <ShortcutsModal onClose={() => setShortcuts(false)} />}
     </div>
   );
 }

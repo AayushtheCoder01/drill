@@ -34,8 +34,12 @@ export default function Controls() {
             className={"grade" + (i === suggestedIdx ? " suggest" : "")}
             data-g={i}
             onClick={() => review.grade((i + 1) as 1 | 2 | 3 | 4)}
+            title={`Grade ${l} (${i + 1})`}
           >
-            <span className="lbl">{l}</span>
+            <span className="lbl">
+              {l}
+              <kbd className="grade-key">{i + 1}</kbd>
+            </span>
             <span className="ivl">{fmt(pv[i])}</span>
           </button>
         ))}

@@ -38,18 +38,29 @@
 html {
   font-size: 16px;
 }
-/* No visible scrollbars anywhere. Everything still scrolls — wheel, trackpad,
-   keys, touch — but nothing in the app is wide or long enough to need a bar
-   to drag, and a permanent grey slider down the side of a reading column is
-   the loudest thing on the page. */
+/* Sleek, auto-fading scrollbars. Nearly invisible at rest so they never crowd
+   the reading column, but providing clear spatial orientation when scrolling
+   long prose, code blocks, or card lists. */
 * {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-soft) transparent;
 }
 *::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
+  width: 5px;
+  height: 5px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--rule-soft);
+  border-radius: var(--r-full);
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--rule);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
 }
 html,
 body {
@@ -81,6 +92,25 @@ hr {
   border: none;
   border-top: 1px solid var(--rule);
   margin: var(--s-5) 0;
+}
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  font-weight: 500;
+  line-height: 1;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  border-bottom: 2px solid var(--rule);
+  border-radius: var(--r-1);
+  box-shadow: var(--lift-1);
+  user-select: none;
 }
 
 /* Settings.density. Comfortable is the design; compact trims the chrome and
@@ -547,7 +577,7 @@ button.rail-item:hover .rail-item-text {
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
-  transition: background var(--fast), color var(--fast), padding var(--med) var(--ease);
+  transition: background var(--fast), color var(--fast), transform var(--fast), padding var(--med) var(--ease);
 }
 .nav-item svg {
   flex: 0 0 auto;
@@ -555,11 +585,15 @@ button.rail-item:hover .rail-item-text {
 .nav-item:hover {
   background: var(--surface-2);
   color: var(--ink);
+  transform: translateX(2px);
+}
+.nav.collapsed .nav-item:hover {
+  transform: none;
 }
 .nav-item.on {
   background: var(--accent-10);
   color: var(--ink);
-  box-shadow: inset 2px 0 0 var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 .nav-item.on svg {
   color: var(--accent);
@@ -574,6 +608,23 @@ button.rail-item:hover .rail-item-text {
 .nav.collapsed .nav-label {
   opacity: 0;
   transition: opacity 0.07s linear;
+}
+.nav-badge {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-10);
+  border: 1px solid var(--accent-25);
+  border-radius: var(--r-full);
+  padding: 1px 6px;
+  line-height: 1.2;
+  transition: opacity 0.14s linear 0.09s;
+}
+.nav.collapsed .nav-badge {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Whatever the section hangs under its own name — chat's conversation index.
@@ -616,17 +667,42 @@ button.rail-item:hover .rail-item-text {
   flex: 0 0 auto;
   background: var(--page);
 }
+.topbar-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-1);
+  min-width: 0;
+  overflow: hidden;
+}
 .topbar-title {
   font-family: var(--mono);
   font-size: var(--t-3xs);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.topbar-sub {
+  font-family: var(--sans);
+  font-size: var(--t-xs);
   color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar-acts {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
 }
 .nav-scrim {
   position: fixed;
   inset: 0;
   background: var(--scrim);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 15;
   animation: fade var(--fast) var(--ease);
 }
@@ -1066,6 +1142,22 @@ header {
   font-weight: 600;
   font-size: var(--t-sm);
   color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.grade .grade-key {
+  font-size: 9px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  opacity: 0.75;
+  border-radius: 2px;
+}
+.grade[data-g="2"] .grade-key {
+  background: color-mix(in oklab, var(--on-accent) 22%, transparent);
+  border-color: color-mix(in oklab, var(--on-accent) 35%, transparent);
+  color: var(--on-accent);
 }
 .grade .ivl {
   font-family: var(--mono);
@@ -1073,12 +1165,14 @@ header {
   color: var(--ink-3);
 }
 .grade[data-g="0"]:hover {
+  background: var(--red-tint);
   border-color: var(--red);
 }
 .grade[data-g="0"]:hover .lbl {
   color: var(--red);
 }
 .grade[data-g="1"]:hover {
+  background: var(--amber-tint);
   border-color: var(--amber);
 }
 .grade[data-g="1"]:hover .lbl {
@@ -1090,8 +1184,9 @@ header {
   box-shadow: var(--accent-glow);
 }
 .grade[data-g="2"]:hover {
-  background: var(--accent);
+  background: oklch(calc(var(--accent-l) + 4%) var(--accent-c) var(--accent-h));
   border-color: var(--accent);
+  box-shadow: 0 8px 24px -6px oklch(var(--accent-l) var(--accent-c) var(--accent-h) / 0.6);
 }
 .grade[data-g="2"] .lbl {
   color: var(--on-accent);
@@ -1099,9 +1194,10 @@ header {
 }
 .grade[data-g="2"] .ivl {
   color: var(--on-accent);
-  opacity: 0.65;
+  opacity: 0.75;
 }
 .grade[data-g="3"]:hover {
+  background: var(--green-tint);
   border-color: var(--green);
 }
 .grade[data-g="3"]:hover .lbl {
@@ -1135,12 +1231,71 @@ header {
   }
 }
 
-/* --------------------------------------------------------------- states -- */
 .msg {
   text-align: center;
   padding: var(--s-8) var(--s-3);
   max-width: var(--measure);
   margin: 0 auto;
+}
+.card-answer-reveal {
+  animation: answer-in 0.28s var(--ease-out);
+}
+@keyframes answer-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.done-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.done-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--r-full);
+  background: var(--green-tint);
+  border: 1px solid var(--green-edge);
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--s-4);
+  box-shadow: 0 0 24px -4px var(--green-tint);
+  animation: done-pop 0.4s var(--ease-spring);
+}
+@keyframes done-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.mic.recording {
+  position: relative;
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--red-tint);
+}
+.mic-pulse {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--red);
+  animation: pulse 1s infinite;
 }
 .msg h2 {
   font-family: var(--serif);
@@ -1322,7 +1477,18 @@ header {
   border-radius: var(--r-2);
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--fast), border-color var(--fast), color var(--fast);
+  transition: background var(--fast), border-color var(--fast), color var(--fast), transform var(--fast), box-shadow var(--fast);
+}
+.btn:active,
+.pbtn:active,
+.iconbtn:active,
+.tab:active,
+.cbtn:active,
+.tact:active,
+.side-new:active,
+.proj-switch-new:active,
+.csend:active {
+  transform: scale(0.97);
 }
 .btn:hover,
 .pbtn:hover,
@@ -1683,7 +1849,8 @@ a {
   inset: 0;
   z-index: 60;
   background: var(--scrim);
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1696,6 +1863,16 @@ a {
   }
   to {
     opacity: 1;
+  }
+}
+@keyframes modal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 .sheet[hidden],
@@ -1712,8 +1889,8 @@ a {
   max-height: 88vh;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--lift-3);
-  animation: rise var(--med) var(--ease);
+  box-shadow: var(--lift-3), var(--inset-highlight);
+  animation: modal-pop var(--med) var(--ease-spring);
   overflow: hidden;
 }
 .panel-inner {
@@ -2373,19 +2550,36 @@ a {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 72px;
+  bottom: 64px;
   transform: translateX(-50%);
-  z-index: 90;
-  background: var(--surface);
+  z-index: 95;
+  background: var(--surface-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--rule);
-  border-radius: var(--r-2);
-  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-full);
+  padding: var(--s-2) var(--s-5);
   font-family: var(--sans);
   font-size: var(--t-xs);
+  font-weight: 500;
   color: var(--ink);
-  max-width: 88vw;
-  box-shadow: var(--lift-3);
-  animation: rise var(--fast) var(--ease);
+  max-width: 90vw;
+  box-shadow: var(--lift-3), var(--inset-highlight);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  animation: toast-in var(--med) var(--ease-spring);
+  pointer-events: none;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
 }
 .toast[hidden] {
   display: none;

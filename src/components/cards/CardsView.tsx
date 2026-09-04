@@ -220,6 +220,7 @@ function CardsPage() {
                 <button
                   key={f.id}
                   className={"cfilter" + (filter === f.id ? " on" : "")}
+                  data-filter={f.id}
                   onClick={() => setFilter(f.id)}
                   disabled={f.id !== "all" && counts[f.id] === 0}
                 >

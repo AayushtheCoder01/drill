@@ -34,7 +34,11 @@ export type IconName =
   | "journal"
   | "exam"
   | "paperclip"
-  | "bubble";
+  | "bubble"
+  | "check"
+  | "keyboard"
+  | "help"
+  | "refresh";
 
 /* Every path is drawn on a 24-grid, stroked, never filled — except the two
    that mean "on" (star-filled), where a fill is the whole signal. */
@@ -90,6 +94,15 @@ const PATHS: Record<IconName, { d: string; fill?: boolean }[]> = {
   ],
   paperclip: [
     { d: "m21.4 11.6-8.5 8.5a5.6 5.6 0 0 1-7.9-7.9l8.5-8.5a3.8 3.8 0 0 1 5.3 5.3l-8.5 8.5a1.9 1.9 0 0 1-2.7-2.7l7.8-7.8" }
+  ],
+  check: [{ d: "M5 13l4 4L19 7" }],
+  keyboard: [
+    { d: "M3 6h18v12H3z" },
+    { d: "M7 10h.01M11 10h.01M15 10h.01M7 14h.01M17 14h.01M10 14h4" }
+  ],
+  help: [{ d: "M12 17h.01M9 9a3 3 0 1 1 5 2c-.9.7-2 1.4-2 3v1" }],
+  refresh: [
+    { d: "M3 12a9 9 0 0 1 15.4-6.4L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.4 6.4L3 16M3 21v-5h5" }
   ]
 };
 

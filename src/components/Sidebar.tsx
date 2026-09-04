@@ -15,11 +15,14 @@
  * ========================================================================== */
 import { useState, type ReactNode } from "react";
 import * as store from "@/services/store";
+import * as journalStore from "@/services/journalStore";
 import { useDrillStore } from "@/hooks/useDrillStore";
+import { useStoreSync } from "@/hooks/useStoreSync";
 import { useRoute, type View } from "@/context/RouteContext";
 import { applyAppearance } from "@/lib/theme";
 import ProjectSwitcher from "./ProjectSwitcher";
 import SettingsModal from "./settings/SettingsModal";
+import ShortcutsModal from "./ui/ShortcutsModal";
 import Icon, { type IconName } from "./ui/Icon";
 
 const SECTIONS: { view: View; label: string; icon: IconName }[] = [
@@ -47,8 +50,18 @@ export default function Sidebar({
   children?: ReactNode;
 }) {
   const db = useDrillStore();
+  useStoreSync(journalStore);
   const { openHome, openDrill, openCards, openChat, openJournal, openExam } = useRoute();
   const [settings, setSettings] = useState(false);
+  const [shortcuts, setShortcuts] = useState(false);
+
+  const dueCount = store.counts().due;
+  const unrolledCount = journalStore.unrolledEntries(db.activeProjectId).length;
+
+  const badges: Partial<Record<View, number>> = {
+    drill: dueCount > 0 ? dueCount : undefined,
+    journal: unrolledCount > 0 ? unrolledCount : undefined
+  };
 
   const go: Record<View, () => void> = {
     home: openHome,
@@ -96,21 +109,25 @@ export default function Sidebar({
       </div>
 
       <nav className="nav-sections">
-        {SECTIONS.map((s) => (
-          <button
-            key={s.view}
-            className={"nav-item" + (s.view === current ? " on" : "")}
-            aria-current={s.view === current ? "page" : undefined}
-            title={s.label}
-            onClick={() => {
-              go[s.view]();
-              onNavigate();
-            }}
-          >
-            <Icon name={s.icon} size={17} />
-            <span className="nav-label">{s.label}</span>
-          </button>
-        ))}
+        {SECTIONS.map((s) => {
+          const badge = badges[s.view];
+          return (
+            <button
+              key={s.view}
+              className={"nav-item" + (s.view === current ? " on" : "")}
+              aria-current={s.view === current ? "page" : undefined}
+              title={s.label + (badge ? ` (${badge})` : "")}
+              onClick={() => {
+                go[s.view]();
+                onNavigate();
+              }}
+            >
+              <Icon name={s.icon} size={17} />
+              <span className="nav-label">{s.label}</span>
+              {badge != null && <span className="nav-badge">{badge}</span>}
+            </button>
+          );
+        })}
       </nav>
 
       {/* Whatever the section wants under its own name. Hidden in the rail,
@@ -127,6 +144,15 @@ export default function Sidebar({
           <Icon name={night ? "sun" : "moon"} size={17} />
           <span className="nav-label">{night ? "Day" : "Night"}</span>
         </button>
+        <button
+          className="nav-item"
+          onClick={() => setShortcuts(true)}
+          title="Keyboard shortcuts (?)"
+          aria-label="Keyboard shortcuts"
+        >
+          <Icon name="keyboard" size={17} />
+          <span className="nav-label">Shortcuts</span>
+        </button>
         <button className="nav-item" onClick={() => setSettings(true)} title="Settings" aria-label="Settings">
           <Icon name="settings" size={17} />
           <span className="nav-label">Settings</span>
@@ -134,6 +160,7 @@ export default function Sidebar({
       </div>
 
       {settings && <SettingsModal onClose={() => setSettings(false)} />}
+      {shortcuts && <ShortcutsModal onClose={() => setShortcuts(false)} />}
     </aside>
   );
 }

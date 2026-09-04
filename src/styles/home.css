@@ -91,12 +91,17 @@
   background: var(--surface);
   color: var(--ink);
   cursor: pointer;
-  transition: background var(--fast), border-color var(--fast), box-shadow var(--fast);
+  box-shadow: var(--lift-1);
+  transition: background var(--fast), border-color var(--fast), box-shadow var(--fast), transform var(--fast);
 }
 .home-call:hover {
   background: var(--surface-2);
   border-color: var(--accent-45);
   box-shadow: var(--lift-2);
+  transform: translateY(-1px);
+}
+.home-call:active {
+  transform: scale(0.99);
 }
 .home-call-txt {
   min-width: 0;
@@ -125,6 +130,11 @@
   background: var(--accent);
   color: var(--on-accent);
   font: 500 var(--t-sm) / 1 var(--sans);
+  box-shadow: var(--accent-glow);
+  transition: transform var(--fast) var(--ease-spring), box-shadow var(--fast);
+}
+.home-call:hover .home-call-cta {
+  transform: scale(1.03);
 }
 @media (max-width: 620px) {
   .home-call {
@@ -138,20 +148,30 @@
 }
 
 /* --------------------------------------------------------------- figures -- */
-/* Four numbers on one line, unboxed, dropping to two columns before they
-   crowd. Set in the reading face: a number is the one piece of chrome worth
-   making handsome, and tabular figures keep it from twitching. */
 .home-figs {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--s-5);
+  gap: var(--s-4);
   margin-bottom: var(--s-8);
 }
 @media (max-width: 720px) {
   .home-figs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--s-5) var(--s-4);
+    gap: var(--s-4);
   }
+}
+.home-fig {
+  background: var(--surface);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-3);
+  padding: var(--s-4);
+  box-shadow: var(--lift-1);
+  transition: transform var(--fast), border-color var(--fast), box-shadow var(--fast);
+}
+.home-fig:hover {
+  border-color: var(--rule);
+  transform: translateY(-2px);
+  box-shadow: var(--lift-2);
 }
 .home-fig-n {
   font: 400 var(--t-2xl) / var(--lh-tight) var(--serif);
@@ -236,6 +256,13 @@
   border-radius: 2px;
   background: var(--rule-soft);
   display: block;
+  transition: transform 0.1s var(--ease), box-shadow var(--fast);
+  cursor: pointer;
+}
+.act-cell:hover:not(.future) {
+  transform: scale(1.3);
+  z-index: 5;
+  box-shadow: 0 2px 8px oklch(0% 0 0 / 0.4);
 }
 /* Four steps of the accent, scaled against the busiest day in the window, so
    the grid reads the same whether you do five cards a day or five hundred. */
@@ -254,6 +281,7 @@
 .act-cell.future {
   background: none;
   box-shadow: inset 0 0 0 1px var(--rule-soft);
+  cursor: default;
 }
 .act-legend {
   display: flex;
@@ -296,6 +324,10 @@
   text-align: left;
   cursor: pointer;
   color: var(--ink);
+  transition: transform var(--fast), color var(--fast);
+}
+.toc-row:hover {
+  transform: translateX(4px);
 }
 .toc-name {
   font-family: var(--serif);

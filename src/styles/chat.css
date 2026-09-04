@@ -44,12 +44,17 @@
   gap: var(--s-2);
   cursor: pointer;
   box-shadow: var(--lift-1);
-  transition: background var(--fast), border-color var(--fast), color var(--fast), transform var(--fast);
+  transition: background var(--fast), border-color var(--fast), color var(--fast), transform var(--fast), box-shadow var(--fast);
 }
 .side-new:hover {
   background: var(--surface-2);
   border-color: var(--accent-45);
   color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: var(--lift-2);
+}
+.side-new:active {
+  transform: scale(0.98);
 }
 .side-kbd {
   margin-left: auto;
@@ -627,11 +632,13 @@
   overflow: hidden;
   background: var(--page-2);
   max-width: var(--page-w);
+  box-shadow: var(--lift-1);
 }
 .codehead {
   display: flex;
   align-items: center;
   padding: var(--s-1) var(--s-2) var(--s-1) var(--s-3);
+  background: var(--surface-2);
   border-bottom: 1px solid var(--rule-soft);
 }
 .codelang {
@@ -648,7 +655,16 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 3px var(--s-2);
+  border-radius: var(--r-1);
   --btn-edge: transparent;
+  transition: background var(--fast), color var(--fast), transform var(--fast);
+}
+.codecopy:hover {
+  background: var(--surface);
+  --btn-edge: var(--rule);
+}
+.codecopy:active {
+  transform: scale(0.96);
 }
 .codeblock pre {
   margin: 0;
@@ -741,12 +757,16 @@
   align-items: center;
   gap: 4px;
   cursor: pointer;
-  transition: color var(--fast), background var(--fast), border-color var(--fast);
+  box-shadow: var(--lift-1);
+  transition: color var(--fast), background var(--fast), border-color var(--fast), transform var(--fast);
 }
 .tact:hover {
   color: var(--ink);
   background: var(--surface-2);
   border-color: var(--rule);
+}
+.tact:active {
+  transform: scale(0.96);
 }
 .tact.on {
   color: var(--amber);
@@ -864,11 +884,13 @@
   border: 1px solid var(--rule);
   border-radius: var(--r-3);
   background: var(--page-2);
-  transition: border-color var(--fast), background var(--fast);
+  box-shadow: var(--lift-1);
+  transition: border-color var(--fast), background var(--fast), box-shadow var(--fast);
 }
 .composer-box:focus-within {
   border-color: var(--accent-45);
   background: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-10), var(--lift-2);
 }
 /* The text and Send share one line, which is what keeps the resting height to
    a single row. Bottom-aligned so Send stays on the last line as the box
@@ -1036,14 +1058,27 @@
   bottom: calc(100% + var(--s-2));
   left: 0;
   right: 0;
-  background: var(--surface);
-  border: 1px solid var(--rule);
+  background: var(--surface-glass, var(--surface));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border-subtle, var(--rule));
   border-radius: var(--r-2);
   overflow: hidden;
   z-index: 40;
   box-shadow: var(--lift-3);
   max-height: 300px;
   overflow-y: auto;
+  animation: pop-up var(--fast) var(--ease-spring);
+}
+@keyframes pop-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .slashitem {
   width: 100%;
@@ -1150,12 +1185,15 @@
   bottom: calc(100% + var(--s-2));
   left: 0;
   width: min(420px, 78vw);
-  background: var(--surface);
-  border: 1px solid var(--rule);
+  background: var(--surface-glass, var(--surface));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border-subtle, var(--rule));
   border-radius: var(--r-2);
   box-shadow: var(--lift-3);
   z-index: 50;
   padding: var(--s-3);
+  animation: pop-up var(--fast) var(--ease-spring);
 }
 .modelpop .fi {
   margin-bottom: var(--s-2);
@@ -1301,7 +1339,7 @@
 }
 .starter {
   background: var(--surface);
-  border: 1px solid var(--rule-soft);
+  border: 1px solid var(--border-subtle, var(--rule-soft));
   border-radius: var(--r-3);
   padding: var(--s-4);
   cursor: pointer;
@@ -1311,13 +1349,17 @@
   display: flex;
   align-items: flex-start;
   gap: var(--s-3);
+  box-shadow: var(--lift-1);
   transition: background var(--fast), border-color var(--fast), transform var(--fast), box-shadow var(--fast);
 }
 .starter:hover:not(:disabled) {
   background: var(--surface-2);
   border-color: var(--accent-45);
-  transform: translateY(-1px);
-  box-shadow: var(--lift-1);
+  transform: translateY(-2px);
+  box-shadow: var(--lift-2);
+}
+.starter:active:not(:disabled) {
+  transform: scale(0.98);
 }
 .starter-icon {
   flex: 0 0 auto;

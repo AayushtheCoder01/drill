@@ -1,9 +1,11 @@
 import * as store from "@/services/store";
 import { useSheet } from "@/context/SheetContext";
+import { useRoute } from "@/context/RouteContext";
 import Icon from "./ui/Icon";
 
 export default function Done() {
   const { open } = useSheet();
+  const { openHome, openCards } = useRoute();
   const c = store.counts();
   const up = store.nextDue();
   const decks = store.pool();
@@ -36,7 +38,10 @@ export default function Done() {
 
   return (
     <main id="stage">
-      <div className="msg">
+      <div className="msg done-msg">
+        <div className="done-badge" aria-hidden="true">
+          <Icon name="check" size={28} />
+        </div>
         <h2>{head}</h2>
         <p>{body}</p>
         <p className="stat">
@@ -44,15 +49,25 @@ export default function Done() {
         </p>
       </div>
       <div className="controls">
-        {!total || c.unseen > 0 ? (
-          <button className="btn pri wide" onClick={() => open({ name: "ai" })}>
-            <Icon name="sparkle" /> Make cards with AI
-          </button>
-        ) : (
-          <button className="btn wide" onClick={() => open({ name: "notes", card: null })}>
-            Log an insight from today
-          </button>
-        )}
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-2)", width: "100%" }}>
+          {!total || c.unseen > 0 ? (
+            <button className="btn pri wide" onClick={() => open({ name: "ai" })}>
+              <Icon name="sparkle" /> Make cards with AI
+            </button>
+          ) : (
+            <button className="btn pri wide" onClick={() => open({ name: "notes", card: null })}>
+              <Icon name="journal" /> Log an insight from today
+            </button>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--s-2)", width: "100%" }}>
+            <button className="btn" onClick={openCards}>
+              <Icon name="cards" size={15} /> Library
+            </button>
+            <button className="btn" onClick={openHome}>
+              <Icon name="home" size={15} /> Home
+            </button>
+          </div>
+        </div>
       </div>
     </main>
   );
