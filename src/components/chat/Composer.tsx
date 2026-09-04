@@ -301,7 +301,7 @@ export default function Composer({ disabled, busy, placeholder, commands, refere
             <div className="att-row">
               {attachments.map((a) => (
                 <span key={a.id} className="att-chip">
-                  📎 {a.name}
+                  <Icon name="paperclip" size={11} /> {a.name}
                   <span className="x" onClick={() => setAttachments((p) => p.filter((x) => x.id !== a.id))}>
                     <Icon name="close" size={11} />
                   </span>
@@ -337,8 +337,7 @@ export default function Composer({ disabled, busy, placeholder, commands, refere
             />
             {busy ? (
               <button className="csend stop" onClick={onStop} title="Stop generating" aria-label="Stop generating">
-                <Icon name="stop" size={12} />
-                <span>Stop</span>
+                <Icon name="stop" size={13} />
               </button>
             ) : (
               <button
@@ -348,8 +347,7 @@ export default function Composer({ disabled, busy, placeholder, commands, refere
                 title="Send  (enter)"
                 aria-label="Send"
               >
-                <Icon name="send" size={14} />
-                <span>Send</span>
+                <Icon name="send" size={15} />
               </button>
             )}
           </div>
@@ -359,8 +357,9 @@ export default function Composer({ disabled, busy, placeholder, commands, refere
               popover the moment you clicked into it. */}
           <div className="composer-tools">
             {tools}
-            <button className="cbtn ghost" onClick={() => fileRef.current?.click()} title="Attach a text file">
-              📎
+            <button className="cbtn ghost attach-btn" onClick={() => fileRef.current?.click()} title="Attach a text file" aria-label="Attach a text file">
+              <Icon name="paperclip" size={12} />
+              <span>Attach</span>
             </button>
             <input
               ref={fileRef}

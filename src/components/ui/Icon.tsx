@@ -33,6 +33,7 @@ export type IconName =
   | "cards"
   | "journal"
   | "exam"
+  | "paperclip"
   | "bubble";
 
 /* Every path is drawn on a 24-grid, stroked, never filled — except the two
@@ -86,6 +87,9 @@ const PATHS: Record<IconName, { d: string; fill?: boolean }[]> = {
     { d: "M9.5 3.5h5v3h-5z" },
     { d: "M14.5 5h2.5a1 1 0 0 1 1 1v13.5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5" },
     { d: "m9.5 13 1.8 1.8 3.4-3.6" }
+  ],
+  paperclip: [
+    { d: "m21.4 11.6-8.5 8.5a5.6 5.6 0 0 1-7.9-7.9l8.5-8.5a3.8 3.8 0 0 1 5.3 5.3l-8.5 8.5a1.9 1.9 0 0 1-2.7-2.7l7.8-7.8" }
   ]
 };
 

@@ -25,34 +25,90 @@
 /* ---------------------------------------------- index, inside the sidebar -- */
 /* The conversation list is passed to Sidebar as `.nav-extra` content, so it
    inherits the rail's ground and only has to lay itself out. */
+/* ---------------------------------------------- index, inside the sidebar -- */
 .side-head {
   padding: var(--s-3) var(--s-2) var(--s-2);
   flex: 0 0 auto;
 }
 .side-new {
+  width: 100%;
   font-size: var(--t-xs);
+  font-weight: 500;
   padding: var(--s-2) var(--s-3);
+  background: var(--surface);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-2);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  cursor: pointer;
+  box-shadow: var(--lift-1);
+  transition: background var(--fast), border-color var(--fast), color var(--fast), transform var(--fast);
+}
+.side-new:hover {
+  background: var(--surface-2);
+  border-color: var(--accent-45);
+  color: var(--accent);
+}
+.side-kbd {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+  background: var(--page-2);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-1);
+  padding: 1px 5px;
 }
 .side-search {
   padding: 0 var(--s-2) var(--s-2);
   flex: 0 0 auto;
 }
+.side-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.side-search-icon {
+  position: absolute;
+  left: var(--s-2);
+  color: var(--ink-3);
+  pointer-events: none;
+}
 .side-search input {
   width: 100%;
   background: var(--page);
-  border: 1px solid var(--rule);
+  border: 1px solid var(--rule-soft);
   color: var(--ink);
   border-radius: var(--r-2);
   font-family: var(--sans);
   font-size: var(--t-xs);
-  padding: var(--s-2) var(--s-3);
+  padding: 6px var(--s-5) 6px 28px;
+  transition: border-color var(--fast), background var(--fast);
 }
 .side-search input::placeholder {
   color: var(--ink-3);
 }
 .side-search input:focus {
   border-color: var(--accent);
+  background: var(--surface);
   outline: none;
+}
+.side-search-clear {
+  position: absolute;
+  right: var(--s-2);
+  background: none;
+  border: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.side-search-clear:hover {
+  color: var(--ink);
 }
 .side-list {
   flex: 1;
@@ -62,7 +118,12 @@
   min-height: 0;
 }
 .side-group {
-  padding: var(--s-3) var(--s-2) var(--s-2);
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: var(--s-3) var(--s-2) var(--s-1);
   margin: 0;
   position: sticky;
   top: 0;
@@ -74,34 +135,36 @@
   text-align: left;
   background: none;
   border: none;
-  border-bottom: 1px solid var(--rule-soft);
-  border-radius: 0;
+  border-radius: var(--r-2);
+  margin-bottom: 2px;
   padding: var(--s-2);
   cursor: pointer;
-  color: inherit;
+  color: var(--ink-2);
   font: inherit;
   display: block;
   position: relative;
-  transition: background var(--fast);
+  transition: background var(--fast), color var(--fast);
 }
 .side-item:hover {
   background: var(--surface-2);
+  color: var(--ink);
 }
 .side-item.on {
   background: var(--accent-10);
-  box-shadow: inset 2px 0 0 var(--accent);
+  color: var(--accent);
 }
 .side-item .st {
   font-family: var(--sans);
   font-weight: 500;
   font-size: var(--t-xs);
   line-height: 1.35;
-  color: var(--ink);
+  color: inherit;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: block;
-  padding-right: var(--s-5);
+  display: flex;
+  align-items: center;
+  padding-right: var(--s-4);
 }
 .side-item .sp {
   font-family: var(--mono);
@@ -115,16 +178,21 @@
 }
 .side-item .sx {
   position: absolute;
-  top: var(--s-2);
+  top: 50%;
   right: var(--s-1);
+  transform: translateY(-50%);
   opacity: 0;
   color: var(--ink-3);
-  padding: 2px 4px;
+  padding: 3px;
   border-radius: var(--r-1);
   line-height: 1;
   display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity var(--fast), color var(--fast), background var(--fast);
 }
-.side-item:hover .sx {
+.side-item:hover .sx,
+.side-item:focus-within .sx {
   opacity: 1;
 }
 .side-item .sx:hover {
@@ -133,9 +201,8 @@
 }
 .side-pin {
   color: var(--amber);
-  font-size: 8px;
   margin-right: var(--s-1);
-  vertical-align: 2px;
+  flex: 0 0 auto;
 }
 .side-foot {
   border-top: 1px solid var(--rule-soft);
@@ -144,8 +211,25 @@
   gap: var(--s-2);
   flex: 0 0 auto;
 }
-.side-foot button {
+.side-foot-btn {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  background: none;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-2);
+  color: var(--ink-3);
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  padding: var(--s-1) var(--s-2);
+  cursor: pointer;
+  transition: background var(--fast), color var(--fast);
+}
+.side-foot-btn:hover {
+  background: var(--surface-2);
+  color: var(--ink);
 }
 
 /* --------------------------------------------------- conversation header -- */
@@ -185,13 +269,29 @@
   font-size: var(--t-3xs);
   color: var(--ink-3);
   display: flex;
-  gap: var(--s-3);
+  gap: var(--s-2);
   align-items: center;
   margin-right: auto;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+.head-badge {
+  font-family: var(--sans);
+  font-size: var(--t-3xs);
+  padding: 3px var(--s-2);
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  border: 1px solid var(--rule-soft);
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1;
+}
+.head-badge.mono {
+  font-family: var(--mono);
 }
 .chat-headbtn {
   font-size: var(--t-2xs);
@@ -381,7 +481,6 @@
   white-space: nowrap;
 }
 
-/* The model's reply is the reading surface — serif, at the measure. */
 .turn-body {
   font-family: var(--serif);
   font-size: calc(var(--t-read) * var(--text-scale));
@@ -389,23 +488,29 @@
   color: var(--ink-2);
   max-width: var(--measure);
   text-wrap: pretty;
+  border-left: 2px solid transparent;
+  padding-left: var(--s-4);
+  margin-left: calc(-1 * (2px + var(--s-4)));
+  transition: border-color var(--fast);
 }
-/* What you asked is marked in the margin rather than bubbled — a question
-   pencilled beside the text, not a speech balloon. */
+/* What you asked is in a soft prompt card; the reply is the reading surface. */
 .turn.user .turn-body {
   font-family: var(--sans);
   font-size: var(--t-sm);
   line-height: 1.6;
   color: var(--ink);
-  border-left: 2px solid var(--rule);
-  padding-left: var(--s-4);
+  background: var(--surface-2);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-3);
+  padding: var(--s-3) var(--s-4);
+  max-width: var(--measure);
   white-space: pre-wrap;
   word-break: break-word;
+  box-shadow: var(--lift-1);
+  margin-left: 0;
 }
-.turn.user.starred .turn-body,
-.turn.assistant.starred .turn-body {
-  border-left: 2px solid var(--amber);
-  padding-left: var(--s-4);
+.turn.user.starred .turn-body {
+  border-color: var(--amber-edge);
 }
 
 /* markdown inside an assistant turn */
@@ -583,17 +688,22 @@
 .att-chip {
   font-family: var(--mono);
   font-size: var(--t-3xs);
-  color: var(--ink-3);
+  color: var(--ink-2);
+  background: var(--surface-2);
   border: 1px solid var(--rule);
   border-radius: var(--r-1);
   padding: 3px var(--s-2);
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: var(--s-2);
+  transition: border-color var(--fast), background var(--fast);
 }
 .att-chip .x {
   cursor: pointer;
   opacity: 0.55;
+  display: inline-flex;
+  align-items: center;
+  transition: opacity var(--fast), color var(--fast);
 }
 .att-chip .x:hover {
   opacity: 1;
@@ -603,7 +713,7 @@
 /* turn actions */
 .turn-acts {
   display: flex;
-  gap: 2px;
+  gap: var(--s-1);
   align-items: center;
   margin-top: var(--s-3);
   opacity: 0;
@@ -620,14 +730,33 @@
 .tact {
   font-family: var(--mono);
   font-size: var(--t-3xs);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: var(--s-1) var(--s-2);
-  --btn-edge: transparent;
-  --btn-fg: var(--ink-3);
+  padding: 4px var(--s-2);
+  border-radius: var(--r-1);
+  border: 1px solid var(--rule-soft);
+  background: var(--surface);
+  color: var(--ink-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: color var(--fast), background var(--fast), border-color var(--fast);
+}
+.tact:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+  border-color: var(--rule);
 }
 .tact.on {
-  --btn-fg: var(--amber);
+  color: var(--amber);
+  background: var(--amber-tint);
+  border-color: var(--amber-edge);
+}
+.tact.danger:hover {
+  color: var(--red);
+  background: var(--red-tint);
+  border-color: var(--red-edge);
 }
 .variant-nav {
   display: flex;
@@ -733,7 +862,7 @@
 }
 .composer-box {
   border: 1px solid var(--rule);
-  border-radius: var(--r-2);
+  border-radius: var(--r-3);
   background: var(--page-2);
   transition: border-color var(--fast), background var(--fast);
 }
@@ -748,7 +877,7 @@
   display: flex;
   align-items: flex-end;
   gap: var(--s-2);
-  padding-right: var(--s-2);
+  padding: var(--s-1) var(--s-2) var(--s-1) 0;
 }
 .composer-box textarea {
   flex: 1 1 auto;
@@ -798,16 +927,30 @@
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  padding: var(--s-1) var(--s-2) var(--s-2) var(--s-3);
+  padding: var(--s-2) var(--s-3);
   flex-wrap: wrap;
   row-gap: var(--s-1);
+  background: var(--page-2);
+  border-top: 1px solid var(--rule-soft);
+  border-bottom-left-radius: var(--r-3);
+  border-bottom-right-radius: var(--r-3);
 }
 .composer-bar .csend {
   margin-left: auto;
+  width: auto;
+  height: auto;
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--r-2);
+  font-size: var(--t-xs);
+  box-shadow: var(--accent-glow);
 }
 .cbtn {
   font-size: var(--t-2xs);
   padding: var(--s-1) var(--s-2);
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
   --btn-edge: transparent;
 }
 .cbtn:hover {
@@ -818,7 +961,23 @@
   font-size: var(--t-xs);
   gap: var(--s-1);
   padding: var(--s-2) var(--s-3);
-  margin-bottom: var(--s-2);
+  margin-bottom: 0;
+}
+/* The main composer's Send/Stop is an icon-only circle, not the wider
+   labelled pill used in the edit bar below: the resting box is only ~40px
+   tall and the default `.btn.pri` glow (accent-glow) spilled past its own
+   bottom border in a box that tight, reading as a misaligned button. */
+.composer-row .csend {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  box-shadow: none;
+  margin-bottom: 4px;
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .csend.stop {
   --btn-bg: var(--red-tint);
@@ -966,7 +1125,8 @@
   align-items: center;
   gap: var(--s-2);
   font-family: var(--mono);
-  font-size: var(--t-3xs);
+  font-size: var(--t-2xs);
+  height: 26px;
   max-width: 220px;
 }
 .modelchip-name {
@@ -996,6 +1156,9 @@
   box-shadow: var(--lift-3);
   z-index: 50;
   padding: var(--s-3);
+}
+.modelpop .fi {
+  margin-bottom: var(--s-2);
 }
 .modelpop-head {
   display: flex;
@@ -1098,14 +1261,18 @@
   padding: var(--s-7) var(--gutter);
   overflow-y: auto;
 }
-/* Auto margins rather than justify-content: centre, so that when the
-   openers are taller than the pane the top stays reachable instead of
-   being clipped above the scroll origin. */
-.chat-empty > :first-child {
-  margin-top: auto;
-}
-.chat-empty > :last-child {
-  margin-bottom: auto;
+.chat-empty-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: var(--r-full);
+  background: var(--accent-10);
+  border: 1px solid var(--accent-45);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--s-4);
+  box-shadow: var(--lift-1);
 }
 .chat-empty h2 {
   font-family: var(--serif);
@@ -1122,32 +1289,50 @@
   font-size: var(--t-read);
   line-height: var(--lh-body);
   margin: 0 0 var(--s-6);
-  max-width: 44ch;
+  max-width: 48ch;
   text-align: center;
 }
-/* Openers read as a contents list, not a grid of tiles. */
 .starters {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 var(--s-6);
+  gap: var(--s-3);
   width: 100%;
   max-width: var(--page-wide);
-  border-top: 1px solid var(--rule-soft);
 }
 .starter {
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--rule-soft);
-  border-radius: 0;
-  padding: var(--s-4) var(--s-2);
+  background: var(--surface);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-3);
+  padding: var(--s-4);
   cursor: pointer;
   text-align: left;
   color: inherit;
   font: inherit;
-  transition: background var(--fast);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  transition: background var(--fast), border-color var(--fast), transform var(--fast), box-shadow var(--fast);
 }
-.starter:hover {
+.starter:hover:not(:disabled) {
   background: var(--surface-2);
+  border-color: var(--accent-45);
+  transform: translateY(-1px);
+  box-shadow: var(--lift-1);
+}
+.starter-icon {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-2);
+  background: var(--accent-10);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.starter-content {
+  flex: 1;
+  min-width: 0;
 }
 .starter .t {
   font-family: var(--serif);
@@ -1155,14 +1340,26 @@
   font-size: var(--t-md);
   color: var(--ink);
   display: block;
-  margin-bottom: var(--s-1);
+  margin-bottom: 2px;
 }
 .starter .s {
   font-family: var(--sans);
   font-size: var(--t-xs);
   color: var(--ink-3);
-  line-height: 1.5;
+  line-height: 1.45;
   display: block;
+}
+.starter-arrow {
+  flex: 0 0 auto;
+  color: var(--ink-3);
+  opacity: 0;
+  transition: opacity var(--fast), transform var(--fast);
+  margin-top: 4px;
+}
+.starter:hover .starter-arrow {
+  opacity: 1;
+  color: var(--accent);
+  transform: translateX(2px);
 }
 
 /* ---------------------------------------------------- command palette -- */
@@ -1193,6 +1390,10 @@
   font-size: var(--t-md);
   padding: var(--s-4) var(--s-5);
   outline: none;
+  transition: border-color var(--fast);
+}
+.palette input:focus {
+  border-bottom-color: var(--accent);
 }
 .palette input::placeholder {
   color: var(--ink-3);
@@ -1214,9 +1415,11 @@
   display: flex;
   align-items: center;
   gap: var(--s-3);
+  transition: background var(--fast);
 }
 .palette-item.sel {
   background: var(--accent-10);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 .palette-item .pt {
   font-family: var(--sans);

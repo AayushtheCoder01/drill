@@ -67,12 +67,15 @@
   border: 1px dashed var(--rule);
   border-radius: var(--r-2);
   text-align: center;
-  padding: var(--s-1);
-  transition: border-color var(--fast), background var(--fast);
+  padding: var(--s-4) var(--s-3);
+  color: var(--ink-3);
+  font-size: var(--t-xs);
+  transition: border-color var(--fast), background var(--fast), color var(--fast);
 }
 .jrnl-drop:hover {
   border-color: var(--accent-45);
   background: var(--accent-05);
+  color: var(--accent);
 }
 
 .jrnl-narrative {

@@ -180,7 +180,7 @@ export default function MessageTurn({
         <div className="att-row">
           {turn.attachments.map((a) => (
             <span key={a.id} className="att-chip" title={`${a.text.length.toLocaleString()} characters`}>
-              📎 {a.name}
+              <Icon name="paperclip" size={11} /> {a.name}
             </span>
           ))}
         </div>
@@ -255,34 +255,40 @@ export default function MessageTurn({
 
       {!editing && !streaming && !failed && (
         <div className={`turn-acts${isLast ? " always" : ""}`}>
-          <button className="tact" onClick={copyAll}>
-            Copy
+          <button className="tact" onClick={copyAll} title="Copy response">
+            <Icon name="copy" size={11} />
+            <span>Copy</span>
           </button>
           {isUser ? (
-            <button className="tact" onClick={beginEdit} disabled={busy}>
-              Edit
+            <button className="tact" onClick={beginEdit} disabled={busy} title="Edit message">
+              <Icon name="pencil" size={11} />
+              <span>Edit</span>
             </button>
           ) : (
             <>
-              <button className="tact" onClick={onRegenerate} disabled={busy}>
-                Regenerate
+              <button className="tact" onClick={onRegenerate} disabled={busy} title="Regenerate response">
+                <Icon name="sparkle" size={11} />
+                <span>Regenerate</span>
               </button>
-              <button className="tact" onClick={() => onMakeCards(selectedOrAll())} disabled={busy}>
-                <Icon name="sparkle" size={12} /> Make cards
+              <button className="tact" onClick={() => onMakeCards(selectedOrAll())} disabled={busy} title="Turn into flashcards">
+                <Icon name="cards" size={11} />
+                <span>Make cards</span>
               </button>
-              <button className="tact" onClick={() => onSaveNote(selectedOrAll())}>
-                Save insight
+              <button className="tact" onClick={() => onSaveNote(selectedOrAll())} title="Save to insight log">
+                <Icon name="journal" size={11} />
+                <span>Save insight</span>
               </button>
             </>
           )}
-          <button className="tact" onClick={onBranch} title="Copy the thread up to here into a new conversation">
-            Branch
+          <button className="tact" onClick={onBranch} title="Branch into a new conversation">
+            <Icon name="panel" size={11} />
+            <span>Branch</span>
           </button>
-          <button className={"tact" + (turn.starred ? " on" : "")} onClick={onStar}>
-            <Icon name={turn.starred ? "star-filled" : "star"} size={12} />
+          <button className={"tact" + (turn.starred ? " on" : "")} onClick={onStar} title={turn.starred ? "Unstar turn" : "Star turn"}>
+            <Icon name={turn.starred ? "star-filled" : "star"} size={11} />
           </button>
-          <button className="tact danger" onClick={onDelete}>
-            Delete
+          <button className="tact danger" onClick={onDelete} title="Delete message">
+            <Icon name="close" size={11} />
           </button>
         </div>
       )}

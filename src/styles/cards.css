@@ -144,13 +144,30 @@
   color: inherit;
 }
 .cfilter-sel {
-  padding: var(--s-1) var(--s-3);
+  padding: var(--s-1) calc(var(--s-3) + 16px) var(--s-1) var(--s-3);
   border: 1px solid var(--rule-soft);
   border-radius: var(--r-full);
-  background: none;
+  background: var(--page);
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position: calc(100% - 14px) calc(50% + 1px), calc(100% - 9px) calc(50% + 1px);
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  appearance: none;
+  -webkit-appearance: none;
   color: var(--ink-2);
   font: 400 var(--t-xs) / 1.6 var(--sans);
   cursor: pointer;
+  transition: border-color var(--fast), color var(--fast), background var(--fast);
+}
+.cfilter-sel:hover {
+  border-color: var(--rule);
+  color: var(--ink);
+}
+.cfilter-sel:focus,
+.cfilter:focus {
+  border-color: var(--accent);
+  outline: none;
 }
 
 /* ------------------------------------------------------------ the list -- */

@@ -91,12 +91,12 @@ export default function ChatSidebar({
         }}
       >
         <span className="st">
-          {m.pinned && <span className="side-pin">●</span>}
-          {m.title}
+          {m.pinned && <Icon name="star-filled" size={11} className="side-pin" />}
+          <span>{m.title}</span>
         </span>
         <span className="sp">{subtitle}</span>
-        <span className="sx" onClick={(e) => del(e, m)} title="Delete">
-          <Icon name="close" size={12} />
+        <span className="sx" onClick={(e) => del(e, m)} title="Delete conversation" aria-label="Delete conversation">
+          <Icon name="close" size={11} />
         </span>
       </button>
     );
@@ -104,24 +104,29 @@ export default function ChatSidebar({
 
   return (
     <>
-      {/* Section navigation and the project switcher used to be duplicated
-          here, disagreeing with both the review loop's header and the
-          journal's tab bar. Sidebar owns those now, and this component is
-          only the index of conversations that hangs underneath them. */}
       <div className="side-head">
-        <button className="side-new" onClick={onNew}>
+        <button className="side-new" onClick={onNew} title="New conversation (ctrl+J)">
           <Icon name="plus" size={14} />
-          New chat
+          <span>New chat</span>
+          <span className="side-kbd">⌘J</span>
         </button>
       </div>
 
       <div className="side-search">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="search conversations…"
-          spellCheck={false}
-        />
+        <div className="side-search-box">
+          <Icon name="search" size={13} className="side-search-icon" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search conversations…"
+            spellCheck={false}
+          />
+          {query && (
+            <button className="side-search-clear" onClick={() => setQuery("")} aria-label="Clear search">
+              <Icon name="close" size={11} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="side-list">
@@ -164,7 +169,10 @@ export default function ChatSidebar({
       </div>
 
       <div className="side-foot">
-        <button onClick={() => setShowArchived((v) => !v)}>{showArchived ? "← Active" : "Archived"}</button>
+        <button className="side-foot-btn" onClick={() => setShowArchived((v) => !v)}>
+          <Icon name="archive" size={12} />
+          <span>{showArchived ? "Active chats" : "Archived chats"}</span>
+        </button>
       </div>
     </>
   );

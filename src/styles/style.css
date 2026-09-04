@@ -2373,7 +2373,7 @@ a {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: var(--s-6);
+  bottom: 72px;
   transform: translateX(-50%);
   z-index: 90;
   background: var(--surface);

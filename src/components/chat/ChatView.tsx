@@ -360,12 +360,22 @@ export default function ChatView() {
                 {c.title}
               </button>
               <div className="chat-meta">
-                <span>{resolved.model}</span>
-                <span>{getPersona(c.personaId).name}</span>
-                <span title="Approximate — counted without the model's tokeniser">
+                <span className="head-badge mono" title="Active model">
+                  <Icon name="sparkle" size={10} />
+                  {resolved.model}
+                </span>
+                <span className="head-badge" title="Persona">
+                  <Icon name="bubble" size={10} />
+                  {getPersona(c.personaId).name}
+                </span>
+                <span className="head-badge mono" title="Approximate tokens in context">
                   ~{formatTokens(contextTokens)} ctx
                 </span>
-                {c.usage.cost != null && <span>{formatCost(c.usage.cost)}</span>}
+                {c.usage.cost != null && (
+                  <span className="head-badge mono" title="Estimated cost">
+                    {formatCost(c.usage.cost)}
+                  </span>
+                )}
               </div>
               <button
                 className={"chat-headbtn" + (c.pinned ? " on" : "")}
@@ -373,17 +383,18 @@ export default function ChatView() {
                 title={c.pinned ? "Unpin" : "Pin"}
                 aria-pressed={c.pinned}
               >
-                <Icon name={c.pinned ? "star-filled" : "star"} />
+                <Icon name={c.pinned ? "star-filled" : "star"} size={13} />
               </button>
-              <button className={"chat-headbtn" + (drawer ? " on" : "")} onClick={() => setDrawer((v) => !v)}>
-                Settings
+              <button className={"chat-headbtn" + (drawer ? " on" : "")} onClick={() => setDrawer((v) => !v)} title="Conversation settings">
+                <Icon name="settings" size={13} />
+                <span>Settings</span>
               </button>
             </>
           ) : (
             <>
               <span className="chat-title">New conversation</span>
               <div className="chat-meta">
-                <span>{resolved.backend.label}</span>
+                <span className="head-badge mono">{resolved.backend.label}</span>
               </div>
             </>
           )}
