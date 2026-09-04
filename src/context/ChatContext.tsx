@@ -23,7 +23,7 @@ import * as memoryStore from "@/services/memoryStore";
 import * as memoryCapture from "@/services/memoryCapture";
 import * as AI from "@/services/ai";
 import { isAbort } from "@/services/ai/backends";
-import { loadPricing, priceFor } from "@/services/pricing";
+import { loadPricing, priceForModel } from "@/services/pricing";
 import { buildContext } from "@/lib/chatContext";
 import { getPersona } from "@/lib/personas";
 import { budgetFor } from "@/lib/effort";
@@ -219,7 +219,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               /* What the provider says it charged beats what we can
                  reconstruct: it is the real figure, and it includes web
                  search fees that tokens-times-price cannot see. */
-              usage = { ...u, cost: u.reportedCost ?? costOf(u, priceFor(c.model)) };
+              /* Priced through the same function the usage ledger uses, and
+                 through the *resolved* backend rather than the conversation's
+                 raw one — c.backend is "" whenever the thread inherits. The
+                 two used to disagree: this line looked the model up in the
+                 catalogue regardless of where the call actually went, so a
+                 local or free backend reported a cost it never charged. */
+              usage = { ...u, cost: u.reportedCost ?? costOf(u, priceForModel(AI.resolve({ backend: c.backend, model: c.model }).type, c.model)) };
             }
           },
           { backend: c.backend, model: c.model }

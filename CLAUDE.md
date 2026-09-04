@@ -84,6 +84,22 @@ not fire while an INPUT/TEXTAREA/SELECT has focus), and `ChatView`/`Composer`
 the modal in the same commit.** A cheatsheet row that nothing listens for is
 worse than no row.
 
+**Backends and credentials.** `services/ai/backends.ts` holds one entry per
+provider — OpenRouter, Groq, Ollama, and a generic OpenAI-compatible one — and
+anything speaking the OpenAI wire format needs only headers, via
+`openAICompatible()`. Two rules that are easy to miss:
+
+- Each entry declares `pricing: "catalogue" | "free" | "unpriced"`, and
+  `services/pricing.ts` reads that rather than checking backend ids. Omitting
+  it means "unpriced", which is deliberate — a new backend must opt in to
+  claiming a price instead of inheriting a `$0` that isn't true.
+- `key`/`model`/`baseUrl` are single live fields, mirrored per backend into
+  `Settings.creds`. **Only `store.setBackend()` may change `settings.backend`**
+  — it stashes the outgoing backend's three fields and restores the incoming
+  one's. Assigning `backend` through `updateSettings` skips that and silently
+  destroys a key. `RETIRED_BACKENDS` in `store.ts` is how a removed provider
+  is retired without deleting the secret its user pasted.
+
 **Singleton components with entity-scoped state need a `key`.** `Composer` is
 keyed on the conversation id because otherwise a draft leaks between threads.
 

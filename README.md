@@ -18,10 +18,9 @@ A full chat client that happens to know what you have been studying. That is
 the whole point of it living here rather than in a browser tab pointed at
 openrouter.ai.
 
-- **Any backend** — the same OpenRouter / Ollama / OpenAI / Anthropic /
-  OpenAI-compatible picker the rest of the app uses, but chosen **per
-  conversation**, so a cheap model can mark recall while a strong one writes
-  cards.
+- **Any backend** — the same OpenRouter / Groq / Ollama / OpenAI-compatible
+  picker the rest of the app uses, but chosen **per conversation**, so a cheap
+  model can mark recall while a strong one writes cards.
 - **It can see your decks** — attach your weak cards, what is due today, a
   whole deck, or your insight log. Context is rebuilt from your real progress
   every time you send, so a thread you return to next week reflects next
@@ -149,6 +148,26 @@ the list too.
 { "inference": { "type": "openrouter", "apiKey": "sk-or-v1-...", "model": "anthropic/claude-sonnet-4.5" } }
 ```
 
+### Groq — fast, and free within a rate limit
+
+Groq speaks the OpenAI chat format, so everything works: streaming, the model
+list, card writing, recall marking.
+
+1. Get a key at [console.groq.com/keys](https://console.groq.com/keys)
+2. **⋯ → Settings → Where inference runs → Groq**, paste the key
+3. **Load model list**, pick a model, **Test**
+
+```json
+{ "inference": { "type": "groq", "apiKey": "gsk_...", "model": "llama-3.3-70b-versatile" } }
+```
+
+The free tier limits **tokens per minute**, not requests, and Drill sends large
+prompts when a conversation has a whole deck or the day's brief attached. A
+429 from Groq is almost always that, not a billing problem — wait a minute or
+attach less. Cost readouts show `$0`, which is a statement about the free tier
+rather than a lookup; see `pricing` in `src/services/ai/backends.ts` if you
+move to a paid plan.
+
 ### Ollama — local, free, offline
 
 Nothing leaves your machine and there is nothing to pay for. (Only works when
@@ -193,29 +212,6 @@ will drift out of house style and sometimes return prose instead of JSON. If you
 have the memory, a 14B–32B model is a real step up for that one job. You can
 keep a hosted model for writing cards and switch to Ollama for everything else —
 the backend picker is one dropdown.
-
-### OpenAI
-
-```json
-{ "inference": { "type": "openai", "apiKey": "sk-...", "model": "gpt-4o-mini" } }
-```
-
-Key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
-Drill calls the REST API directly with `fetch` rather than pulling in the
-`openai` SDK — the wire format is identical, and it keeps the dependency list
-short.
-
-### Anthropic
-
-```json
-{ "inference": { "type": "anthropic", "apiKey": "sk-ant-...", "model": "claude-sonnet-4-5" } }
-```
-
-Key from [console.anthropic.com](https://console.anthropic.com/settings/keys).
-The API blocks browser-origin requests unless asked not to; Drill sends the
-`anthropic-dangerous-direct-browser-access` header for you. That is fine for a
-personal deployment where you are your own user — do not do it in anything
-you deploy for other people to enter their key into.
 
 ### Anything OpenAI-compatible
 

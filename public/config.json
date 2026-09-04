@@ -14,7 +14,7 @@
   ],
 
   "inference": {
-    "_": "type: openrouter | ollama | openai | anthropic | custom",
+    "_": "type: openrouter | groq | ollama | custom",
     "type": "openrouter",
     "apiKey": "",
     "model": "",

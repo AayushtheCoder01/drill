@@ -2,18 +2,28 @@
  * pricing.ts — what a model costs.
  *
  * OpenRouter publishes per-token pricing for its whole catalogue on /models,
- * and that catalogue covers other vendors' models too — `openai/gpt-4o-mini`,
- * `anthropic/claude-sonnet-4.5`. So one public, unauthenticated fetch prices
- * three of the five backends, and the remaining two are local inference,
- * which is free. That is the whole reason there is no hand-maintained price
- * table in this repo: a bundled table would rot, and every new model would be
- * a code edit.
+ * so one public, unauthenticated fetch prices every model it serves. That is
+ * the whole reason there is no hand-maintained price table in this repo: a
+ * bundled table would rot, and every new model would be a code edit.
  *
- * A model that still does not match reports no price at all. Showing a
- * fabricated number would be worse than showing none.
+ * Which backends that applies to is the backend's own business, declared as
+ * `pricing` on its BackendDef rather than decided by a list of ids here:
+ *
+ *   catalogue  look it up below
+ *   free       nothing to pay — Ollama runs locally, Groq's tier is free
+ *   unpriced   we do not know
+ *
+ * The third state used to be missing, and its absence was a real bug: the
+ * custom backend was assumed local and hardcoded to $0, so pointing it at a
+ * paid hosted API — the obvious thing to do with it — billed you and reported
+ * every call as free.
+ *
+ * A model that matches nothing reports no price at all. Showing a fabricated
+ * number would be worse than showing none.
  *
  * Cached in localStorage for a day: the list is ~300KB and changes rarely.
  * ========================================================================== */
+import { BACKENDS } from "@/services/ai/backends";
 import type { ModelPrice } from "@/types/chat";
 
 const CACHE_KEY = "drill:pricing:v1";
@@ -23,9 +33,9 @@ const TTL = 24 * 60 * 60 * 1000;
  *  pointing somewhere else entirely. */
 const CATALOGUE = "https://openrouter.ai/api/v1/models";
 
-/** Local inference costs nothing. That is a fact about the backend, not a
- *  missing price, so it reads "$0" rather than "—". */
-const FREE: ModelPrice = { id: "local", prompt: 0, completion: 0 };
+/** Costs nothing. That is a fact about the backend, not a missing price, so
+ *  it reads "$0" rather than "—". */
+const FREE: ModelPrice = { id: "free", prompt: 0, completion: 0 };
 
 interface Cache {
   at: number;
@@ -104,40 +114,36 @@ export function priceFor(modelId: string): ModelPrice | undefined {
   return memo ? memo[modelId] : undefined;
 }
 
-/** Vendors name the same model differently from the catalogue, in two ways
+/** Vendors name the same model differently from the catalogue in two ways
  *  that are both mechanical:
  *
- *    dates    Anthropic ships claude-sonnet-4-5-20250929, OpenAI ships
- *             gpt-4o-2024-08-06; the catalogue lists neither suffix.
- *    version  Anthropic's API separates the version with a hyphen
- *             (claude-sonnet-4-5); the catalogue uses a dot
- *             (claude-sonnet-4.5). Same for claude-3-5-sonnet.
+ *    dates    a model shipped as gpt-4o-2024-08-06 or claude-sonnet-4-5-20250929;
+ *             the catalogue lists neither suffix.
+ *    version  an API that separates the version with a hyphen
+ *             (claude-sonnet-4-5) where the catalogue uses a dot
+ *             (claude-sonnet-4.5).
  *
  *  Returns the ids worth trying, most specific first. */
-function candidates(backend: string, model: string): string[] {
-  const vendor = backend === "openai" ? "openai/" : backend === "anthropic" ? "anthropic/" : "";
-
+function candidates(model: string): string[] {
   const undated = model.replace(/-\d{8}$/, "").replace(/-\d{4}-\d{2}-\d{2}$/, "");
   /* -4-5- → -4.5- , which also covers the older claude-3-5-sonnet shape. */
-  const dotted = undated.replace(/-(\d+)-(\d+)/g, "-$1.$2");
+  const dotted = undated.replace(/-(\d)-(\d)(?=-|$)/, "-$1.$2");
 
-  const bare = [model, undated, dotted];
   const out: string[] = [];
-  for (const b of bare) {
-    if (!out.includes(b)) out.push(b);
-    if (vendor && !out.includes(vendor + b)) out.push(vendor + b);
+  for (const id of [model, undated, dotted]) {
+    if (id && out.indexOf(id) < 0) out.push(id);
   }
   return out;
 }
 
-/** The price for a model on a specific backend, which is what callers
- *  actually have. Returns undefined when nothing matched — the caller must
- *  render that as unknown, never as zero. */
 export function priceForModel(backend: string, model: string): ModelPrice | undefined {
-  if (backend === "ollama" || backend === "custom") return FREE;
+  /* An unknown backend id is treated as unpriced, not as free. */
+  const mode = BACKENDS[backend as keyof typeof BACKENDS]?.pricing ?? "unpriced";
+  if (mode === "free") return FREE;
+  if (mode !== "catalogue") return undefined;
   if (!memo || !model) return undefined;
 
-  for (const id of candidates(backend, model)) {
+  for (const id of candidates(model)) {
     const hit = memo[id];
     if (hit) return hit;
   }

@@ -69,12 +69,26 @@ export default function GlobalScope() {
       tutor: tutor.trim() || store.DEFAULT_TUTOR,
       ...extra
     });
+    /* Mirror the credentials into the per-backend vault, so switching away
+       and back returns what was actually typed here. */
+    store.rememberCreds();
   }
 
+  /* Changing provider used to blank the base URL and carry the key across,
+     which meant pasting a key for the new backend overwrote the old one's —
+     switch to Groq, come back to OpenRouter, and that key was gone. The store
+     now files the outgoing backend's three fields away and hands back the
+     incoming one's, so the drafts here are re-seeded from what it restored
+     rather than from whatever was left on screen. */
   function onBackendChange(v: string) {
-    setBackend(v as BackendType | "");
-    setBaseUrl("");
-    grabAndSave({ backend: v as BackendType, baseUrl: "" } as Partial<typeof s>);
+    grabAndSave();
+    store.setBackend(v);
+    const next = store.settings();
+    setBackend(next.backend as BackendType | "");
+    setKey(next.key);
+    setModel(next.model);
+    setBaseUrl(next.baseUrl);
+    setOutMsg(null);
   }
 
   function test() {

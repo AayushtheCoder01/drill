@@ -58,6 +58,7 @@ export const DEFAULT_SETTINGS: Settings = {
   key: "",
   model: "",
   baseUrl: "",
+  creds: {},
   newPerDay: 10,
   tutor: DEFAULT_TUTOR,
   lang: "english",
@@ -152,6 +153,39 @@ export function makeDeck(name: string, cards?: Partial<Card>[], projectId?: stri
   };
 }
 
+/**
+ * Backends that used to exist and no longer do.
+ *
+ * Drill dropped direct OpenAI and Anthropic: both are reachable through
+ * OpenRouter with one key, and maintaining two more wire formats bought
+ * nothing. Anyone who was on one of them gets moved to OpenRouter — but
+ * their key is *not* carried across, because an OpenAI key sent to
+ * openrouter.ai is a 401 that looks like a bug rather than a migration.
+ *
+ * The old key, model and base URL are filed in the credential vault under
+ * their original backend name instead of being deleted. Nothing reads that
+ * entry any more, and that is the point: a secret the user typed in should
+ * not be destroyed by a release note. `creds` is deliberately keyed by string
+ * so those entries stay valid after the union shrank.
+ */
+const RETIRED_BACKENDS: Record<string, string> = { openai: "openrouter", anthropic: "openrouter" };
+
+function normSettings(st: Settings): Settings {
+  st.lang = normLang(st.lang);
+  if (!st.creds || typeof st.creds !== "object") st.creds = {};
+
+  const successor = RETIRED_BACKENDS[st.backend];
+  if (successor) {
+    st.creds[st.backend] = { key: st.key || "", model: st.model || "", baseUrl: st.baseUrl || "" };
+    const restored = st.creds[successor];
+    st.backend = successor;
+    st.key = restored?.key || "";
+    st.model = restored?.model || "";
+    st.baseUrl = restored?.baseUrl || "";
+  }
+  return st;
+}
+
 function normLang(v: unknown): "english" | "hinglish" {
   if (!v) return "english";
   const s = String(v).toLowerCase();
@@ -183,6 +217,45 @@ export function deck(): Deck {
 }
 export function settings(): Settings {
   return db.settings;
+}
+
+/**
+ * Switch which backend the app talks to, without losing the last one's key.
+ *
+ * `key`, `model` and `baseUrl` are single fields shared by every backend, so
+ * changing provider used to carry the old key across and then overwrite it the
+ * moment you pasted a new one — switch to Groq, come back to OpenRouter, and
+ * the OpenRouter key was simply gone. It had been typed into a box and
+ * silently destroyed by a dropdown.
+ *
+ * So the three fields are stashed under the outgoing backend on the way out
+ * and restored for the incoming one on the way in. A backend never used before
+ * comes back blank, which is what lets its placeholders (defaultBaseUrl,
+ * defaultModel) show through.
+ */
+export function setBackend(next: string): void {
+  const s = db.settings;
+  if (!s.creds) s.creds = {};
+  const prev = s.backend;
+  if (prev) s.creds[prev] = { key: s.key || "", model: s.model || "", baseUrl: s.baseUrl || "" };
+
+  const restored = s.creds[next];
+  s.backend = next;
+  s.key = restored?.key || "";
+  s.model = restored?.model || "";
+  s.baseUrl = restored?.baseUrl || "";
+  saveNow();
+  notify();
+}
+
+/** Keep the vault current when the live fields are edited and saved, so the
+ *  next switch stashes what you actually typed rather than what was there
+ *  when you last changed provider. */
+export function rememberCreds(): void {
+  const s = db.settings;
+  if (!s.backend) return;
+  if (!s.creds) s.creds = {};
+  s.creds[s.backend] = { key: s.key || "", model: s.model || "", baseUrl: s.baseUrl || "" };
 }
 
 /** The one place Settings gets mutated. Every settings screen should call
@@ -366,8 +439,7 @@ export function init(cfg?: DrillConfig): DrillDB {
   db = loaded ? migrate.migrateToV4(loaded.data) : freshDB(cfg);
   lastInit = { fresh, fromVersion, migrated: willMigrate, backedUp };
 
-  db.settings = { ...DEFAULT_SETTINGS, ...(db.settings || {}) };
-  db.settings.lang = normLang(db.settings.lang);
+  db.settings = normSettings({ ...DEFAULT_SETTINGS, ...(db.settings || {}) });
   if (!Array.isArray(db.log)) db.log = [];
   if (!Array.isArray(db.notes)) db.notes = [];
 
@@ -952,8 +1024,7 @@ export function restoreBackup(raw: DrillDB | LegacyDBv3 | LegacyDBv2): void {
   const v = migrate.dbVersionOf(raw);
   const asV3 = v <= 2 ? migrateV2(raw as LegacyDBv2) : (raw as LegacyDBv3 | DrillDB);
   db = migrate.migrateToV4(asV3);
-  db.settings = { ...DEFAULT_SETTINGS, ...(db.settings || {}) };
-  db.settings.lang = normLang(db.settings.lang);
+  db.settings = normSettings({ ...DEFAULT_SETTINGS, ...(db.settings || {}) });
   if (!Array.isArray(db.log)) db.log = [];
   if (!Array.isArray(db.notes)) db.notes = [];
   if (!db.projects[db.activeProjectId]) db.activeProjectId = Object.keys(db.projects)[0];

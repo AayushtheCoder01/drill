@@ -8,7 +8,7 @@ import * as AI from "@/services/ai";
 import * as store from "@/services/store";
 import * as chatStore from "@/services/chatStore";
 import { PERSONAS, getPersona } from "@/lib/personas";
-import { priceFor } from "@/services/pricing";
+import { priceForModel } from "@/services/pricing";
 import { formatCost, formatTokens } from "@/lib/tokens";
 import { describeSource, retrieveForSource } from "@/lib/chatContext";
 import { originLabel, resolveBackend, resolveEffort, resolveModel } from "@/lib/resolveSetting";
@@ -45,7 +45,7 @@ export default function ConversationScope() {
   const rModel = resolveModel(c, project);
   const rEffort = resolveEffort(c, project);
   const resolved = AI.resolve({ backend: rBackend.value, model: rModel.value });
-  const price = priceFor(resolved.model);
+  const price = priceForModel(resolved.type, resolved.model);
 
   function hasSource(pred: (s: ContextSource) => boolean): boolean {
     return c!.context.some(pred);

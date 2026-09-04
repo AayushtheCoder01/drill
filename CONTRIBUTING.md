@@ -39,7 +39,7 @@ src/
                      localStorage's per-origin quota.
     pricing.ts      per-model pricing, where the backend publishes it.
     ai/
-      backends.ts   one object per inference provider (OpenRouter, OpenAI, Anthropic, Ollama, custom).
+      backends.ts   one object per inference provider (OpenRouter, Groq, Ollama, custom).
       index.ts      resolve() + chat() + card writing / marking / titles / follow-ups.
   context/          React context: route, sheet pane, review loop, chat, toasts.
   components/       the review loop (Header, Ladder, Stage, Controls) and every sheet pane.
@@ -151,7 +151,7 @@ myservice: {
 } as BackendDef
 ```
 
-That is all `openrouter`, `openai` and `custom` are.
+That is all `openrouter`, `groq` and `custom` are.
 
 ### What a good backend PR includes
 

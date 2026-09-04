@@ -1,5 +1,5 @@
 /* ============================================================================
- * backends.ts — one chat() call, five places it can go.
+ * backends.ts — one chat() call, four places it can go.
  *
  * Adding a backend means adding one entry to BACKENDS below. Each entry
  * describes itself (does it need a key, where do you get one, what is its
@@ -163,8 +163,7 @@ function reachError(label: string, url: string, e: unknown): Error {
   );
 }
 
-/** Read an SSE stream, hand each `data:` payload to `onEvent`. Used by the
- *  OpenAI-compatible and Anthropic adapters, which differ only in payload. */
+/** Read an SSE stream, hand each `data:` payload to `onEvent`. */
 async function readSSE(res: Response, onEvent: (j: any) => void): Promise<void> {
   const reader = res.body!.getReader();
   const dec = new TextDecoder();
@@ -321,16 +320,6 @@ function openAICompatible(
 
 /* --------------------------------------------------------------- backends */
 
-function anthropicHeaders(ctx: AIContext): Record<string, string> {
-  return {
-    "Content-Type": "application/json",
-    "x-api-key": ctx.apiKey,
-    "anthropic-version": "2023-06-01",
-    /* Without this the API refuses browser-origin requests outright. */
-    "anthropic-dangerous-direct-browser-access": "true",
-    ...ctx.headers
-  };
-}
 
 export const BACKENDS: Record<BackendType, BackendDef> = {
   openrouter: {
@@ -345,6 +334,9 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
     /* The only backend that can search: OpenRouter runs it server-side and
        injects the results into the prompt, so it stays one request. */
     supports: ["web"],
+    /* The catalogue this prices against is OpenRouter's own, so its ids match
+       by construction. */
+    pricing: "catalogue",
     ...openAICompatible(
       "OpenRouter",
       (ctx) => {
@@ -362,136 +354,34 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
     )
   } as BackendDef,
 
-  openai: {
-    id: "openai",
-    label: "OpenAI",
+  groq: {
+    id: "groq",
+    label: "Groq",
     needsKey: true,
     local: false,
-    keyUrl: "https://platform.openai.com/api-keys",
-    defaultBaseUrl: "https://api.openai.com/v1",
-    defaultModel: "gpt-4o-mini",
-    note: "Direct to OpenAI. Your key is sent from the browser to api.openai.com.",
-    ...openAICompatible("OpenAI", (ctx) => ({
+    keyUrl: "https://console.groq.com/keys",
+    defaultBaseUrl: "https://api.groq.com/openai/v1",
+    defaultModel: "llama-3.3-70b-versatile",
+    note: "Very fast, and free within a per-minute rate limit. Load the model list to see what it serves today.",
+    /* A claim about the free tier, not a lookup: Groq's own model ids
+       ("llama-3.3-70b-versatile") do not match the OpenRouter catalogue's
+       ("meta-llama/llama-3.3-70b-instruct"), and a hand-written mapping
+       between them is exactly the table pricing.ts exists to avoid. If you
+       move onto a paid Groq plan, change this to "unpriced" — an honest
+       blank beats a confident zero. */
+    pricing: "free",
+    ...openAICompatible("Groq", (ctx) => ({
       "Content-Type": "application/json",
       Authorization: "Bearer " + ctx.apiKey,
       ...ctx.headers
     }))
   } as BackendDef,
 
-  /* Anthropic is the one backend with a different wire format: the system
-     prompt is a top-level field, not a message, and replies come back as
-     content blocks. max_tokens is required. */
-  anthropic: {
-    id: "anthropic",
-    label: "Anthropic",
-    needsKey: true,
-    local: false,
-    keyUrl: "https://console.anthropic.com/settings/keys",
-    defaultBaseUrl: "https://api.anthropic.com/v1",
-    defaultModel: "claude-sonnet-4-5",
-    note: "Direct to Anthropic. Browser calls need the direct-access header, which Drill sends for you.",
-
-    async chat(messages, opts, ctx) {
-      const sys = messages
-        .filter((m) => m.role === "system")
-        .map((m) => m.content)
-        .join("\n\n");
-      let turns = messages
-        .filter((m) => m.role !== "system")
-        .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
-      if (!turns.length) turns = [{ role: "user", content: sys || "Hello" }];
-
-      const url = ctx.baseUrl + "/messages";
-      const body: Record<string, unknown> = {
-        model: ctx.model,
-        max_tokens: opts.maxTokens || 2048,
-        temperature: opts.temperature == null ? 0.4 : opts.temperature,
-        messages: turns,
-        stream: !!opts.onToken
-      };
-      if (sys) body.system = sys;
-
-      let res: Response;
-      try {
-        res = await fetch(url, {
-          method: "POST",
-          headers: anthropicHeaders(ctx),
-          body: JSON.stringify(body),
-          signal: opts.signal
-        });
-      } catch (e) {
-        if (isAbort(e)) throw e;
-        throw reachError("Anthropic", url, e);
-      }
-      if (!res.ok) {
-        const t = await res.text().catch(() => "");
-        throw httpError("Anthropic", res, t);
-      }
-      if (!opts.onToken) {
-        const j = await res.json();
-        if (opts.onUsage && j.usage) {
-          opts.onUsage({
-            promptTokens: j.usage.input_tokens || 0,
-            completionTokens: j.usage.output_tokens || 0,
-            /* Anthropic reports cache reads and writes separately, and neither
-               is included in input_tokens. Both are prompt-side work. */
-            cachedPromptTokens: (j.usage.cache_read_input_tokens || 0) + (j.usage.cache_creation_input_tokens || 0)
-          });
-        }
-        const text = ((j.content || []) as { type: string; text?: string }[])
-          .filter((b) => b.type === "text")
-          .map((b) => b.text)
-          .join("");
-        if (!text) throw emptyReplyError("Anthropic", j.stop_reason, "");
-        return text;
-      }
-      let out = "";
-      // Anthropic splits usage across two events: input on message_start,
-      // output on message_delta.
-      let promptTokens = 0;
-      let completionTokens = 0;
-      let cachedPromptTokens = 0;
-      await readSSE(res, (j) => {
-        if (j.type === "message_start" && j.message?.usage) {
-          promptTokens = j.message.usage.input_tokens || 0;
-          completionTokens = j.message.usage.output_tokens || 0;
-          cachedPromptTokens = (j.message.usage.cache_read_input_tokens || 0) + (j.message.usage.cache_creation_input_tokens || 0);
-        }
-        if (j.type === "message_delta" && j.usage) {
-          completionTokens = j.usage.output_tokens || completionTokens;
-        }
-        if (j.type === "content_block_delta" && j.delta && j.delta.type === "text_delta") {
-          out += j.delta.text;
-          opts.onToken!(j.delta.text, out);
-        }
-      });
-      if (opts.onUsage && (promptTokens || completionTokens)) opts.onUsage({ promptTokens, completionTokens, cachedPromptTokens });
-      return out;
-    },
-
-    async listModels(ctx) {
-      const url = ctx.baseUrl + "/models?limit=100";
-      let res: Response;
-      try {
-        res = await fetch(url, { headers: anthropicHeaders(ctx) });
-      } catch (e) {
-        throw reachError("Anthropic", url, e);
-      }
-      if (!res.ok) {
-        const t = await res.text().catch(() => "");
-        throw httpError("Anthropic", res, t);
-      }
-      const j = await res.json();
-      return ((j.data || []) as { id?: string }[]).map((m) => m.id).filter(Boolean).sort() as string[];
-    }
-  },
-
-  /* Ollama's native endpoints. /api/chat rather than /api/generate because
-     Drill sends real conversations — system + user + assistant turns — and
-     /api/generate flattens all of that into one prompt string. */
   ollama: {
     id: "ollama",
     label: "Ollama (local)",
+    /* Runs on your own machine. The one backend where $0 is a fact. */
+    pricing: "free",
     needsKey: false,
     local: true,
     keyUrl: "https://ollama.com/download",
@@ -583,6 +473,11 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
     defaultBaseUrl: "http://localhost:8080/v1",
     defaultModel: "local-model",
     note: "Point Base URL at any /v1 endpoint that speaks the OpenAI chat format. Key optional.",
+    /* This used to report $0, on the assumption that a custom endpoint is a
+       local one. It is not: pointing this at a paid hosted API is the obvious
+       thing to do with it, and then every call was billed and reported free.
+       Unpriced says "we do not know", which is the truth here. */
+    pricing: "unpriced",
     ...openAICompatible("Backend", (ctx) => {
       const h: Record<string, string> = { "Content-Type": "application/json", ...ctx.headers };
       if (ctx.apiKey) h.Authorization = "Bearer " + ctx.apiKey;
@@ -591,4 +486,4 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
   } as BackendDef
 };
 
-export const BACKEND_ORDER: BackendType[] = ["openrouter", "ollama", "openai", "anthropic", "custom"];
+export const BACKEND_ORDER: BackendType[] = ["openrouter", "groq", "ollama", "custom"];

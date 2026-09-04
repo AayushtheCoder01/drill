@@ -99,11 +99,25 @@ export type Density = "comfortable" | "compact";
  *  design; only the ink and the paper swap. See lib/theme.ts. */
 export type Theme = "night" | "day";
 
-export interface Settings {
-  backend: string;
+/** One backend's saved credentials. */
+export interface BackendCreds {
   key: string;
   model: string;
   baseUrl: string;
+}
+
+export interface Settings {
+  backend: string;
+  /** The live credentials — whichever backend is currently selected. */
+  key: string;
+  model: string;
+  baseUrl: string;
+  /** The same three fields, remembered per backend, so switching provider and
+   *  switching back does not lose the key you already pasted. Keyed by a
+   *  plain string rather than BackendType on purpose: a backend removed from
+   *  the union leaves its entry sitting here harmlessly instead of taking a
+   *  secret down with it. store.setBackend is the only thing that writes it. */
+  creds: Record<string, BackendCreds>;
   newPerDay: number;
   tutor: string;
   lang: Lang;
@@ -217,7 +231,18 @@ export interface QueueItem {
 
 /* ---------------------------------------------------------------- config -- */
 
-export type BackendType = "openrouter" | "openai" | "anthropic" | "ollama" | "custom";
+export type BackendType = "openrouter" | "groq" | "ollama" | "custom";
+
+/** How a backend's calls get costed.
+ *
+ *   catalogue  look the model up in OpenRouter's published prices
+ *   free       genuinely nothing to pay — local inference, or a free tier
+ *   unpriced   we do not know, and say so rather than guessing
+ *
+ * The third state is the point. A missing price used to be indistinguishable
+ * from a zero one, so a custom endpoint pointed at a paid API reported every
+ * call as free. */
+export type PricingMode = "catalogue" | "free" | "unpriced";
 
 export interface InferenceConfig {
   type: BackendType;
@@ -339,6 +364,9 @@ export interface BackendDef {
   id: BackendType;
   label: string;
   needsKey: boolean;
+  /** Absent means "unpriced" — a new backend has to opt in to claiming a
+   *  price, rather than inheriting someone else's assumption. */
+  pricing?: PricingMode;
   local: boolean;
   keyUrl: string;
   defaultBaseUrl: string;
