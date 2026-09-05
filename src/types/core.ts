@@ -126,6 +126,23 @@ export interface Memory {
   /** Lowercased, extracted at write time; the retrieval scorer's main input. */
   keywords: string[];
 
+  /**
+   * The subject this belongs under — "backprop", "optimisers", "notation".
+   * Null for anything unfiled, which is most of what exists.
+   *
+   * Memory was a flat bag before this: you could ask it a question but you
+   * could not *navigate* it, so "what do I know about X" had no answer that
+   * did not run a keyword search and hope. A topic is one short slug, so it
+   * costs nothing to store, groups the memory panel, gives retrieval a filter
+   * that is exact rather than fuzzy, and gives the agent loop an index it can
+   * walk. Deliberately free text rather than an enum: the subjects are the
+   * learner's, and a fixed list would be wrong for the second project.
+   */
+  topic?: string | null;
+  /** Ids of related memories. A cheap graph edge — enough for "these three
+   *  are the same idea" without an ontology nobody maintains. */
+  links?: string[];
+
   created: number;
   updatedAt: number;
 
@@ -153,6 +170,9 @@ export interface MemoryCandidate {
   text: string;
   createdAt: number;
   origin: MemoryOrigin | null;
+  /** Carried through to the Memory this becomes, so a topic proposed by the
+   *  agent is not lost at the tray. */
+  topic?: string | null;
   /** Id of the memory the model believes this replaces. */
   supersedes: string | null;
   /** True when the learner stated this outright rather than the model

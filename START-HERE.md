@@ -11,28 +11,33 @@
 
 ## Progress
 
+> **This table went stale once already.** It still read "Phase 1 — next" long
+> after projects, journal, memory, distill and exams had all shipped, which
+> made it worse than no table: a new session trusts it. Audited against the
+> code on **2026-09-06**; if you finish a phase, tick it in the same commit.
+
 ### v1 — The Daily Loop
 
 | Phase | | State |
 |---|---|---|
 | 0 | Foundations and safety | **done** |
-| 1 | Projects | next |
-| 2 | Log and Journal | |
-| 3 | Memory core | |
-| 4 | Distill — journal into memory and cards | |
-| 5 | Exams | |
-| 6 | Unified settings and the run transcript | |
+| 1 | Projects | **done** |
+| 2 | Log and Journal | **done** |
+| 3 | Memory core | **done** |
+| 4 | Distill — journal into memory and cards | **done** |
+| 5 | Exams | **done** |
+| 6 | Unified settings and the run transcript | **done** |
 
 ### v2 — Depth
-| 7 | Chat on the journal | |
-| 8 | Files, attachments, `@` picker | |
-| 9 | Capture bridge from other AI apps | |
-| 10 | Context inspector and cache tuning | |
+| 7 | Chat on the journal | **done** |
+| 8 | Files, attachments, `@` picker | **done** |
+| 9 | Capture bridge from other AI apps | not started |
+| 10 | Context inspector and cache tuning | **done** (inspector; cache tuning not started) |
 
 ### v3 — Later
-| 11 | Auto-backup to disk | |
-| 12 | Agent loop behind high effort | |
-| 13 | Period reports, mind maps, richer media | |
+| 11 | Auto-backup to disk | not started |
+| 12 | Agent loop behind high effort | **done** — see §13 |
+| 13 | Period reports, mind maps, richer media | not started |
 
 **Phase 0 notes for whoever picks this up:**
 
@@ -43,8 +48,9 @@
   Verified: a later bad state cannot overwrite it.
 - `store.initReport()` returns `{fresh, fromVersion, migrated, backedUp}`.
   Nothing surfaces it yet — Phase 6 should.
-- IndexedDB `drill-chat` is v2 with `memories` and `candidates` stores created.
-  Only [backup.ts](src/services/backup.ts) touches them so far.
+- IndexedDB `drill-chat` was left at v2 by Phase 0, with `memories` and
+  `candidates` created but unread. It is **v4** now and both are load-bearing;
+  the guarded `contains()` pattern in `idb.ts` is how stores were added since.
 - Conversations gain new fields lazily via `chatStore.repair()`. No bulk migration.
 - New records use `U.uuid()`. `U.uid()` stays for cards and decks, whose ids
   appear in deck files and must survive re-import.
@@ -110,9 +116,15 @@ Do not relitigate these while building.
 
 1. **Frontend only.** No backend, no accounts, no sync. Browser storage plus
    the user's own API key.
-2. **Pipeline, not agent loop.** One API call per operation. Retrieval and
-   scoping are deterministic TypeScript. The effort dial is where a loop lands
-   in v3.
+2. **Pipeline by default; agent loop where it is asked for.** *Amended
+   2026-09-06, when Phase 12 landed — this decision was written expecting to be
+   cashed in, and it was.* Every non-chat operation (journal, distill, rollup,
+   exam, card writing, marking) is still exactly one API call with
+   deterministic TypeScript retrieval, and that is not negotiable. Chat now has
+   three modes, per conversation: `direct` is the old single call and remains
+   the default; `agent` and `deep` run the loop in `services/agent/`. As
+   predicted, the effort dial is where it landed — `agentSteps` on
+   `EffortBudget`. See §13.
 3. **No embeddings.** Keyword + recency + usage scoring, plus date filtering,
    which is exact and free.
 4. **Nothing commits itself.** Every stage proposes; the learner accepts.
@@ -138,7 +150,7 @@ Do not relitigate these while building.
 | World | Where | Holds | Access |
 |---|---|---|---|
 | `DrillDB` v4 | `localStorage["mldrill:v3"]` | settings, **projects**, decks, srs, log, notes | **sync**, `services/store.ts` |
-| Chat + memory | IndexedDB `drill-chat` v2 | conversations, meta, memories, candidates | **async**, `services/chatStore.ts`, `idb.ts` |
+| Chat + memory | IndexedDB `drill-chat` **v4** | conversations, meta, memories, candidates, journal, rollups, exams, usage | **async**, `services/chatStore.ts`, `idb.ts` |
 
 The sync/async split is load-bearing: the review loop renders without awaiting
 IndexedDB. New small data goes in `DrillDB`; new growing data goes in
@@ -154,9 +166,11 @@ IndexedDB behind a sync cache, copying the `chatStore` pattern.
 - **`ProposalsBlock`** — `{label, cards, targetDeck, onCommitted}`. Every
   card-proposing surface uses it. Distilled cards use it too.
 - **`lib/chatContext.ts`** — `renderSource` / `describeSource` / `sourceSize` /
-  `buildSystemPrompt`. Context is rebuilt at send time, never frozen. Handles
-  `deck`, `weak`, `due`, `notes`; `memory`, `knowledge`, `journal` are declared
-  in the type but not yet implemented.
+  `buildContext`. Context is rebuilt at send time, never frozen. Every source in
+  the type is now implemented: `deck`, `weak`, `due`, `notes`, `memory`,
+  `knowledge`, `journal`, and `today` (which is `lib/dayBrief.ts` — the only
+  source that is a *moment* rather than a category, and the one that puts the
+  review log and the learner's own recall attempts into a prompt).
 - **`store.isLeech`**, `weakCards`, `dueCards` — the drill-data queries exist.
 - **`types/core.ts`** — `Project`, `Memory`, `MemoryCandidate`, `Note`, `Effort`,
   `KnowledgeItem`, `FullBackup` all defined in Phase 0.
@@ -165,11 +179,20 @@ IndexedDB behind a sync cache, copying the `chatStore` pattern.
 
 ### Known problems still open
 
-- **Two settings surfaces** — `panes/SettingsPane.tsx` (global) and
-  `chat/SettingsDrawer.tsx` (per-conversation), each with its own model picker
-  and no indication of which wins. `SettingsPane` also mutates settings in
-  place and forces re-renders with a `setTick` counter. Phase 6.
-- **Nothing reads the memory stores yet.** Phase 3.
+*Both original entries here were fixed by Phases 3 and 6 and are removed;
+what follows is the list as it actually stands on 2026-09-06.*
+
+- **No error boundary anywhere.** A render crash in `Shell`, `Sidebar` or the
+  composer takes down the whole app, not one view. This was hit for real during
+  Phase 12 (a component rendered before its new prop was threaded through) and
+  the whole tree went with it.
+- **The agent loop has never run against a real model.** No API key in this
+  environment. See §13, "What is verified, and what is not".
+- **Drafts reset on navigation.** `draftModel`, `draftEffort` and `draftMode`
+  live in `ChatContext` state; leaving chat and coming back loses an unsent
+  choice. Long-standing, minor, one fix for all three.
+- **Phase 9 (capture bridge) and Phase 11 (auto-backup to disk) are not
+  started**, and cache tuning from Phase 10 is not either.
 
 ---
 
@@ -850,3 +873,101 @@ Wording will need tuning; the structure should not.
 > memory — new entries, merges of things now known to be the same, and
 > retirements of anything these entries have superseded. Mark each retirement
 > with the id it replaces. Invent nothing not present in the entries.
+
+---
+
+## 13. Phase 12 — the agent loop
+
+Landed 2026-09-05/06. `src/services/agent/` plus `src/types/agent.ts`, about
+2,300 lines including tests. Written twice: once from first principles, then
+rebuilt the same day against published agent-design research, which found three
+real faults in the first version. The rebuild is what shipped.
+
+### Three chat modes
+
+`Conversation.mode`, per conversation, resolved in `ChatContext.run()`:
+
+| mode | what it does | rounds |
+|---|---|---|
+| `direct` | one request, context chosen up front by `lib/chatContext.ts` | 0 |
+| `agent` | looks things up reactively, then answers | `agentSteps` (1/3/6) |
+| `deep` | states a plan, works every step, closes it out, then answers | `deepSteps()` = 2n+2 |
+
+`direct` is the default and must stay the default — it is right for most
+messages, and the other two cost a request per round. An older two-value flag
+spelled the first mode `"chat"`; `chatStore.repair()` renames it and lands
+anything unrecognised on `direct`, so no existing thread silently became
+multi-request.
+
+### The shape, and why
+
+- **`loop.ts` takes `chat` *and* `runTool` injected.** This is not decoration.
+  There is no API key here and `tools.ts` reaches localStorage and IndexedDB,
+  so injection is the only reason the control flow — budgets, stopping, aborts,
+  the plan close-out — has 28 tests that run under `node --test`. Keep it
+  injected. The loop owns `ToolContext.scratch`; callers pass
+  `Omit<ToolContext, "scratch">`.
+- **Two wire protocols, one catalogue** (`protocol.ts`). `native` is the
+  provider's own `tools`/`tool_calls`; `text` is a fenced ```drill-call block,
+  which is what lets the whole loop run on Ollama and llama.cpp. Both flatten
+  to `ToolCall[]` before `loop.ts` sees anything, so the loop never branches on
+  protocol.
+- **Writes still propose.** §2.4 survives: every write tool goes through
+  `services/candidates` and the project's autonomy policy. A `manual` project
+  gets a read-only assistant, and the catalogue is *filtered* rather than the
+  model being asked nicely — "please do not write" is not a permission model.
+- **Eleven tools, named as verbs** — `recall`, `open`, `remember`, `forget`.
+  The first version had five separate search tools; consolidating them into one
+  `recall` with a `source` filter is the single biggest quality change in the
+  rebuild. Read `tools.ts`'s header before adding a twelfth.
+
+### Traps, each of which has already cost something
+
+- **A hardcoded tool name in a prompt string is a bug waiting.** The text
+  protocol's worked example said `memory_search` and survived the rename that
+  deleted that tool, so every local model was shown an example calling
+  something that did not exist — on the code path least likely to be noticed.
+  It is now derived from the catalogue, with tests. Do not reintroduce a
+  literal tool name into any prompt.
+- **Effort is read by every mode, but `agentSteps` only means something in
+  `agent`/`deep`.** An effort blurb that mentioned lookups was describing a
+  budget `direct` cannot spend. `effortMeans(effort, mode)` in `lib/effort.ts`
+  is the only thing that should phrase this; `EffortBudget.blurb` must stay
+  mode-neutral, and `effort.test.ts` enforces that.
+- **Anything settable before a conversation exists needs a draft.**
+  `ChatContext.update()` returns early with no conversation, so the mode picker
+  silently did nothing on first arrival at chat until `draftMode` was added
+  beside `draftModel`/`draftEffort`. Any new per-conversation control has the
+  same hole. (Known and left alone: all three drafts reset if you navigate away
+  from chat and back.)
+- **The loop's failure mode is spending, not crashing.** Three budgets guard
+  it: `maxSteps`, `MAX_TOOL_CHARS` (12k across the whole message), and per-tool
+  caps applied in `runTool` rather than trusted to each tool.
+- **Deep mode's close-out nudge fires at most once.** A model that answers with
+  plan steps open is handed the list back one time; after that the answer
+  stands and `trace.unfinished` records what it skipped. Nagging twice burns
+  the budget arguing.
+
+### What is verified, and what is not
+
+Verified in a browser against seeded and real data: the plan and trace render,
+the mode picker reports the right per-mode cost, tool filtering (read-only /
+scratch / deep) is correct, the generated prompt names only real tools and
+round-trips through our own parser, and all six sections still mount.
+
+**Never yet run against a real model.** There is no API key in this
+environment, so real streaming, real token and cost totals, and — the important
+one — whether a model actually chooses good tools are all untested. That last
+is where the system prompt earns or loses its keep. First job with a key: run a
+Deep query against a real deck and read the trace.
+
+### Next, in the order the user asked for it
+
+1. **The scratch chat** — a non-project thread for quick unrelated questions.
+   Cleanest path is a reserved `system: true` project so `projectId` stays
+   non-null everywhere and `chatStore.repair()` keeps working;
+   `projectId: string | null` would touch every `db.projects[c.projectId]` in
+   the app. `toolsFor({inProject: false})` already handles the tool side.
+2. **Restructure the memory panel around `Memory.topic`** — the field and
+   `memoryStore.topics()` exist and nothing renders them yet.
+3. **The UI/navigation restructure**, to make the project hierarchy visible.

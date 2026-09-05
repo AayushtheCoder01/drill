@@ -29,7 +29,27 @@ export interface EffortBudget {
   replyScale: number;
   /** Whether the second, cheaper follow-up request is worth making. */
   followups: boolean;
-  /** One line for the chip's tooltip, in plain words. */
+  /**
+   * Rounds of tool use allowed in agent mode. START-HERE §2.2 named the effort
+   * dial as where an agent loop would land, and this is that landing: the dial
+   * already meant "how much is one message allowed to cost", and a round of
+   * tool use is a whole request, so it belongs to the same budget as history
+   * and reply length rather than to a switch of its own.
+   *
+   * Low is deliberately non-zero. One lookup is the difference between "I
+   * cannot know what you studied" and an answer — cheap effort should still be
+   * able to check one thing.
+   */
+  agentSteps: number;
+  /**
+   * One line for the chip's tooltip, in plain words.
+   *
+   * Says nothing about lookups. Effort is read by every mode, but `agentSteps`
+   * only means something in agent and deep — a blurb that promised "up to
+   * three lookups" while the thread was set to Direct was describing a budget
+   * that could not be spent. The lookup sentence is appended by the chip,
+   * which is the only place that knows the mode.
+   */
   blurb: string;
 }
 
@@ -39,13 +59,15 @@ export const EFFORT_BUDGETS: Record<Effort, EffortBudget> = {
     memoryLimit: 3,
     replyScale: 0.5,
     followups: false,
-    blurb: "Short memory, brief answers, one request per message."
+    agentSteps: 1,
+    blurb: "Short memory, brief answers."
   },
   medium: {
     historyTurns: 24,
     memoryLimit: 8,
     replyScale: 1,
     followups: true,
+    agentSteps: 3,
     blurb: "The working default: recent history, eight memories, full-length answers."
   },
   high: {
@@ -53,6 +75,7 @@ export const EFFORT_BUDGETS: Record<Effort, EffortBudget> = {
     memoryLimit: 16,
     replyScale: 2,
     followups: true,
+    agentSteps: 6,
     blurb: "The whole conversation, twice the memory, room for a long answer. Costs the most."
   }
 };
@@ -61,4 +84,33 @@ export const EFFORT_ORDER: Effort[] = ["low", "medium", "high"];
 
 export function budgetFor(effort: Effort): EffortBudget {
   return EFFORT_BUDGETS[effort] || EFFORT_BUDGETS.medium;
+}
+
+/**
+ * Deep mode's round allowance, derived from the reactive one.
+ *
+ * `2n + 2`, because writing the plan and closing each step are themselves
+ * rounds — a plan that runs out of budget before its own last item is worse
+ * than no plan, since it produces an answer that visibly skipped half of what
+ * it promised. Lives here rather than in the mode picker so the number shown
+ * on the chip and the number the loop is given cannot drift apart.
+ */
+export function deepSteps(agentSteps: number): number {
+  return agentSteps * 2 + 2;
+}
+
+/**
+ * What this effort buys *in the mode currently selected*, as one sentence.
+ *
+ * The two chips sit side by side in the composer and both look like cost
+ * dials, so their relationship has to be stated somewhere or it reads as two
+ * settings that might be fighting. They are not: effort sets the size of
+ * everything, and the mode decides whether the lookup budget is one of the
+ * things being sized.
+ */
+export function effortMeans(effort: Effort, mode: "direct" | "agent" | "deep"): string {
+  const b = budgetFor(effort);
+  if (mode === "direct") return b.blurb + " No lookups — Direct mode answers in one request.";
+  const n = mode === "deep" ? deepSteps(b.agentSteps) : b.agentSteps;
+  return `${b.blurb} In ${mode === "deep" ? "Deep" : "Agent"} mode it also sets the lookup budget: up to ${n}, each one a request.`;
 }

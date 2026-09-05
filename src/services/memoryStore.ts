@@ -67,10 +67,43 @@ function persistOnly(m: Memory): void {
   notify();
 }
 
+/**
+ * One topic slug, or null.
+ *
+ * Normalised hard on the way in because a topic is only useful if two
+ * memories about the same subject land on the *same string* — "Backprop",
+ * "backprop " and "back-prop" grouping into three headings is the failure
+ * mode that makes people stop filing things.
+ */
+export function normTopic(raw: string | null | undefined): string | null {
+  const t = String(raw || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .slice(0, 40);
+  return t || null;
+}
+
 /* ------------------------------------------------------------------ reads */
 
 export function all(): Memory[] {
   return items;
+}
+
+/** Every topic in use, with how many active memories sit under each, most
+ *  populated first. This is what lets the memory panel be a structure rather
+ *  than a list. */
+export function topics(opts: { projectId?: string | null } = {}): { topic: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const m of items) {
+    if (!m.active || !m.topic) continue;
+    if (opts.projectId !== undefined && m.scope === "project" && m.projectId !== opts.projectId) continue;
+    counts.set(m.topic, (counts.get(m.topic) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([topic, count]) => ({ topic, count }))
+    .sort((a, b) => b.count - a.count || a.topic.localeCompare(b.topic));
 }
 
 export function get(id: string): Memory | undefined {
@@ -106,6 +139,9 @@ export interface CreateInput {
   source: MemorySource;
   origin?: MemoryOrigin | null;
   pinned?: boolean;
+  /** The subject slug this files under. Null is normal — most memory is
+   *  unfiled, and a wrong topic is worse than none. */
+  topic?: string | null;
 }
 
 export function create(input: CreateInput): Memory {
@@ -117,6 +153,8 @@ export function create(input: CreateInput): Memory {
     type: input.type,
     text: input.text.trim(),
     keywords: extractKeywords(input.text),
+    topic: normTopic(input.topic),
+    links: [],
     created: now,
     updatedAt: now,
     useCount: 0,
@@ -132,7 +170,7 @@ export function create(input: CreateInput): Memory {
   return m;
 }
 
-export function update(id: string, patch: { text?: string; type?: MemoryType }): void {
+export function update(id: string, patch: { text?: string; type?: MemoryType; topic?: string | null }): void {
   const m = get(id);
   if (!m) return;
   if (patch.text !== undefined) {
@@ -140,6 +178,7 @@ export function update(id: string, patch: { text?: string; type?: MemoryType }):
     m.keywords = extractKeywords(m.text);
   }
   if (patch.type !== undefined) m.type = patch.type;
+  if (patch.topic !== undefined) m.topic = normTopic(patch.topic);
   persistChanged(m);
 }
 

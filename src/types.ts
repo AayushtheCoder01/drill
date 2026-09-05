@@ -295,11 +295,27 @@ export interface FSRSParams {
 
 /* -------------------------------------------------------------------- ai -- */
 
-export type ChatRole = "system" | "user" | "assistant";
+export type ChatRole = "system" | "user" | "assistant" | "tool";
+
+/** One tool the model asked to run, as it travels on the wire. `args` is
+ *  already parsed — backends hand over JSON strings and the adapter is where
+ *  that stops being everyone else's problem. */
+export interface WireToolCall {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+}
 
 export interface ChatMessage {
   role: ChatRole;
   content: string;
+  /** Assistant messages that requested tools. Additive: every existing caller
+   *  builds `{role, content}` and still typechecks. */
+  toolCalls?: WireToolCall[];
+  /** Set on a `tool` message, naming the call it answers. */
+  toolCallId?: string;
+  /** The tool's name, which some providers require on the result message. */
+  name?: string;
 }
 
 /** Token counts for one exchange. `cost` is only set when the backend
@@ -339,6 +355,14 @@ export interface ChatOpts {
   actions?: ChatActionId[];
   /** Sources the backend cited, reported once when the reply is complete. */
   onCitations?: (c: Citation[]) => void;
+  /** Tool definitions, already compiled to the provider's shape by
+   *  services/agent/protocol.ts. Only the OpenAI-compatible adapter reads
+   *  this; a backend that ignores it degrades to a plain reply, which the
+   *  agent loop correctly treats as "no calls, this is the answer". */
+  tools?: unknown[];
+  /** Tools the model asked for. Called once per reply, before the promise
+   *  settles, so a reply that is *only* tool calls still reports them. */
+  onToolCalls?: (calls: WireToolCall[]) => void;
 }
 
 /** One source a web-search-backed reply drew on. `start`/`end` are character

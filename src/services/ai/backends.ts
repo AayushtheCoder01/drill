@@ -17,7 +17,7 @@
  * the same BackendDef shape and swap fetch() targets for calls to your API.
  * ========================================================================== */
 import { CHAT_ACTIONS, type ChatActionId } from "@/lib/chatActions";
-import type { AIContext, BackendDef, BackendType, ChatMessage, ChatOpts, Citation, TokenUsage } from "@/types";
+import type { AIContext, BackendDef, BackendType, ChatMessage, ChatOpts, Citation, TokenUsage, WireToolCall } from "@/types";
 
 /** True for the exception fetch throws when an AbortSignal fires. Callers
  *  treat this as "the user stopped it", not as a failure to report. */
@@ -118,6 +118,97 @@ function readCitations(node: unknown): Citation[] {
 function dedupeCitations(list: Citation[]): Citation[] {
   const seen = new Set<string>();
   return list.filter((c) => (seen.has(c.url) ? false : (seen.add(c.url), true)));
+}
+
+/* ----------------------------------------------------------- tool calling */
+
+/** Our ChatMessage translated to the OpenAI wire shape. The tool fields are
+ *  omitted entirely when absent rather than sent as undefined — some strict
+ *  gateways reject a null `tool_calls` on a plain assistant message. */
+function toWire(m: ChatMessage): Record<string, unknown> {
+  const out: Record<string, unknown> = { role: m.role, content: m.content };
+  if (m.toolCalls?.length) {
+    out.tool_calls = m.toolCalls.map((c) => ({
+      id: c.id,
+      type: "function",
+      function: { name: c.name, arguments: JSON.stringify(c.args ?? {}) }
+    }));
+  }
+  if (m.toolCallId) out.tool_call_id = m.toolCallId;
+  if (m.name) out.name = m.name;
+  return out;
+}
+
+/**
+ * Tool calls out of a completed message.
+ *
+ * `arguments` is a JSON *string* by the spec, and models do return it
+ * malformed — a truncated object, or prose where JSON was asked for. An
+ * unparseable call becomes an empty argument object rather than being dropped:
+ * the tool then reports what it needed, which the model can act on, whereas a
+ * silently vanished call looks to the loop like "no calls, answer now" and
+ * produces a confident reply built on nothing.
+ */
+function readToolCalls(node: unknown): WireToolCall[] {
+  const list = (node as { tool_calls?: unknown[] })?.tool_calls;
+  if (!Array.isArray(list)) return [];
+  const out: WireToolCall[] = [];
+  for (const raw of list) {
+    const c = raw as { id?: string; function?: { name?: string; arguments?: string } };
+    const name = c?.function?.name;
+    if (!name) continue;
+    let args: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(c.function?.arguments || "{}");
+      if (parsed && typeof parsed === "object") args = parsed as Record<string, unknown>;
+    } catch {
+      /* Left empty on purpose — see above. */
+    }
+    out.push({ id: c.id || name + ":" + out.length, name, args });
+  }
+  return out;
+}
+
+/**
+ * Reassemble tool calls from a stream.
+ *
+ * Streamed calls arrive as fragments keyed by `index`, with the name on the
+ * first fragment and `arguments` split across many — so they have to be
+ * accumulated by index and only parsed once the stream ends. Parsing each
+ * delta would fail on every fragment but the last.
+ */
+class ToolCallAccumulator {
+  private byIndex = new Map<number, { id: string; name: string; args: string }>();
+
+  add(delta: unknown): void {
+    const list = (delta as { tool_calls?: unknown[] })?.tool_calls;
+    if (!Array.isArray(list)) return;
+    for (const raw of list) {
+      const c = raw as { index?: number; id?: string; function?: { name?: string; arguments?: string } };
+      const i = typeof c.index === "number" ? c.index : 0;
+      const slot = this.byIndex.get(i) || { id: "", name: "", args: "" };
+      if (c.id) slot.id = c.id;
+      if (c.function?.name) slot.name = c.function.name;
+      if (c.function?.arguments) slot.args += c.function.arguments;
+      this.byIndex.set(i, slot);
+    }
+  }
+
+  done(): WireToolCall[] {
+    return [...this.byIndex.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([i, s]) => {
+        let args: Record<string, unknown> = {};
+        try {
+          const parsed = JSON.parse(s.args || "{}");
+          if (parsed && typeof parsed === "object") args = parsed as Record<string, unknown>;
+        } catch {
+          /* see readToolCalls */
+        }
+        return { id: s.id || s.name + ":" + i, name: s.name, args };
+      })
+      .filter((c) => c.name);
+  }
 }
 
 /* ---------------------------------------------------------------- shared */
@@ -224,11 +315,15 @@ function openAICompatible(
       const url = ctx.baseUrl + "/chat/completions";
       const body: Record<string, unknown> = {
         model: ctx.model,
-        messages,
+        messages: messages.map(toWire),
         temperature: opts.temperature == null ? 0.4 : opts.temperature,
         stream: !!opts.onToken
       };
       if (opts.maxTokens) body.max_tokens = opts.maxTokens;
+      /* Sent only when the caller asked for tools. An empty `tools: []` is
+         rejected by some gateways and changes behaviour on others, so absent
+         has to mean absent. */
+      if (opts.tools?.length) body.tools = opts.tools;
       /* Actions the caller asked for, filtered to what this backend can
          actually do. `stream_options: {include_usage:true}` used to be set
          here; OpenRouter deprecated it and returns usage unconditionally. */
@@ -259,8 +354,14 @@ function openAICompatible(
           const cites = dedupeCitations(readCitations(choice.message));
           if (cites.length) opts.onCitations(cites);
         }
+        const toolCalls = readToolCalls(choice.message);
+        if (toolCalls.length && opts.onToolCalls) opts.onToolCalls(toolCalls);
         const text = (choice.message && choice.message.content) || "";
-        if (!text) {
+        /* A reply that is nothing but tool calls has empty content and is
+           entirely correct — it is the normal shape of an agent step. Throwing
+           "the model said nothing" here is what would break the loop on its
+           first useful turn. */
+        if (!text && !toolCalls.length) {
           const reasoning = String((choice.message && (choice.message.reasoning || choice.message.reasoning_content)) || "");
           throw emptyReplyError(label, choice.finish_reason, reasoning);
         }
@@ -275,6 +376,7 @@ function openAICompatible(
          deduped by url. Missing them entirely would silently drop the whole
          point of a web-search reply. */
       let cites: Citation[] = [];
+      const calls = new ToolCallAccumulator();
       await readSSE(res, (j) => {
         const u = readOpenAIUsage(j);
         if (u) usage = u;
@@ -285,6 +387,7 @@ function openAICompatible(
         cites = cites.concat(readCitations(choice.message), readCitations(choice.delta));
         const d = choice.delta;
         if (!d) return;
+        calls.add(d);
         if (d.reasoning || d.reasoning_content) reasoned = true;
         if (d.content) {
           out += d.content;
@@ -293,7 +396,9 @@ function openAICompatible(
       });
       if (usage && opts.onUsage) opts.onUsage(usage);
       if (opts.onCitations && cites.length) opts.onCitations(dedupeCitations(cites));
-      if (!out) throw emptyReplyError(label, finish, reasoned ? "yes" : "");
+      const streamedCalls = calls.done();
+      if (streamedCalls.length && opts.onToolCalls) opts.onToolCalls(streamedCalls);
+      if (!out && !streamedCalls.length) throw emptyReplyError(label, finish, reasoned ? "yes" : "");
       return out;
     },
 

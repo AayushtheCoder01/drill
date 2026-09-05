@@ -26,13 +26,60 @@ import { isAbort } from "@/services/ai/backends";
 import { loadPricing, priceForModel } from "@/services/pricing";
 import { buildContext } from "@/lib/chatContext";
 import { getPersona } from "@/lib/personas";
-import { budgetFor } from "@/lib/effort";
+import { budgetFor, deepSteps } from "@/lib/effort";
 import type { Effort } from "@/types/core";
 import { costOf } from "@/lib/tokens";
 import { resolveBackend, resolveEffort, resolveModel } from "@/lib/resolveSetting";
 import { useRoute } from "./RouteContext";
-import type { Attachment, Conversation, ContextSource, Turn, Usage } from "@/types/chat";
-import type { ChatMessage, Citation, Memory } from "@/types";
+import type { Attachment, ChatMode, Conversation, ContextSource, Turn, Usage, Variant } from "@/types/chat";
+import { runAgentTurn } from "@/services/agent";
+import type { AgentPlan, AgentTrace, ToolCall, ToolRun } from "@/types/agent";
+import type { BackendType, ChatMessage, Citation, Memory } from "@/types";
+
+/** A one-off backend/model for a single regenerate call — applied to that
+ *  variant only, never written to conversation.backend/model. */
+type ModelOverride = { backend?: BackendType | ""; model?: string };
+
+/**
+ * The agent loop mid-flight, for the "what is it doing" panel.
+ *
+ * Keyed by step number rather than appended in arrival order, because the
+ * events for one round do not arrive together: `thought` comes from the reply,
+ * `calling` fires per tool before it runs, and `called` lands whenever that
+ * tool finishes — and calls in a round run concurrently, so they finish out of
+ * order. A running list would interleave two rounds the first time one tool
+ * was slower than the next round's first.
+ *
+ * A step whose `calls` outnumber its `runs` has tools still in flight, which is
+ * what makes "searching your memory…" possible: a call and its result are
+ * separate events, and the interesting moment is the gap between them.
+ */
+export interface LiveStep {
+  step: number;
+  thought: string;
+  calls: ToolCall[];
+  runs: ToolRun[];
+}
+
+export interface AgentLive {
+  steps: LiveStep[];
+  answering: boolean;
+  /** Deep mode's plan, updated in place as steps close. */
+  plan: AgentPlan | null;
+  notes: string[];
+}
+
+/** Upsert one step, without mutating the array React is rendering. */
+function patchStep(live: AgentLive, step: number, fn: (s: LiveStep) => LiveStep): AgentLive {
+  const steps = [...live.steps];
+  const i = steps.findIndex((s) => s.step === step);
+  const base: LiveStep = i >= 0 ? steps[i] : { step, thought: "", calls: [], runs: [] };
+  const next = fn(base);
+  if (i >= 0) steps[i] = next;
+  else steps.push(next);
+  steps.sort((a, b) => a.step - b.step);
+  return { ...live, steps };
+}
 
 interface ChatState {
   conversation: Conversation | null;
@@ -41,13 +88,16 @@ interface ChatState {
   streaming: string | null;
   /** id of the turn being streamed into */
   streamingTurnId: string | null;
+  /** The agent loop as it happens, or null outside agent mode. Live state
+   *  only — the durable record is Variant.trace. */
+  agentLive: AgentLive | null;
   busy: boolean;
   error: string | null;
   followups: string[];
 
   send: (text: string, attachments?: Attachment[]) => Promise<void>;
   stop: () => void;
-  regenerate: (turnId: string) => Promise<void>;
+  regenerate: (turnId: string, override?: ModelOverride) => Promise<void>;
   editUserTurn: (turnId: string, text: string) => Promise<void>;
   retry: () => Promise<void>;
   branchFrom: (turnIndex: number) => void;
@@ -61,6 +111,13 @@ interface ChatState {
   setDraftModel: (m: string) => void;
   draftEffort: Effort | "";
   setDraftEffort: (e: Effort | "") => void;
+  /** The mode chosen on the empty screen, before a conversation exists to pin
+   *  it to. Without this, picking Agent or Deep on first arrival at chat did
+   *  nothing at all: `update()` returns early with no conversation, so the
+   *  choice was dropped and the chip snapped back to Direct. Model and effort
+   *  already had drafts for exactly this reason; mode was added without one. */
+  draftMode: ChatMode;
+  setDraftMode: (m: ChatMode) => void;
 }
 
 const Ctx = createContext<ChatState | null>(null);
@@ -73,11 +130,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState<string | null>(null);
   const [streamingTurnId, setStreamingTurnId] = useState<string | null>(null);
+  const [agentLive, setAgentLive] = useState<AgentLive | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followups, setFollowups] = useState<string[]>([]);
   const [draftModel, setDraftModel] = useState("");
   const [draftEffort, setDraftEffort] = useState<Effort | "">("");
+  const [draftMode, setDraftMode] = useState<ChatMode>("direct");
 
   const abortRef = useRef<AbortController | null>(null);
   const followupAbort = useRef<AbortController | null>(null);
@@ -170,7 +229,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   /* ---- the one place a request is actually made ---- */
   const run = useCallback(
-    async (c: Conversation, targetTurn: Turn, upToIndex: number) => {
+    async (c: Conversation, targetTurn: Turn, upToIndex: number, override?: ModelOverride) => {
+      // A regenerate can ask for a different model without pinning the
+      // conversation to it — c.backend/c.model stay untouched either way.
+      const runBackend = override?.backend ?? c.backend;
+      const runModel = override?.model ?? c.model;
       const controller = new AbortController();
       abortRef.current = controller;
       followupAbort.current?.abort();
@@ -199,8 +262,80 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const budget = budgetFor(resolveEffort(c, store.get().projects[c.projectId]).value);
       const replyScale = budget.replyScale;
 
+      /* Agent mode is a different shape of request, not a different feature:
+         same turn, same variants, same abort path, same receipts. Everything
+         after this branch is shared, which is why the loop returns an answer
+         string rather than writing the turn itself. */
+      let trace: AgentTrace | undefined;
+      let agentProposed: NonNullable<Variant["agentProposed"]> | undefined;
+
       try {
-        const full = await AI.chat(
+        let full: string;
+        const mode = c.mode === "agent" || c.mode === "deep" ? c.mode : "direct";
+        if (mode !== "direct") {
+          const resolved = AI.resolve({ backend: runBackend, model: runModel });
+          setAgentLive({ steps: [], answering: false, plan: null, notes: [] });
+          const result = await runAgentTurn({
+            /* messages[0] is the system message buildMessages already built —
+               persona plus the deterministic context block. The loop keeps it:
+               fixed context is cheaper than a tool call, so anything reliably
+               worth knowing should already be in there. */
+            system: messages[0]?.role === "system" ? messages[0].content : "",
+            history: messages.filter((m) => m.role !== "system"),
+            projectId: c.projectId,
+            conversationId: c.id,
+            turnId: targetTurn.id,
+            backend: resolved.type,
+            /* Shared with the mode picker via lib/effort, so the number shown
+               on the chip is the number the loop actually gets. */
+            maxSteps: mode === "deep" ? deepSteps(budget.agentSteps) : budget.agentSteps,
+            planning: mode === "deep",
+            inProject: !!store.get().projects[c.projectId],
+            /* Writes follow the same policy every other surface obeys. A
+               project on `manual` gets a read-only assistant rather than one
+               that fills a tray nobody asked for. */
+            allowWrites: (store.get().projects[c.projectId]?.memoryPolicy?.autonomy || store.settings().autonomy) !== "manual",
+            temperature: c.temperature,
+            maxTokens: Math.max(256, Math.round(c.maxTokens * replyScale)),
+            signal: controller.signal,
+            override: { backend: runBackend, model: runModel },
+            onEvent: (e) => {
+              if (e.kind === "token") {
+                acc = e.acc;
+                setStreaming(e.acc);
+              } else if (e.kind === "thought") {
+                setAgentLive((s) => (s ? patchStep(s, e.step, (st) => ({ ...st, thought: e.text })) : s));
+              } else if (e.kind === "calling") {
+                /* What streamed during this round was intent, not answer. Drop
+                   it from the reply body — it reappears as the step's thought
+                   in the trace, which is where a "let me check three things"
+                   belongs. */
+                acc = "";
+                setStreaming("");
+                setAgentLive((s) => (s ? patchStep(s, e.step, (st) => ({ ...st, calls: [...st.calls, e.call] })) : s));
+              } else if (e.kind === "called") {
+                setAgentLive((s) => (s ? patchStep(s, e.step, (st) => ({ ...st, runs: [...st.runs, e.run] })) : s));
+              } else if (e.kind === "plan") {
+                /* Cloned on the way in: the plan tools mutate their own object
+                   in the run scratch, so storing it by reference would give
+                   React the same object every time and nothing would re-render. */
+                setAgentLive((s) => (s ? { ...s, plan: { goal: e.plan.goal, items: e.plan.items.map((i) => ({ ...i })) } } : s));
+              } else if (e.kind === "note") {
+                setAgentLive((s) => (s ? { ...s, notes: [...s.notes, e.text] } : s));
+              } else if (e.kind === "answering") {
+                setAgentLive((s) => (s ? { ...s, answering: true } : s));
+              }
+            }
+          });
+          full = result.answer;
+          trace = result.trace;
+          if (result.proposed.length) agentProposed = result.proposed;
+          usage = {
+            ...result.usage,
+            cost: result.usage.reportedCost ?? costOf(result.usage, priceForModel(resolved.type, runModel))
+          };
+        } else
+        full = await AI.chat(
           messages,
           {
             temperature: c.temperature,
@@ -221,14 +356,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                  search fees that tokens-times-price cannot see. */
               /* Priced through the same function the usage ledger uses, and
                  through the *resolved* backend rather than the conversation's
-                 raw one — c.backend is "" whenever the thread inherits. The
+                 raw one — runBackend is "" whenever the thread inherits. The
                  two used to disagree: this line looked the model up in the
                  catalogue regardless of where the call actually went, so a
                  local or free backend reported a cost it never charged. */
-              usage = { ...u, cost: u.reportedCost ?? costOf(u, priceForModel(AI.resolve({ backend: c.backend, model: c.model }).type, c.model)) };
+              usage = { ...u, cost: u.reportedCost ?? costOf(u, priceForModel(AI.resolve({ backend: runBackend, model: runModel }).type, runModel)) };
             }
           },
-          { backend: c.backend, model: c.model }
+          { backend: runBackend, model: runModel }
         );
 
         const raw = full || acc;
@@ -249,12 +384,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
         targetTurn.variants.push({
           content,
-          model: c.model,
+          model: runModel,
           usage,
           elapsed: Date.now() - started,
           createdAt: Date.now(),
           saved,
-          citations
+          citations,
+          trace,
+          agentProposed
         });
         targetTurn.active = targetTurn.variants.length - 1;
         targetTurn.error = undefined;
@@ -273,9 +410,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           if (acc.trim()) {
             targetTurn.variants.push({
               content: acc,
-              model: c.model,
+              model: runModel,
               elapsed: Date.now() - started,
-              createdAt: Date.now()
+              createdAt: Date.now(),
+              /* Whatever the loop got through before the stop is still the
+                 honest account of how that half-answer was reached. */
+              trace
             });
             targetTurn.active = targetTurn.variants.length - 1;
             chatStore.persist(c, true);
@@ -293,6 +433,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setBusy(false);
         setStreaming(null);
         setStreamingTurnId(null);
+        setAgentLive(null);
         rerender();
       }
     },
@@ -349,7 +490,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         // being created here, or choosing one before typing does nothing.
         c = chatStore.create({
           ...(draftModel ? { model: draftModel } : {}),
-          ...(draftEffort ? { effort: draftEffort } : {})
+          ...(draftEffort ? { effort: draftEffort } : {}),
+          ...(draftMode !== "direct" ? { mode: draftMode } : {})
         });
         setConversation(c);
         openChat(c.id);
@@ -379,7 +521,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const regenerate = useCallback(
-    async (turnId: string) => {
+    async (turnId: string, override?: ModelOverride) => {
       const c = conversation;
       if (!c || busy) return;
       const idx = c.turns.findIndex((t) => t.id === turnId);
@@ -388,7 +530,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       if (turn.role !== "assistant") return;
       // Anything after this reply was a response to it, so it no longer holds.
       if (idx < c.turns.length - 1) chatStore.truncateAfter(c, idx);
-      await run(c, turn, idx - 1);
+      await run(c, turn, idx - 1, override);
     },
     [conversation, busy, run]
   );
@@ -480,6 +622,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     loading,
     streaming,
     streamingTurnId,
+    agentLive,
     busy,
     error,
     followups,
@@ -496,7 +639,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     draftModel,
     setDraftModel,
     draftEffort,
-    setDraftEffort
+    setDraftEffort,
+    draftMode,
+    setDraftMode
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

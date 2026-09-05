@@ -20,9 +20,16 @@ especially its **Project layout** section. Do not restate it here.
 ```bash
 npm run dev     # vite; usually :5173, falls back to :5174 if taken
 npm run lint    # tsc --noEmit. The only lint there is
-npm test        # tsx --test src/**/*.test.ts  (66 tests: fsrs, cardFormat, memory*)
+npm test        # tsx --test src/**/*.test.ts
+                # 99 tests: fsrs, cardFormat, memory*, effort, agent/loop
 npm run build   # tsc -b && vite build
 ```
+
+**A dev server's port is part of its origin.** `localhost:5173` and
+`localhost:5174` have entirely separate `localStorage` and IndexedDB, so a
+second `npm run dev` while one is already running gives you a *fresh empty
+app*, not the data you were just looking at. Convenient for testing against
+throwaway state; alarming for ten seconds if you do not know it.
 
 Before saying a change is done: `npm run lint && npm test && npm run build`,
 and then **look at it in the browser**. See *Verifying* below — this codebase
@@ -103,11 +110,38 @@ anything speaking the OpenAI wire format needs only headers, via
 **Singleton components with entity-scoped state need a `key`.** `Composer` is
 keyed on the conversation id because otherwise a draft leaks between threads.
 
+**Chat has three modes, and one of them is an agent loop.** `Conversation.mode`
+is `direct` (one call, the default) / `agent` (reactive lookups) / `deep` (plan
+first, close every step, then answer). The loop lives in `services/agent/` —
+read `tools.ts`'s header before touching the catalogue, and START-HERE §13 for
+the whole picture. Four things bite:
+
+- **`loop.ts` takes `chat` *and* `runTool` injected.** That is the only reason
+  its 28 tests run with no API key and no IndexedDB. Do not "simplify" it by
+  importing them.
+- **Never put a literal tool name in a prompt string.** One did, survived the
+  rename that deleted that tool, and taught every local model to call something
+  that did not exist. Derive it from the catalogue.
+- **Effort is read by every mode; `agentSteps` only means something in
+  `agent`/`deep`.** `EffortBudget.blurb` must stay mode-neutral;
+  `effortMeans(effort, mode)` is the only thing that phrases the lookup budget,
+  and `effort.test.ts` enforces it.
+- **Anything settable before a conversation exists needs a draft.**
+  `ChatContext.update()` returns early with no conversation, so a new
+  per-conversation control silently does nothing on the empty chat screen until
+  it gets a `draft*` beside `draftModel` / `draftEffort` / `draftMode`.
+
+**There is still no error boundary.** A render crash anywhere — `Shell`,
+`Sidebar`, or a composer chip rendered before its new prop was threaded through
+— white-screens the whole app. That happened for real while building Phase 12.
+
 ## Verifying
 
 There is **no API key in this environment**, so live inference, real streaming,
 the abort path and real token/cost accounting cannot be tested. Say so plainly
-rather than implying they were. Everything else can be driven directly:
+rather than implying they were. **The agent loop has never run against a real
+model** — whether it picks good tools is the open question, and the first thing
+to try when a key exists. Everything else can be driven directly:
 
 - Seed state and drive the DOM with the browser tools against `npm run dev`.
   `store` state is `localStorage["mldrill:v3"]`; conversations are the

@@ -58,6 +58,8 @@ export interface ProposeInput {
   type: MemoryType;
   text: string;
   origin?: MemoryOrigin | null;
+  /** Subject slug, carried to the Memory this becomes. */
+  topic?: string | null;
   supersedes?: string | null;
   /** True when the learner said this outright and the model only transcribed
    *  it. Under "assisted" autonomy these commit without review. */
@@ -104,6 +106,7 @@ export function propose(drafts: ProposeInput[]): ProposeResult {
         text: d.text.trim(),
         createdAt: Date.now(),
         origin: d.origin || null,
+        topic: memoryStore.normTopic(d.topic),
         supersedes: d.supersedes || null,
         stated: !!d.stated,
         status: "pending"
@@ -128,6 +131,7 @@ export function propose(drafts: ProposeInput[]): ProposeResult {
         projectId: c.projectId,
         type: c.type,
         text: c.text,
+        topic: c.topic,
         source: c.stated ? "stated" : "proposed",
         origin: c.origin
       })
@@ -148,7 +152,7 @@ function drop(id: string): void {
 /** Commits the candidate as real memory, retiring whatever it supersedes,
  *  then removes it from the tray. `edits` lets the review UI change the text
  *  or type before committing without a separate save step. */
-export function accept(id: string, edits?: { text?: string; type?: MemoryType }): Memory | null {
+export function accept(id: string, edits?: { text?: string; type?: MemoryType; topic?: string | null }): Memory | null {
   const c = items.find((x) => x.id === id);
   if (!c) return null;
   const m = memoryStore.create({
@@ -156,6 +160,7 @@ export function accept(id: string, edits?: { text?: string; type?: MemoryType })
     projectId: c.projectId,
     type: edits?.type ?? c.type,
     text: (edits?.text ?? c.text).trim(),
+    topic: edits?.topic !== undefined ? edits.topic : c.topic,
     source: "proposed",
     origin: c.origin
   });

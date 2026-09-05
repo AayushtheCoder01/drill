@@ -9,7 +9,32 @@
  * ========================================================================== */
 import type { BackendType, Citation, TokenUsage } from "@/types";
 import type { ChatActionId } from "@/lib/chatActions";
+import type { AgentTrace } from "@/types/agent";
 import type { Effort, MemoryScope } from "@/types/core";
+
+/**
+ * How a message is answered. Three genuinely different purchases, not a
+ * quality slider — each is the right answer to a different kind of question.
+ *
+ *   direct  one request. Context is chosen deterministically by
+ *           lib/chatContext.ts before the call. Fast, cheap, and correct for
+ *           "explain this to me", which is most messages.
+ *
+ *   agent   the model looks things up itself, reactively, then answers. For
+ *           "what am I still getting wrong" — where what to fetch second
+ *           depends on what the first lookup returned.
+ *
+ *   deep    the model states a plan, works it, closes every step, and only
+ *           then answers. For questions worth several minutes: "where am I
+ *           actually weak across this whole project", "what should I do next".
+ *           Slower and dearer than `agent` on purpose — the plan is what makes
+ *           a long run auditable and stops it declaring victory early.
+ *
+ * Per conversation rather than global: the mode that suits a thread is a
+ * property of what the thread is for, and a global switch would make every
+ * quick question expensive.
+ */
+export type ChatMode = "direct" | "agent" | "deep";
 
 /** Re-exported so chat code has one import for its own vocabulary. */
 export type Usage = TokenUsage;
@@ -52,6 +77,14 @@ export interface Variant {
   saved?: SavedMemory;
   /** Sources a web-search reply drew on. */
   citations?: Citation[];
+  /** How an agent-mode reply was arrived at — every lookup it made and what
+   *  came back. Persisted rather than kept in memory because an answer you
+   *  cannot audit is an answer you cannot correct, and the whole argument for
+   *  letting a model go and look things up is that you can check its working. */
+  trace?: AgentTrace;
+  /** What an agent-mode reply proposed along the way, so the turn can show one
+   *  receipt instead of burying it in the trace. */
+  agentProposed?: { id: string; text: string; kind: "memory" | "card" | "note" }[];
 }
 
 export interface Turn {
@@ -118,6 +151,10 @@ export interface Conversation {
 
   /** "" means inherit from the project, which may inherit from global. */
   effort: Effort | "";
+  /** Absent on conversations created before agent mode existed, which
+   *  chatStore.repair() reads as "chat" — the cheap default, so an old thread
+   *  never silently becomes expensive. */
+  mode?: ChatMode;
 
   context: ContextSource[];
   /** Attachments that survive every turn, as opposed to Turn.attachments

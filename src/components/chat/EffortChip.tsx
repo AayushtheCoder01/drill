@@ -14,21 +14,25 @@
 import { useEffect, useRef, useState } from "react";
 import * as store from "@/services/store";
 import * as chatStore from "@/services/chatStore";
-import { EFFORT_BUDGETS, EFFORT_ORDER } from "@/lib/effort";
+import { EFFORT_ORDER, effortMeans } from "@/lib/effort";
 import { resolveEffort } from "@/lib/resolveSetting";
-import type { Conversation } from "@/types/chat";
+import type { ChatMode, Conversation } from "@/types/chat";
 import type { Effort } from "@/types/core";
 import Icon from "../ui/Icon";
 
 export default function EffortChip({
   conversation,
   draftEffort,
-  onDraftEffort
+  onDraftEffort,
+  draftMode
 }: {
   /** Null on the empty screen, before a conversation exists to pin it to. */
   conversation: Conversation | null;
   draftEffort: Effort | "";
   onDraftEffort: (e: Effort | "") => void;
+  /** The mode selected on the empty screen, so this chip can describe what
+   *  effort buys there too rather than assuming Direct. */
+  draftMode: ChatMode;
 }) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -65,14 +69,23 @@ export default function EffortChip({
     setOpen(false);
   }
 
-  const budget = EFFORT_BUDGETS[resolved.value];
+  /* What effort buys *in the mode currently selected*. The two chips sit next
+     to each other and both read as cost dials, so a tooltip promising "up to
+     three lookups" while the thread was on Direct — which makes none — was the
+     app contradicting itself inside the composer.
+
+     Falls back to the draft, not to "direct": on the empty screen there is no
+     conversation to read, so reading only `conversation?.mode` made this chip
+     describe Direct while the mode chip beside it clearly said Deep. */
+  const raw = conversation ? conversation.mode : draftMode;
+  const mode = raw === "agent" || raw === "deep" ? raw : "direct";
 
   return (
     <div className="modelchip" ref={boxRef}>
       <button
         className="cbtn ghost modelchip-btn"
         onClick={() => setOpen((v) => !v)}
-        title={`${resolved.value} effort — ${budget.blurb}`}
+        title={`${resolved.value} effort — ${effortMeans(resolved.value, mode)}`}
       >
         <span className={"modelchip-dot" + (chosen ? " pinned" : "")} />
         <span className="modelchip-name">{resolved.value}</span>
@@ -97,7 +110,7 @@ export default function EffortChip({
                 onClick={() => choose(e)}
               >
                 <span className="effortrow-n">{e}</span>
-                <span className="effortrow-b">{EFFORT_BUDGETS[e].blurb}</span>
+                <span className="effortrow-b">{effortMeans(e, mode)}</span>
               </button>
             ))}
           </div>

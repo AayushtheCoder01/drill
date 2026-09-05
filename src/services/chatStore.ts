@@ -15,7 +15,7 @@ import * as store from "./store";
 import { idbAll, idbBulkPut, idbClear, idbDelete, idbGet, idbPut, STORE_CONV, STORE_META } from "./idb";
 import { DEFAULT_PERSONA_ID, getPersona } from "@/lib/personas";
 import { markdownToText } from "@/lib/plaintext";
-import type { Conversation, ConversationMeta, ContextSource, Turn, Usage, Variant } from "@/types/chat";
+import type { ChatMode, Conversation, ConversationMeta, ContextSource, Turn, Usage, Variant } from "@/types/chat";
 import type { BackendType, Effort } from "@/types";
 
 let metas: ConversationMeta[] = [];
@@ -174,6 +174,15 @@ function repair(c: Conversation): Conversation {
   if (!Array.isArray(c.pinnedAttachments)) c.pinnedAttachments = [];
   if (typeof c.rolledUpThrough !== "number") c.rolledUpThrough = 0;
   if (!Array.isArray(c.actions)) c.actions = [];
+  /* "chat" was the first name for the single-call mode, before `deep` made a
+     two-value flag inadequate. Renamed rather than kept as an alias so there
+     is one spelling of it in the codebase.
+
+     Anything unrecognised — including a thread written before modes existed —
+     lands on `direct`. A thread that silently became multi-request because the
+     app updated would be a bill the learner never agreed to. */
+  if ((c.mode as string) === "chat") c.mode = "direct";
+  if (c.mode !== "agent" && c.mode !== "deep" && c.mode !== "direct") c.mode = "direct";
   return c;
 }
 
@@ -196,6 +205,8 @@ export interface CreateOpts {
   /** Defaults to the active project. */
   projectId?: string;
   effort?: Effort | "";
+  /** Carried from the empty screen's mode picker. Absent means `direct`. */
+  mode?: ChatMode;
 }
 
 /**
@@ -241,6 +252,7 @@ export function create(opts: CreateOpts = {}): Conversation {
     temperature: opts.temperature ?? persona.temperature ?? 0.6,
     maxTokens: 4096,
     effort: opts.effort || "",
+    mode: opts.mode || "direct",
     context: opts.context ?? defaultContext(),
     pinnedAttachments: [],
     turns: [],

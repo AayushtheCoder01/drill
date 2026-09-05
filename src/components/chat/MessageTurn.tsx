@@ -14,11 +14,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { renderMarkdown, markdownToText } from "@/lib/markdown";
 import MemorySaved from "./MemorySaved";
+import AgentTrace, { stepsFromTrace } from "./AgentTrace";
+import type { AgentLive } from "@/context/ChatContext";
 import Sources from "./Sources";
+import RegenerateMenu from "./RegenerateMenu";
 import { formatCost, formatTokens } from "@/lib/tokens";
+import * as AI from "@/services/ai";
 import * as chatStore from "@/services/chatStore";
 import { useToast } from "@/context/ToastContext";
-import type { Turn } from "@/types/chat";
+import type { Conversation, Turn } from "@/types/chat";
+import type { BackendType } from "@/types";
 import Icon from "../ui/Icon";
 
 /* One selector, used to build the contents and to jump within it. */
@@ -27,9 +32,15 @@ const HEADINGS = "h1, h2, h3";
 interface Props {
   turn: Turn;
   isLast: boolean;
+  /** The agent loop mid-flight, when this is the turn being answered into.
+   *  Null everywhere else, including in chat mode. */
+  agentLive?: AgentLive | null;
   streamingText: string | null;
   busy: boolean;
-  onRegenerate: () => void;
+  /** Backend/model of the conversation this turn belongs to, so Regenerate
+   *  can offer "try a different model" without pinning the thread to it. */
+  conversation: Conversation;
+  onRegenerate: (override?: { backend?: BackendType | ""; model?: string }) => void;
   onEdit: (text: string) => void;
   onBranch: () => void;
   onMakeCards: (text: string) => void;
@@ -43,8 +54,10 @@ interface Props {
 export default function MessageTurn({
   turn,
   isLast,
+  agentLive,
   streamingText,
   busy,
+  conversation,
   onRegenerate,
   onEdit,
   onBranch,
@@ -246,6 +259,26 @@ export default function MessageTurn({
         <div className="turn-body">{content}</div>
       ) : (
         <div className="turn-body" ref={bodyRef}>
+          {/* Above the reply, because it happened before it — and because a
+              collapsed one-line summary reads as provenance, which is what it
+              is, rather than as an appendix nobody opens. */}
+          {agentLive && (agentLive.steps.length || agentLive.plan) ? (
+            <AgentTrace
+              steps={agentLive.steps}
+              plan={agentLive.plan}
+              notes={agentLive.notes}
+              running={!agentLive.answering}
+            />
+          ) : !streaming && variant?.trace && (variant.trace.steps.length || variant.trace.plan) ? (
+            <AgentTrace
+              steps={stepsFromTrace(variant.trace.steps)}
+              plan={variant.trace.plan}
+              notes={variant.trace.notes}
+              unfinished={variant.trace.unfinished}
+              truncated={variant.trace.truncated}
+              totalMs={variant.trace.totalMs}
+            />
+          ) : null}
           <span dangerouslySetInnerHTML={{ __html: html }} />
           {streaming && <span className="caret" />}
           {!streaming && variant?.citations?.length ? <Sources citations={variant.citations} /> : null}
@@ -266,10 +299,12 @@ export default function MessageTurn({
             </button>
           ) : (
             <>
-              <button className="tact" onClick={onRegenerate} disabled={busy} title="Regenerate response">
-                <Icon name="sparkle" size={11} />
-                <span>Regenerate</span>
-              </button>
+              <RegenerateMenu
+                backend={conversation.backend}
+                currentModel={variant?.model || AI.resolve({ backend: conversation.backend, model: conversation.model }).model}
+                busy={busy}
+                onRegenerate={onRegenerate}
+              />
               <button className="tact" onClick={() => onMakeCards(selectedOrAll())} disabled={busy} title="Turn into flashcards">
                 <Icon name="cards" size={11} />
                 <span>Make cards</span>

@@ -865,6 +865,25 @@
   background: var(--red-tint);
   border-color: var(--red-edge);
 }
+/* Regenerate is a split button: the label redoes the reply as-is, the caret
+   opens the same upward popover ModelChip uses, but scoped to one variant —
+   see RegenerateMenu's header comment for why that's a separate control from
+   the composer's model pin. */
+.regenmenu {
+  position: relative;
+  display: inline-flex;
+}
+.regenmenu-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.regenmenu-caret {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
 .variant-nav {
   display: flex;
   align-items: center;
@@ -1888,4 +1907,355 @@
 .cbtn.actchip:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ============================================================================
+ * The agent trace — what the assistant looked at before it answered.
+ *
+ * Set as marginalia, not as a panel: the reply is the text, and this is the
+ * apparatus around it. Hence the rule down the left rather than a box, and
+ * type one step below the body — it should be legible without competing.
+ * ========================================================================== */
+.atrace {
+  margin: 0 0 var(--s-4);
+  font-size: var(--t-xs);
+}
+
+.atrace-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-1) var(--s-2);
+  margin-left: calc(var(--s-2) * -1);
+  border: 0;
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--ink-3);
+  font: inherit;
+  cursor: pointer;
+  transition: color var(--dur, 120ms) var(--ease), background var(--dur, 120ms) var(--ease);
+}
+.atrace-toggle:hover:not(:disabled) {
+  color: var(--ink-2);
+  background: var(--surface);
+}
+.atrace-toggle:disabled {
+  cursor: default;
+}
+/* Running, the summary is the only interesting thing on screen, so it takes
+   the accent and pulses. Finished, it recedes to a footnote. */
+.atrace.live .atrace-toggle {
+  color: var(--accent);
+}
+.atrace.live .atrace-toggle svg {
+  animation: atrace-pulse 1.4s var(--ease) infinite;
+}
+@keyframes atrace-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .atrace.live .atrace-toggle svg,
+  .atrace-row.pending .atrace-dot {
+    animation: none;
+  }
+}
+
+.atrace-chev {
+  transition: transform var(--dur, 120ms) var(--ease);
+}
+.atrace-chev.on {
+  transform: rotate(180deg);
+}
+
+.atrace-body {
+  margin-top: var(--s-2);
+  padding-left: var(--s-3);
+  border-left: 1px solid var(--rule-soft);
+}
+.atrace-step + .atrace-step {
+  margin-top: var(--s-3);
+}
+
+/* The model's stated intent. Italic because it is reported speech — this is
+   the assistant talking about what it is about to do, not to the reader. */
+.atrace-thought {
+  margin: 0 0 var(--s-2);
+  color: var(--ink-3);
+  font-style: italic;
+  line-height: var(--lh-snug);
+}
+
+.atrace-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.atrace-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  padding: var(--s-1) var(--s-2);
+  border: 0;
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.atrace-head:hover:not(:disabled) {
+  background: var(--surface);
+}
+.atrace-head:disabled {
+  cursor: default;
+}
+
+.atrace-dot {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--r-full);
+  background: var(--green);
+}
+.atrace-row.pending .atrace-dot {
+  background: var(--accent);
+  animation: atrace-pulse 1s var(--ease) infinite;
+}
+/* A tool that found nothing is not a failure, and must not look like one —
+   amber, not red. "No cards matched" is a real answer. */
+.atrace-row.miss .atrace-dot {
+  background: var(--amber);
+}
+
+.atrace-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.atrace-subject {
+  color: var(--ink-3);
+}
+.atrace-time {
+  flex: none;
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+}
+
+/* Verbatim tool output. Scrolls inside itself so a long result cannot widen
+   the reading column. */
+.atrace-result {
+  margin: var(--s-1) 0 var(--s-2) var(--s-4);
+  padding: var(--s-2) var(--s-3);
+  max-height: 15rem;
+  overflow: auto;
+  border-radius: var(--r-2);
+  background: var(--page-2);
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  line-height: var(--lh-snug);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.atrace-note {
+  margin: var(--s-3) 0 0;
+  color: var(--amber);
+  line-height: var(--lh-snug);
+}
+
+/* ---------------------------------------------------------------------------
+ * The plan, in deep mode.
+ *
+ * Set as a stated intention rather than a progress widget: no bars, no
+ * percentages. A numbered list with the finished ones struck back is what a
+ * person writes on paper, and it is legible at a glance without decoding.
+ * ------------------------------------------------------------------------- */
+.aplan {
+  margin: 0 0 var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-3);
+  background: var(--surface);
+  border: 1px solid var(--rule-soft);
+}
+.aplan-goal {
+  margin: 0 0 var(--s-3);
+  color: var(--ink);
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+}
+.aplan-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  counter-reset: aplan;
+}
+.aplan-item {
+  display: flex;
+  gap: var(--s-2);
+  align-items: flex-start;
+  font-size: var(--t-xs);
+  line-height: var(--lh-snug);
+  color: var(--ink-2);
+}
+.aplan-mark {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+}
+.aplan-item.done .aplan-mark {
+  color: var(--green);
+}
+.aplan-item.doing .aplan-mark {
+  color: var(--accent);
+  font-weight: 700;
+}
+/* Done is receded, not struck through: the reader still needs to know what was
+   covered, and strikethrough on a list of things you did reads as cancelled. */
+.aplan-item.done .aplan-text,
+.aplan-item.dropped .aplan-text {
+  color: var(--ink-3);
+}
+.aplan-item.dropped .aplan-text {
+  font-style: italic;
+}
+.aplan-item.doing {
+  color: var(--ink);
+}
+.aplan-text {
+  min-width: 0;
+}
+.aplan-note {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-3);
+  font-size: var(--t-3xs);
+}
+.aplan-progress {
+  margin: var(--s-3) 0 0;
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+}
+
+.atrace-notes {
+  margin-top: var(--s-3);
+  padding-top: var(--s-2);
+  border-top: 1px dashed var(--rule-soft);
+}
+.atrace-noteline {
+  margin: 0 0 var(--s-1);
+  color: var(--ink-2);
+  line-height: var(--lh-snug);
+}
+.atrace-noteline::before {
+  content: "— ";
+  color: var(--ink-3);
+}
+.atrace-note.warn {
+  color: var(--red);
+}
+
+/* ---------------------------------------------------------------------------
+ * The mode picker. Three modes is one more than a toggle carries.
+ * ------------------------------------------------------------------------- */
+.modechip {
+  position: relative;
+  display: inline-flex;
+}
+.modechip-pop {
+  position: absolute;
+  bottom: calc(100% + var(--s-2));
+  left: 0;
+  z-index: 40;
+  width: min(21rem, 78vw);
+  padding: var(--s-1);
+  border-radius: var(--r-3);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  box-shadow: var(--shadow-3, 0 12px 32px -12px oklch(0% 0 0 / 0.5));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.modechip-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  width: 100%;
+  padding: var(--s-2) var(--s-3);
+  border: 0;
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.modechip-row:hover {
+  background: var(--surface-2);
+}
+.modechip-row.on {
+  background: var(--accent-10);
+  color: var(--ink);
+}
+.modechip-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--ink-3);
+}
+.modechip-row.on .modechip-icon,
+.modechip-tick {
+  color: var(--accent);
+}
+.modechip-text {
+  flex: 1;
+  min-width: 0;
+}
+.modechip-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  color: var(--ink);
+  font-size: var(--t-sm);
+}
+.modechip-cost {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+}
+.modechip-blurb {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-3);
+  font-size: var(--t-2xs);
+  line-height: var(--lh-snug);
+}
+.modechip-tick {
+  flex: none;
+  margin-top: 3px;
+}
+
+.modechip-head {
+  padding: var(--s-2) var(--s-3) var(--s-1);
+  color: var(--ink-3);
+  font-size: var(--t-3xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }

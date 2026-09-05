@@ -30,6 +30,7 @@ import ChatRail from "../rail/ChatRail";
 import Icon from "../ui/Icon";
 import ChatSidebar from "./ChatSidebar";
 import MessageTurn from "./MessageTurn";
+import ModeChip from "./ModeChip";
 import Composer, { type SlashCommand } from "./Composer";
 import ConversationSettings from "./ConversationSettings";
 import CommandPalette, { type PaletteAction } from "./CommandPalette";
@@ -431,9 +432,15 @@ export default function ChatView() {
                   key={t.id}
                   turn={t}
                   isLast={i === c.turns.length - 1}
+                  /* The loop as it runs, above the turn it is answering into.
+                     Handed down rather than read from context inside
+                     MessageTurn so exactly one turn can ever show it — the
+                     one being streamed into. */
+                  agentLive={chat.streamingTurnId === t.id ? chat.agentLive : null}
                   streamingText={chat.streamingTurnId === t.id ? chat.streaming : null}
                   busy={chat.busy}
-                  onRegenerate={() => void chat.regenerate(t.id)}
+                  conversation={c}
+                  onRegenerate={(override) => void chat.regenerate(t.id, override)}
                   onEdit={(text) => void chat.editUserTurn(t.id, text)}
                   onBranch={() => chat.branchFrom(i)}
                   onMakeCards={(text) => setCardSource(text)}
@@ -477,7 +484,18 @@ export default function ChatView() {
           tools={
             <>
               <ModelChip conversation={c} draftModel={chat.draftModel} onDraftModel={chat.setDraftModel} />
-              <EffortChip conversation={c} draftEffort={chat.draftEffort} onDraftEffort={chat.setDraftEffort} />
+              <EffortChip
+                conversation={c}
+                draftEffort={chat.draftEffort}
+                onDraftEffort={chat.setDraftEffort}
+                draftMode={chat.draftMode}
+              />
+              <ModeChip
+                conversation={c}
+                draftMode={chat.draftMode}
+                onDraftMode={chat.setDraftMode}
+                onChange={(mode) => chat.update({ mode })}
+              />
               <ActionChips
                 active={c?.actions || []}
                 backend={c?.backend}
