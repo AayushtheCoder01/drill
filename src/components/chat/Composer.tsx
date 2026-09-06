@@ -19,9 +19,11 @@
  * The composer earns its height. At rest it is one line - the box and Send,
  * nothing else - because on a laptop window this bar was 172px of a 522px
  * screen and the transcript above it had barely half the page to read in.
- * The tool row (model, effort, actions, attach) and the key hints appear
- * once the composer has focus or something in it, which is exactly when they
- * are worth their room and never while you are reading.
+ * The tool row and the key hints appear once the composer has focus or
+ * something in it, which is exactly when they are worth their room and never
+ * while you are reading. The row itself is two clusters — what the message is
+ * set to on the left, what will answer it on the right — because it used to be
+ * one flat run of six controls and read as an instrument panel.
  * ========================================================================== */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as U from "@/lib/util";
@@ -45,9 +47,15 @@ interface Props {
   /** Everything referenceable, rebuilt by the caller so the composer never
    *  reaches into the stores itself. */
   references: Reference[];
-  /** Rendered at the left of the composer bar — the model chip. Passed in
-   *  rather than built here so the composer stays ignorant of conversations. */
+  /** The left of the tool row: the Tools menu and whatever it has switched on.
+   *  Passed in rather than built here so the composer stays ignorant of
+   *  conversations. */
   tools?: ReactNode;
+  /** The right of the tool row — the model chip. Separated from `tools`
+   *  because the split is the layout: what the message is set to sits on one
+   *  side, what will answer it on the other, and the gap between them is what
+   *  stops six controls reading as one undifferentiated row. */
+  trailing?: ReactNode;
   onSend: (text: string, attachments: Attachment[]) => void;
   onStop: () => void;
   /** set to a string to overwrite the draft from outside (follow-up chips) */
@@ -56,7 +64,7 @@ interface Props {
 
 const MAX_FILE_BYTES = 400_000;
 
-export default function Composer({ disabled, busy, placeholder, commands, references, tools, onSend, onStop, seed }: Props) {
+export default function Composer({ disabled, busy, placeholder, commands, references, tools, trailing, onSend, onStop, seed }: Props) {
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [slashSel, setSlashSel] = useState(0);
@@ -356,31 +364,40 @@ export default function Composer({ disabled, busy, placeholder, commands, refere
               either way: a chip that unmounted on blur would close its own
               popover the moment you clicked into it. */}
           <div className="composer-tools">
-            {tools}
-            <button className="cbtn ghost attach-btn" onClick={() => fileRef.current?.click()} title="Attach a text file" aria-label="Attach a text file">
-              <Icon name="paperclip" size={12} />
-              <span>Attach</span>
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              multiple
-              accept=".txt,.md,.json,.csv,.py,.js,.ts,.tsx,.jsx,.html,.css,.yml,.yaml,.r,.sql,.java,.c,.cpp,.go,.rs,text/*"
-              style={{ display: "none" }}
-              onChange={(e) => {
-                if (e.target.files) void addFiles(e.target.files);
-                e.target.value = "";
-              }}
-            />
-            {attachedTokens > 0 && <span className="composer-hint">~{attachedTokens.toLocaleString()} tok attached</span>}
-            {/* The hint strip used to stand under the box for ever: three
-                lines, 47px, instructions you had read on your first day. One
-                line now, and only while there is nothing typed. */}
-            {!text && (
-              <span className="composer-hint keys">
-                enter sends · shift+enter newline · / and @
-              </span>
-            )}
+            {/* Two clusters, not one row. Left is what the message is set to;
+                right is what will answer it. Six controls in a single flat run
+                read as a dashboard nobody parses — the gap is doing real work
+                here, not decoration. */}
+            <div className="ctools-left">
+              <button
+                className="cbtn ghost attach-btn"
+                onClick={() => fileRef.current?.click()}
+                title="Attach a text file"
+                aria-label="Attach a text file"
+              >
+                <Icon name="paperclip" size={13} />
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                accept=".txt,.md,.json,.csv,.py,.js,.ts,.tsx,.jsx,.html,.css,.yml,.yaml,.r,.sql,.java,.c,.cpp,.go,.rs,text/*"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  if (e.target.files) void addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              {tools}
+            </div>
+            <div className="ctools-right">
+              {attachedTokens > 0 && <span className="composer-hint">~{attachedTokens.toLocaleString()} tok attached</span>}
+              {/* The hint strip used to stand under the box for ever: three
+                  lines, 47px, instructions you had read on your first day. One
+                  line now, and only while there is nothing typed. */}
+              {!text && <span className="composer-hint keys">enter sends · shift+enter newline · / and @</span>}
+              {trailing}
+            </div>
           </div>
         </div>
       </div>

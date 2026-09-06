@@ -16,7 +16,7 @@
  * ever grows a backend, this is the file that would move server-side: keep
  * the same BackendDef shape and swap fetch() targets for calls to your API.
  * ========================================================================== */
-import { CHAT_ACTIONS, type ChatActionId } from "@/lib/chatActions";
+import { CHAT_ACTIONS, availability, type ChatActionId } from "@/lib/chatActions";
 import type { AIContext, BackendDef, BackendType, ChatMessage, ChatOpts, Citation, TokenUsage, WireToolCall } from "@/types";
 
 /** True for the exception fetch throws when an AbortSignal fires. Callers
@@ -79,14 +79,26 @@ function readOpenAIUsage(j: unknown): TokenUsage | undefined {
   };
 }
 
-/** Apply the caller's requested actions, filtered to what this backend can
- *  do. Unsupported ones are dropped rather than sent — the composer disables
- *  the chip, this is the belt to that braces. */
-function applyActions(body: Record<string, unknown>, want: ChatActionId[] | undefined, can: ChatActionId[] | undefined): void {
-  if (!want?.length || !can?.length) return;
+/** Apply the caller's requested actions, filtered to what this backend and
+ *  this model can actually do. Unsupported ones are dropped rather than sent
+ *  — the composer disables the chip, this is the belt to that braces.
+ *
+ *  The model half of the filter matters more than it looks: an action left on
+ *  while the model chip moves to something that cannot do it stays in
+ *  `conversation.actions`, deliberately, so it comes back when you switch the
+ *  model back. That only works because the send path refuses to send it in
+ *  the meantime. */
+function applyActions(
+  body: Record<string, unknown>,
+  want: ChatActionId[] | undefined,
+  backend: BackendType,
+  model: string
+): void {
+  if (!want?.length) return;
+  const can = BACKENDS[backend]?.supports;
   for (const id of want) {
-    if (!can.includes(id)) continue;
-    CHAT_ACTIONS[id]?.apply(body);
+    if (!availability(id, can, model).can) continue;
+    CHAT_ACTIONS[id]?.apply(body, backend);
   }
 }
 
@@ -307,8 +319,8 @@ async function readNDJSON(res: Response, onObj: (j: any) => void): Promise<void>
  *  all speak this. Only the headers and the default host differ. */
 function openAICompatible(
   label: string,
-  headerFn: (ctx: AIContext) => Record<string, string>,
-  supports?: ChatActionId[]
+  id: BackendType,
+  headerFn: (ctx: AIContext) => Record<string, string>
 ): Pick<BackendDef, "chat" | "listModels"> {
   return {
     async chat(messages: ChatMessage[], opts: ChatOpts, ctx: AIContext): Promise<string> {
@@ -324,10 +336,10 @@ function openAICompatible(
          rejected by some gateways and changes behaviour on others, so absent
          has to mean absent. */
       if (opts.tools?.length) body.tools = opts.tools;
-      /* Actions the caller asked for, filtered to what this backend can
-         actually do. `stream_options: {include_usage:true}` used to be set
+      /* Actions the caller asked for, filtered to what this backend and model
+         can actually do. `stream_options: {include_usage:true}` used to be set
          here; OpenRouter deprecated it and returns usage unconditionally. */
-      applyActions(body, opts.actions, supports);
+      applyActions(body, opts.actions, id, ctx.model);
 
       let res: Response;
       try {
@@ -437,13 +449,15 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
     defaultModel: "anthropic/claude-sonnet-4.5",
     note: "One key, every model. Has free models on the list too.",
     /* The only backend that can search: OpenRouter runs it server-side and
-       injects the results into the prompt, so it stays one request. */
-    supports: ["web"],
+       injects the results into the prompt, so it stays one request. Thinking
+       is a per-model question on top of this — see lib/thinking.ts. */
+    supports: ["web", "think"],
     /* The catalogue this prices against is OpenRouter's own, so its ids match
        by construction. */
     pricing: "catalogue",
     ...openAICompatible(
       "OpenRouter",
+      "openrouter",
       (ctx) => {
       /* OpenRouter wants an origin it can attribute the call to. */
       const ref = window.location.origin && window.location.origin !== "null" ? window.location.origin : "http://localhost";
@@ -454,8 +468,7 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
         "X-Title": "Drill",
         ...ctx.headers
       };
-      },
-      ["web"]
+      }
     )
   } as BackendDef,
 
@@ -475,7 +488,7 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
        move onto a paid Groq plan, change this to "unpriced" — an honest
        blank beats a confident zero. */
     pricing: "free",
-    ...openAICompatible("Groq", (ctx) => ({
+    ...openAICompatible("Groq", "groq", (ctx) => ({
       "Content-Type": "application/json",
       Authorization: "Bearer " + ctx.apiKey,
       ...ctx.headers
@@ -493,6 +506,14 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
     defaultBaseUrl: "http://localhost:11434",
     defaultModel: "llama3.1:8b",
     note: "Runs on your machine, costs nothing. Needs OLLAMA_ORIGINS=* so the browser is allowed to call it.",
+    /* Ollama has a native `think` flag, so the local backend gets the thinking
+       switch too. Whether the model in front of it can actually think is not
+       knowable from here — the price catalogue has never heard of
+       "qwen3:8b" — so lib/thinking.ts returns "unknown" and the switch stays
+       live. Ollama refuses with a clear message when it cannot, which is a
+       better answer than a permanently grey button on the one backend where
+       reasoning models are what people run. */
+    supports: ["think"],
 
     async chat(messages, opts, ctx) {
       const url = ctx.baseUrl + "/api/chat";
@@ -503,6 +524,7 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
         options: { temperature: opts.temperature == null ? 0.4 : opts.temperature }
       };
       if (opts.maxTokens) (body.options as Record<string, unknown>).num_predict = opts.maxTokens;
+      applyActions(body, opts.actions, "ollama", ctx.model);
 
       let res: Response;
       try {
@@ -583,7 +605,7 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
        thing to do with it, and then every call was billed and reported free.
        Unpriced says "we do not know", which is the truth here. */
     pricing: "unpriced",
-    ...openAICompatible("Backend", (ctx) => {
+    ...openAICompatible("Backend", "custom", (ctx) => {
       const h: Record<string, string> = { "Content-Type": "application/json", ...ctx.headers };
       if (ctx.apiKey) h.Authorization = "Bearer " + ctx.apiKey;
       return h;

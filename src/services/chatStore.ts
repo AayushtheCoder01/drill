@@ -16,6 +16,7 @@ import { idbAll, idbBulkPut, idbClear, idbDelete, idbGet, idbPut, STORE_CONV, ST
 import { DEFAULT_PERSONA_ID, getPersona } from "@/lib/personas";
 import { markdownToText } from "@/lib/plaintext";
 import type { ChatMode, Conversation, ConversationMeta, ContextSource, Turn, Usage, Variant } from "@/types/chat";
+import type { ChatActionId } from "@/lib/chatActions";
 import type { BackendType, Effort } from "@/types";
 
 let metas: ConversationMeta[] = [];
@@ -207,6 +208,8 @@ export interface CreateOpts {
   effort?: Effort | "";
   /** Carried from the empty screen's mode picker. Absent means `direct`. */
   mode?: ChatMode;
+  /** Carried from the empty screen's capability switches — Web, Think. */
+  actions?: ChatActionId[];
 }
 
 /**
@@ -258,7 +261,7 @@ export function create(opts: CreateOpts = {}): Conversation {
     turns: [],
     usage: { promptTokens: 0, completionTokens: 0 },
     rolledUpThrough: 0,
-    actions: []
+    actions: opts.actions ? [...opts.actions] : []
   };
   cache.set(c.id, c);
   persist(c, true);

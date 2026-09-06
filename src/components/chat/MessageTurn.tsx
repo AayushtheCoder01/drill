@@ -335,6 +335,10 @@ export default function MessageTurn({
           {variant.usage
             ? ` · ${formatTokens(variant.usage.promptTokens)} in / ${formatTokens(variant.usage.completionTokens)} out`
             : ""}
+          {/* The receipt for the Think switch. Reasoning is billed as output
+              and is invisible in the reply, so without this the only evidence
+              that thinking happened is the bill being larger than it looks. */}
+          {variant.usage?.reasoningTokens ? ` (${formatTokens(variant.usage.reasoningTokens)} thinking)` : ""}
           {variant.usage?.cost != null ? " · " + formatCost(variant.usage.cost) : ""}
         </div>
       )}

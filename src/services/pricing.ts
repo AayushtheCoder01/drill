@@ -1,10 +1,18 @@
 /* ============================================================================
- * pricing.ts — what a model costs.
+ * pricing.ts — what a model costs, and what it can do.
  *
  * OpenRouter publishes per-token pricing for its whole catalogue on /models,
  * so one public, unauthenticated fetch prices every model it serves. That is
  * the whole reason there is no hand-maintained price table in this repo: a
  * bundled table would rot, and every new model would be a code edit.
+ *
+ * The same response carries `supported_parameters`, which is the only
+ * machine-readable answer anywhere to "can this model think?". So the fetch
+ * answers two questions and this file owns both — splitting capabilities into
+ * their own module would mean pulling the same 300KB twice. Prices go out
+ * through priceForModel (backend-gated, because a price is a claim about
+ * money); capabilities go out through catalogueEntry (not gated, because the
+ * model is the same model wherever you call it from).
  *
  * Which backends that applies to is the backend's own business, declared as
  * `pricing` on its BackendDef rather than decided by a list of ids here:
@@ -26,7 +34,10 @@
 import { BACKENDS } from "@/services/ai/backends";
 import type { ModelPrice } from "@/types/chat";
 
-const CACHE_KEY = "drill:pricing:v1";
+/* v2 added `reasoning`; a v1 cache has the field missing rather than
+   false, which would read as "cannot think" for every model in it. */
+const CACHE_KEY = "drill:pricing:v2";
+const STALE_KEYS = ["drill:pricing:v1"];
 const TTL = 24 * 60 * 60 * 1000;
 /** Hardcoded rather than taken from the resolved backend: this is fetched
  *  regardless of which backend is active, so the active base URL is usually
@@ -80,6 +91,7 @@ export function loadPricing(): Promise<Record<string, ModelPrice>> {
           name?: string;
           context_length?: number;
           pricing?: { prompt?: string; completion?: string };
+          supported_parameters?: string[];
         };
         if (!m.id || !m.pricing) continue;
         // OpenRouter quotes USD per token as a decimal string; we store per
@@ -87,7 +99,18 @@ export function loadPricing(): Promise<Record<string, ModelPrice>> {
         const prompt = parseFloat(m.pricing.prompt || "0") * 1e6;
         const completion = parseFloat(m.pricing.completion || "0") * 1e6;
         if (!isFinite(prompt) || !isFinite(completion)) continue;
-        models[m.id] = { id: m.id, name: m.name, prompt, completion, contextLength: m.context_length };
+        /* "reasoning" is the parameter you send to make a model think;
+           "include_reasoning" only asks for the trace back. A model that
+           advertises either one accepts the switch. */
+        const params = m.supported_parameters || [];
+        models[m.id] = {
+          id: m.id,
+          name: m.name,
+          prompt,
+          completion,
+          contextLength: m.context_length,
+          reasoning: params.includes("reasoning") || params.includes("include_reasoning")
+        };
       }
       memo = models;
       try {
@@ -150,10 +173,33 @@ export function priceForModel(backend: string, model: string): ModelPrice | unde
   return undefined;
 }
 
+/**
+ * The catalogue's record for a model, whatever backend you reach it through.
+ *
+ * Deliberately *not* gated on the backend's `pricing` mode the way
+ * priceForModel is. That gate exists because quoting OpenRouter's price for a
+ * call that went somewhere else would be a lie about money; there is no
+ * equivalent lie here, because "llama-3.3-70b-instruct cannot think" is true
+ * of the weights and stays true when Groq serves them.
+ *
+ * Returns undefined when the catalogue has never heard of the id, which is
+ * the normal case for a local model — see lib/thinking.ts for what the UI
+ * does with not-knowing.
+ */
+export function catalogueEntry(model: string): ModelPrice | undefined {
+  if (!memo || !model) return undefined;
+  for (const id of candidates(model)) {
+    const hit = memo[id];
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
 export function clearPricing(): void {
   memo = null;
   try {
     localStorage.removeItem(CACHE_KEY);
+    for (const k of STALE_KEYS) localStorage.removeItem(k);
   } catch {
     /* ignore */
   }

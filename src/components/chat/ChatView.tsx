@@ -12,7 +12,6 @@ import * as chatStore from "@/services/chatStore";
 import * as store from "@/services/store";
 import * as AI from "@/services/ai";
 import * as memoryCapture from "@/services/memoryCapture";
-import ActionChips from "./ActionChips";
 import { poolFor } from "@/lib/memoryBrief";
 import type { ChatMessage } from "@/types";
 import { useChat } from "@/context/ChatContext";
@@ -30,7 +29,6 @@ import ChatRail from "../rail/ChatRail";
 import Icon from "../ui/Icon";
 import ChatSidebar from "./ChatSidebar";
 import MessageTurn from "./MessageTurn";
-import ModeChip from "./ModeChip";
 import Composer, { type SlashCommand } from "./Composer";
 import ConversationSettings from "./ConversationSettings";
 import CommandPalette, { type PaletteAction } from "./CommandPalette";
@@ -38,7 +36,7 @@ import CardsModal from "./CardsModal";
 import ChatEmpty from "./ChatEmpty";
 import ReadProgress from "./ReadProgress";
 import ModelChip from "./ModelChip";
-import EffortChip from "./EffortChip";
+import ToolsMenu from "./ToolsMenu";
 
 /* Imported here rather than in main.tsx so both stylesheets ride along with
    the lazy chat chunk instead of blocking the review loop's first paint. */
@@ -481,29 +479,8 @@ export default function ChatView() {
           busy={chat.busy}
           commands={commands}
           references={references}
-          tools={
-            <>
-              <ModelChip conversation={c} draftModel={chat.draftModel} onDraftModel={chat.setDraftModel} />
-              <EffortChip
-                conversation={c}
-                draftEffort={chat.draftEffort}
-                onDraftEffort={chat.setDraftEffort}
-                draftMode={chat.draftMode}
-              />
-              <ModeChip
-                conversation={c}
-                draftMode={chat.draftMode}
-                onDraftMode={chat.setDraftMode}
-                onChange={(mode) => chat.update({ mode })}
-              />
-              <ActionChips
-                active={c?.actions || []}
-                backend={c?.backend}
-                model={c?.model || chat.draftModel}
-                onChange={(actions) => chat.update({ actions })}
-              />
-            </>
-          }
+          tools={<ToolsMenu />}
+          trailing={<ModelChip conversation={c} draftModel={chat.draftModel} onDraftModel={chat.setDraftModel} />}
           seed={seed}
           placeholder={readiness.ok ? "Ask anything — / for commands" : readiness.why}
           onSend={(text, attachments) => void chat.send(text, attachments)}

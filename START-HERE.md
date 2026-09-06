@@ -188,9 +188,9 @@ what follows is the list as it actually stands on 2026-09-06.*
   the whole tree went with it.
 - **The agent loop has never run against a real model.** No API key in this
   environment. See §13, "What is verified, and what is not".
-- **Drafts reset on navigation.** `draftModel`, `draftEffort` and `draftMode`
-  live in `ChatContext` state; leaving chat and coming back loses an unsent
-  choice. Long-standing, minor, one fix for all three.
+- **Drafts reset on navigation.** `draftModel`, `draftEffort`, `draftMode` and
+  `draftActions` live in `ChatContext` state; leaving chat and coming back
+  loses an unsent choice. Long-standing, minor, one fix for all four.
 - **Phase 9 (capture bridge) and Phase 11 (auto-backup to disk) are not
   started**, and cache tuning from Phase 10 is not either.
 
@@ -937,9 +937,15 @@ multi-request.
 - **Anything settable before a conversation exists needs a draft.**
   `ChatContext.update()` returns early with no conversation, so the mode picker
   silently did nothing on first arrival at chat until `draftMode` was added
-  beside `draftModel`/`draftEffort`. Any new per-conversation control has the
-  same hole. (Known and left alone: all three drafts reset if you navigate away
-  from chat and back.)
+  beside `draftModel`/`draftEffort`; the capability switches had the identical
+  bug until `draftActions`. Any new per-conversation control has the same hole.
+  Two halves to the fix, and the second is the one that was missed: the draft
+  has to exist, *and* every creation path has to apply it. They all funnel
+  through `withDrafts()` now, which reads a ref rather than state — ChatView's
+  ctrl+J listener re-registers only when the palette or drawer moves, so it
+  otherwise holds a first-render closure and started every new chat with the
+  drafts empty. (Known and left alone: all four drafts reset if you navigate
+  away from chat and back.)
 - **The loop's failure mode is spending, not crashing.** Three budgets guard
   it: `maxSteps`, `MAX_TOOL_CHARS` (12k across the whole message), and per-tool
   caps applied in `runTool` rather than trusted to each tool.

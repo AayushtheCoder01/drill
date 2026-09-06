@@ -35,6 +35,7 @@ import { useRoute } from "./RouteContext";
 import type { Attachment, ChatMode, Conversation, ContextSource, Turn, Usage, Variant } from "@/types/chat";
 import { runAgentTurn } from "@/services/agent";
 import type { AgentPlan, AgentTrace, ToolCall, ToolRun } from "@/types/agent";
+import type { ChatActionId } from "@/lib/chatActions";
 import type { BackendType, ChatMessage, Citation, Memory } from "@/types";
 
 /** A one-off backend/model for a single regenerate call — applied to that
@@ -119,6 +120,13 @@ interface ChatState {
    *  already had drafts for exactly this reason; mode was added without one. */
   draftMode: ChatMode;
   setDraftMode: (m: ChatMode) => void;
+  /** The capability switches thrown on the empty screen. Same story as the
+   *  three above and the same bug: turning Web on before typing looked like
+   *  it worked, then did nothing, because `update()` has no conversation to
+   *  write to and returns. The chip stayed lit off nothing at all until a
+   *  thread existed to hold it. */
+  draftActions: ChatActionId[];
+  setDraftActions: (a: ChatActionId[]) => void;
 }
 
 const Ctx = createContext<ChatState | null>(null);
@@ -138,6 +146,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [draftModel, setDraftModel] = useState("");
   const [draftEffort, setDraftEffort] = useState<Effort | "">("");
   const [draftMode, setDraftMode] = useState<ChatMode>("direct");
+  const [draftActions, setDraftActions] = useState<ChatActionId[]>([]);
 
   const abortRef = useRef<AbortController | null>(null);
   const followupAbort = useRef<AbortController | null>(null);
@@ -179,6 +188,45 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     return () => {
       document.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("pagehide", onHide);
+    };
+  }, []);
+
+  /**
+   * The drafts as of right now, readable from a callback of any age.
+   *
+   * The mirror is not defensive programming, it is a bug that was caught in
+   * the browser: ChatView registers ctrl+J once and re-registers it only when
+   * the palette or the drawer moves, so the `newConversation` it holds is a
+   * closure from an early render. Reading the draft state directly, that
+   * closure saw the values from whenever the listener was last attached —
+   * always empty — and a new chat started with Web on silently started with
+   * Web off. A ref has no vintage.
+   */
+  const draftsRef = useRef({ draftModel, draftEffort, draftMode, draftActions });
+  useEffect(() => {
+    draftsRef.current = { draftModel, draftEffort, draftMode, draftActions };
+  }, [draftModel, draftEffort, draftMode, draftActions]);
+
+  /**
+   * What the composer was set to before there was a conversation to set it on.
+   *
+   * Every creation path funnels through this, which is the fix for a quieter
+   * version of the same bug: `send()` applied the drafts, but the starter
+   * cards and the slash commands called `newConversation()` directly, so
+   * picking a model and then clicking "Quiz me on what's due" threw the choice
+   * away. Explicit opts still win — a starter that asks for the Socratic
+   * persona means it.
+   *
+   * Only non-empty drafts are emitted, so spreading this over CreateOpts never
+   * overwrites a caller's field with "".
+   */
+  const withDrafts = useCallback((): chatStore.CreateOpts => {
+    const d = draftsRef.current;
+    return {
+      ...(d.draftModel ? { model: d.draftModel } : {}),
+      ...(d.draftEffort ? { effort: d.draftEffort } : {}),
+      ...(d.draftMode !== "direct" ? { mode: d.draftMode } : {}),
+      ...(d.draftActions.length ? { actions: d.draftActions } : {})
     };
   }, []);
 
@@ -509,11 +557,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       if (!c) {
         // A model picked on the empty screen has to survive the conversation
         // being created here, or choosing one before typing does nothing.
-        c = chatStore.create({
-          ...(draftModel ? { model: draftModel } : {}),
-          ...(draftEffort ? { effort: draftEffort } : {}),
-          ...(draftMode !== "direct" ? { mode: draftMode } : {})
-        });
+        c = chatStore.create(withDrafts());
         setConversation(c);
         openChat(c.id);
       }
@@ -534,7 +578,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       await run(c, assistant, c.turns.length - 2);
     },
-    [conversation, openChat, run, rerender]
+    [conversation, openChat, run, rerender, withDrafts]
   );
 
   const stop = useCallback(() => {
@@ -615,7 +659,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const newConversation = useCallback(
     (opts?: chatStore.CreateOpts, firstMessage?: string) => {
-      const c = chatStore.create(opts);
+      const c = chatStore.create({ ...withDrafts(), ...opts });
       setConversation(c);
       openChat(c.id);
       if (firstMessage) {
@@ -635,7 +679,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }, 0);
       }
     },
-    [openChat, run]
+    [openChat, run, withDrafts]
   );
 
   const value: ChatState = {
@@ -662,7 +706,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     draftEffort,
     setDraftEffort,
     draftMode,
-    setDraftMode
+    setDraftMode,
+    draftActions,
+    setDraftActions
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

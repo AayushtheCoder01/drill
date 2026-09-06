@@ -1040,6 +1040,35 @@
   padding: 0 var(--s-2) var(--s-2) var(--s-3);
   animation: tools-in var(--fast) var(--ease);
 }
+/* The two clusters. Left is what the message is set to, right is what will
+   answer it; they are separate flex boxes rather than one run with a spacer so
+   that a narrow window wraps them as two groups instead of shuffling the model
+   chip in among the pills. */
+.ctools-left,
+.ctools-right {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: var(--s-1);
+}
+.ctools-left {
+  flex: 1 1 auto;
+}
+.ctools-right {
+  flex: 0 1 auto;
+  margin-left: auto;
+  flex-wrap: nowrap;
+}
+/* Icon-only. The word "Attach" was 46px spent restating a paperclip, and this
+   row now has a menu button to fit beside it. */
+.attach-btn {
+  padding: 0;
+  width: 26px;
+  justify-content: center;
+  flex: 0 0 auto;
+}
 .composer-box:focus-within .composer-tools,
 .composer-box.armed .composer-tools {
   display: flex;
@@ -1130,10 +1159,10 @@
 /* The key hints give way first: they are the least of what is in the row, and
    on a narrow window Send matters more than being told what enter does. */
 .composer-hint.keys {
-  /* flex: 1 1 0 rather than auto — it takes whatever the chips leave and
-     ellipsises, instead of wrapping the tool row onto a second line the
-     moment the rail is open and the composer is 200px narrower. */
-  flex: 1 1 0;
+  /* flex: 0 1 auto and ellipsising — it gives way before the model chip does,
+     instead of wrapping the tool row onto a second line the moment the rail is
+     open and the composer is 200px narrower. */
+  flex: 0 1 auto;
   min-width: 0;
   text-align: right;
   overflow: hidden;
@@ -1141,7 +1170,9 @@
   white-space: nowrap;
   display: block;
 }
-@media (max-width: 820px) {
+/* Below this the row is doing well to hold the Tools button, the pills and the
+   model; a reminder of what enter does is the first thing to go. */
+@media (max-width: 980px) {
   .composer-hint.keys {
     display: none;
   }
@@ -1350,44 +1381,6 @@
 .modelpop-row.on {
   color: var(--accent);
 }
-/* The effort menu is the same popover with three tall rows: each option has
-   to say what it costs, or it is the dead dial all over again. */
-.effortlist {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.effortrow {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: 0;
-  padding: var(--s-3);
-  border-radius: var(--r-2);
-  cursor: pointer;
-}
-.effortrow:hover {
-  background: var(--accent-10);
-}
-.effortrow-n {
-  font-family: var(--serif);
-  font-size: var(--t-md);
-  color: var(--ink);
-  text-transform: capitalize;
-}
-.effortrow-b {
-  font-family: var(--sans);
-  font-size: var(--t-2xs);
-  line-height: var(--lh-snug);
-  color: var(--ink-3);
-}
-.effortrow.on .effortrow-n {
-  color: var(--accent);
-}
-
 .modelpop-empty {
   font-family: var(--sans);
   font-size: var(--t-2xs);
@@ -1897,18 +1890,6 @@
   margin-left: var(--s-2);
 }
 
-/* An action chip reads as a switch: off is the same ghost button as its
-   neighbours, on is tinted so the state is visible without a label change. */
-.cbtn.actchip.on {
-  --btn-bg: var(--accent-10);
-  --btn-edge: var(--accent-45);
-  --btn-fg: var(--accent);
-}
-.cbtn.actchip:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 /* ============================================================================
  * The agent trace — what the assistant looked at before it answered.
  *
@@ -2173,28 +2154,78 @@
 }
 
 /* ---------------------------------------------------------------------------
- * The mode picker. Three modes is one more than a toggle carries.
+ * The Tools menu, and the pills that report what it has switched on.
+ *
+ * One popover holding three sections, replacing four chips that each owned a
+ * popover of their own. Sectioned rather than merely stacked: the headings are
+ * what let a row afford a full sentence of explanation, which is the only
+ * reason "up to 6 lookups, each one a request" fits anywhere at all.
+ *
+ * The pills are the other half of the bargain. Hiding controls behind a menu
+ * is only honest if what is *on* comes back out, so anything in force is a
+ * labelled pill in the bar that clicks itself off.
  * ------------------------------------------------------------------------- */
-.modechip {
+.toolsmenu {
   position: relative;
   display: inline-flex;
+  flex: 0 0 auto;
 }
-.modechip-pop {
+.tools-btn.open {
+  --btn-bg: var(--surface-2);
+  --btn-edge: var(--rule);
+  --btn-fg: var(--ink);
+}
+.tools-pop {
   position: absolute;
   bottom: calc(100% + var(--s-2));
   left: 0;
-  z-index: 40;
-  width: min(21rem, 78vw);
+  z-index: 50;
+  width: min(23rem, 84vw);
   padding: var(--s-1);
   border-radius: var(--r-3);
-  border: 1px solid var(--rule);
-  background: var(--surface);
-  box-shadow: var(--shadow-3, 0 12px 32px -12px oklch(0% 0 0 / 0.5));
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  border: 1px solid var(--border-subtle, var(--rule));
+  background: var(--surface-glass, var(--surface));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--lift-3);
+  /* 34rem is the measured height of all three sections, so on a normal window
+     the menu never scrolls; the vh clamp is what saves it on a laptop in
+     landscape, where a composer at the bottom of the page does not leave three
+     sections' worth of room above it. */
+  max-height: min(34rem, 78vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  animation: pop-up var(--fast) var(--ease-spring);
 }
-.modechip-row {
+/* A hairline between sections rather than a gap: the sections are one menu,
+   not three menus stacked. */
+.tools-sect + .tools-sect {
+  border-top: 1px solid var(--rule-soft);
+  margin-top: var(--s-1);
+  padding-top: var(--s-1);
+}
+.tools-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3) var(--s-1);
+  color: var(--ink-3);
+  font-size: var(--t-3xs);
+  text-transform: uppercase;
+  letter-spacing: var(--track-caps);
+}
+.tools-clear {
+  background: none;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 0;
+}
+.tools-row {
   display: flex;
   align-items: flex-start;
   gap: var(--s-2);
@@ -2207,55 +2238,169 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background var(--fast);
 }
-.modechip-row:hover {
+.tools-row:hover:not(:disabled) {
   background: var(--surface-2);
 }
-.modechip-row.on {
+.tools-row.on {
   background: var(--accent-10);
   color: var(--ink);
 }
-.modechip-icon {
+/* A row the backend or the model cannot do stays in place and greys, rather
+   than vanishing: "why can't I make it think" has to be answerable by looking
+   at the thing itself, and its blurb is swapped for the reason. */
+.tools-row:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.tools-icon {
   flex: none;
   margin-top: 2px;
   color: var(--ink-3);
 }
-.modechip-row.on .modechip-icon,
-.modechip-tick {
+.tools-row.on .tools-icon,
+.tools-tick {
   color: var(--accent);
 }
-.modechip-text {
+.tools-text {
   flex: 1;
   min-width: 0;
 }
-.modechip-name {
+.tools-name {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   color: var(--ink);
   font-size: var(--t-sm);
 }
-.modechip-cost {
+.tools-cost {
   font-family: var(--mono);
   font-size: var(--t-3xs);
   color: var(--ink-3);
 }
-.modechip-blurb {
+.tools-blurb {
   display: block;
   margin-top: 2px;
   color: var(--ink-3);
   font-size: var(--t-2xs);
   line-height: var(--lh-snug);
 }
-.modechip-tick {
+.tools-tick {
   flex: none;
   margin-top: 3px;
 }
-
-.modechip-head {
-  padding: var(--s-2) var(--s-3) var(--s-1);
+/* The capability rows are switches, not choices, so they end in one — three
+   modes are mutually exclusive and get a tick, two tools are independent and
+   get a track each. The shape carries the difference. */
+.tools-sw {
+  flex: none;
+  margin-top: 3px;
+  width: 26px;
+  height: 15px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  position: relative;
+  transition: background var(--fast), box-shadow var(--fast);
+}
+.tools-sw::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: var(--r-full);
+  background: var(--ink-3);
+  transition: transform var(--fast) var(--ease), background var(--fast);
+}
+.tools-sw.on {
+  background: var(--accent-25);
+  box-shadow: inset 0 0 0 1px var(--accent-45);
+}
+.tools-sw.on::after {
+  transform: translateX(11px);
+  background: var(--accent);
+}
+/* Effort is three exclusive values with no explaining to do per option — the
+   sentence under the control covers all three — so it is a segmented control
+   rather than three more tall rows. */
+.tools-seg {
+  display: flex;
+  gap: 2px;
+  margin: 0 var(--s-3);
+  padding: 2px;
+  border-radius: var(--r-2);
+  background: var(--page-2);
+  box-shadow: inset 0 0 0 1px var(--rule-soft);
+}
+.tools-segbtn {
+  flex: 1;
+  border: 0;
+  border-radius: var(--r-1);
+  background: transparent;
   color: var(--ink-3);
+  font-family: var(--sans);
+  font-size: var(--t-2xs);
+  text-transform: capitalize;
+  padding: var(--s-1) var(--s-2);
+  cursor: pointer;
+  transition: background var(--fast), color var(--fast);
+}
+.tools-segbtn:hover {
+  color: var(--ink);
+}
+.tools-segbtn.on {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: var(--lift-1);
+}
+.tools-note {
+  margin: var(--s-2) 0 var(--s-2);
+  padding: 0 var(--s-3);
+  color: var(--ink-3);
+  font-size: var(--t-2xs);
+  line-height: var(--lh-snug);
+}
+
+/* A pill is a setting that is currently in force. Smaller and rounder than the
+   buttons beside it, because it reports rather than invites. */
+.cpill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  height: 26px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-full);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-family: var(--sans);
   font-size: var(--t-3xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  text-transform: capitalize;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--fast), border-color var(--fast), color var(--fast), transform var(--fast);
+}
+.cpill:hover {
+  background: var(--surface-2);
+  border-color: var(--rule);
+  color: var(--ink);
+}
+.cpill:active {
+  transform: scale(0.96);
+}
+.cpill.on {
+  background: var(--accent-10);
+  border-color: var(--accent-45);
+  color: var(--accent);
+}
+.cpill-x {
+  opacity: 0.55;
+  margin-left: 1px;
+}
+.cpill:hover .cpill-x {
+  opacity: 1;
 }

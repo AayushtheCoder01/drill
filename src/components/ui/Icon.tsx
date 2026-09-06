@@ -38,7 +38,10 @@ export type IconName =
   | "check"
   | "keyboard"
   | "help"
-  | "refresh";
+  | "refresh"
+  | "globe"
+  | "brain"
+  | "sliders";
 
 /* Every path is drawn on a 24-grid, stroked, never filled — except the two
    that mean "on" (star-filled), where a fill is the whole signal. */
@@ -103,6 +106,22 @@ const PATHS: Record<IconName, { d: string; fill?: boolean }[]> = {
   help: [{ d: "M12 17h.01M9 9a3 3 0 1 1 5 2c-.9.7-2 1.4-2 3v1" }],
   refresh: [
     { d: "M3 12a9 9 0 0 1 15.4-6.4L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.4 6.4L3 16M3 21v-5h5" }
+  ],
+  globe: [
+    { d: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" },
+    { d: "M3.5 9h17M3.5 15h17" },
+    { d: "M12 3c2.3 2.4 3.5 5.4 3.5 9s-1.2 6.6-3.5 9c-2.3-2.4-3.5-5.4-3.5-9s1.2-6.6 3.5-9Z" }
+  ],
+  /* A head with a coil inside it rather than the usual lobed brain: at 13px a
+     brain is a grey smudge, and the point of the glyph is "thinking", not
+     anatomy. */
+  brain: [
+    { d: "M15.5 20.5v-2.4c2.6-1 4.3-3.4 4.3-6.3A7.8 7.8 0 0 0 4.4 10L2.8 13.4h2.4v3.2c0 1.1.9 2 2 2h1.6v1.9" },
+    { d: "M9.4 12.6c0-1.4 1.2-2.6 2.6-2.6s2.6 1.2 2.6 2.6-1.2 2-2.6 2.6" }
+  ],
+  sliders: [
+    { d: "M4 7h9M17 7h3M4 17h3M11 17h9" },
+    { d: "M15 7a2 2 0 1 0 4 0 2 2 0 0 0-4 0ZM7 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0Z" }
   ]
 };
 

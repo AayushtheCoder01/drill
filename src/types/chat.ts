@@ -201,11 +201,18 @@ export interface Persona {
   temperature?: number;
 }
 
-/** Model pricing, per million tokens, when the backend publishes it. */
+/** One model as the catalogue describes it: pricing per million tokens, plus
+ *  the capabilities the same response happens to publish. Named for what it
+ *  was first used for; see services/pricing.ts for why one fetch answers both
+ *  questions. */
 export interface ModelPrice {
   id: string;
   prompt: number;
   completion: number;
   contextLength?: number;
   name?: string;
+  /** Whether the model accepts a reasoning parameter — the machine-readable
+   *  answer to "can this one think?". Absent on a record written before the
+   *  field existed, which reads as "not known", never as "no". */
+  reasoning?: boolean;
 }

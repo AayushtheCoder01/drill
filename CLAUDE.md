@@ -91,6 +91,19 @@ not fire while an INPUT/TEXTAREA/SELECT has focus), and `ChatView`/`Composer`
 the modal in the same commit.** A cheatsheet row that nothing listens for is
 worse than no row.
 
+**One composer control is model-dependent, not backend-dependent.** Everything
+else in the app asks "can this backend do it"; thinking asks "can this *model*
+do it", because one OpenRouter key reaches both kinds and the model chip is one
+click away. The answer comes from OpenRouter's `supported_parameters`, which
+`services/pricing.ts` already fetches — one catalogue call answers both "what
+does it cost" and "can it think". `lib/thinking.ts` turns that into three
+states, and the third matters: **not knowing leaves the switch live**. Rounding
+`unknown` down to "no" would grey the control out for every local model and for
+everybody until the catalogue lands. Only a catalogue hit produces a "no".
+Ask `availability(id, supports, model)` in `lib/chatActions.ts` — never
+`backend.supports` directly — because the send path filters on the same call
+and the two must not disagree.
+
 **Backends and credentials.** `services/ai/backends.ts` holds one entry per
 provider — OpenRouter, Groq, Ollama, and a generic OpenAI-compatible one — and
 anything speaking the OpenAI wire format needs only headers, via
@@ -129,7 +142,12 @@ the whole picture. Four things bite:
 - **Anything settable before a conversation exists needs a draft.**
   `ChatContext.update()` returns early with no conversation, so a new
   per-conversation control silently does nothing on the empty chat screen until
-  it gets a `draft*` beside `draftModel` / `draftEffort` / `draftMode`.
+  it gets a `draft*` beside `draftModel` / `draftEffort` / `draftMode` /
+  `draftActions` — and until `withDrafts()` emits it, which is what every
+  creation path (send, starters, slash commands, ctrl+J) funnels through.
+  `withDrafts` reads a ref, not state, because ChatView's ctrl+J listener is
+  re-registered only when the palette or drawer moves and otherwise holds a
+  first-render closure.
 
 **There is still no error boundary.** A render crash anywhere — `Shell`,
 `Sidebar`, or a composer chip rendered before its new prop was threaded through
