@@ -468,10 +468,7 @@ export function init(cfg?: DrillConfig): DrillDB {
      fallback below can stay inside it — otherwise a dangling db.active could
      heal onto a deck from a *different* project than db.activeProjectId. */
   if (!db.projects[db.activeProjectId]) db.activeProjectId = Object.keys(db.projects)[0];
-  if (!db.decks[db.active] || db.decks[db.active].projectId !== db.activeProjectId) {
-    const inProject = decksOf(db.activeProjectId);
-    db.active = inProject.length ? inProject[0].id : Object.keys(db.decks)[0];
-  }
+  ensureActiveDeck();
   saveNow();
   notify();
   return db;
@@ -597,6 +594,10 @@ export function setKnowledgeEnabled(projectId: string, id: string, enabled: bool
 export function archiveProject(id: string, archived: boolean): void {
   const p = db.projects[id];
   if (!p || p.archived === archived) return;
+  /* The personal space is where a chat goes when it belongs nowhere, so there
+     has to be one. The switcher does not offer the action; this is the guard
+     for every other caller. */
+  if (archived && migrate.isPersonalProject(id)) return;
   if (archived) {
     const others = Object.values(db.projects).filter((x) => x.id !== id && !x.archived);
     if (!others.length) return;
@@ -615,17 +616,38 @@ export function archiveProject(id: string, archived: boolean): void {
 export function setActiveProject(id: string): void {
   if (!db.projects[id] || db.activeProjectId === id) return;
   db.activeProjectId = id;
-  let decks = decksOf(id);
-  if (!decks.length) {
-    const d = makeDeck("New deck", [], id);
-    db.decks[d.id] = d;
-    db.projects[id].deckIds.push(d.id);
-    decks = [d];
-  }
-  if (!decks.some((x) => x.id === db.active)) db.active = decks[0].id;
+  ensureActiveDeck();
   db.settings.mix = false;
   saveNow();
   notify();
+}
+
+/**
+ * Guarantee the active project has a deck, and that db.active names one of
+ * *its* decks.
+ *
+ * The fallback used to be `Object.keys(db.decks)[0]`, which reached outside
+ * the project — so opening a project with no decks of its own showed another
+ * project's deck in the header and drilled its cards, "exactly the leak
+ * projects exist to prevent" (see pool()). Reachable long before the personal
+ * space existed: `createProject` has always made a project with no decks in
+ * it, so it happened to anyone who made a second project and reloaded.
+ *
+ * Creating one is the right repair rather than tolerating none, because
+ * `deck()` is read as non-null in a dozen components and `pool()` returns
+ * `[deck()]` — an empty active project is the `[undefined]` that takes the
+ * whole app down, not just the review loop.
+ */
+function ensureActiveDeck(): void {
+  const pid = db.activeProjectId;
+  let mine = decksOf(pid);
+  if (!mine.length) {
+    const d = makeDeck("New deck", [], pid);
+    db.decks[d.id] = d;
+    db.projects[pid].deckIds.push(d.id);
+    mine = [d];
+  }
+  if (!mine.some((d) => d.id === db.active)) db.active = mine[0].id;
 }
 
 /* ---------- deck operations ---------- */
@@ -1029,10 +1051,7 @@ export function restoreBackup(raw: DrillDB | LegacyDBv3 | LegacyDBv2): void {
   if (!Array.isArray(db.log)) db.log = [];
   if (!Array.isArray(db.notes)) db.notes = [];
   if (!db.projects[db.activeProjectId]) db.activeProjectId = Object.keys(db.projects)[0];
-  if (!db.decks[db.active] || db.decks[db.active].projectId !== db.activeProjectId) {
-    const inProject = decksOf(db.activeProjectId);
-    db.active = inProject.length ? inProject[0].id : Object.keys(db.decks)[0];
-  }
+  ensureActiveDeck();
   saveNow();
   notify();
 }

@@ -32,6 +32,40 @@ export const CURRENT_DB_VERSION = 4;
 /** What pre-project decks and notes get filed under. */
 export const DEFAULT_PROJECT_NAME = "General";
 
+/**
+ * The space for chats that do not belong to anything.
+ *
+ * Projects are the right container for "I am learning distributed systems for
+ * six months". They are the wrong container for "what is the syntax for a bash
+ * case statement", and until now there was nowhere to put that question: every
+ * conversation was filed under whichever project happened to be active, so a
+ * one-off answer landed in the middle of a body of work and stayed there.
+ *
+ * So there is one project that is not really a project. It is a real record —
+ * a fixed id rather than a null, deliberately, because `projects[c.projectId]`
+ * is read in a dozen places and every one of them would need a null branch
+ * otherwise; a nullable project id is how you white-screen this app. What
+ * makes it different is entirely in how it is presented: its own group at the
+ * top of the switcher, no goals, no archiving, and chat as the landing view.
+ *
+ * The id is a literal, not a uuid, so the same install always resolves the
+ * same space and a `#/p/personal/chat` link is stable and readable.
+ */
+export const PERSONAL_PROJECT_ID = "personal";
+export const PERSONAL_PROJECT_NAME = "Personal";
+
+export function makePersonalProject(): Project {
+  return makeProject(PERSONAL_PROJECT_NAME, {
+    id: PERSONAL_PROJECT_ID,
+    blurb: "Chats that do not belong to a project"
+  });
+}
+
+/** True for the one project that is a space rather than a body of work. */
+export function isPersonalProject(id: string): boolean {
+  return id === PERSONAL_PROJECT_ID;
+}
+
 export function blankProjectDefaults(): ProjectDefaults {
   return { backend: "", model: "", personaId: "", effort: "", temperature: null };
 }
@@ -149,6 +183,14 @@ export function migrateToV4(raw: LegacyDBv3 | DrillDB): DrillDB {
     decks[id].projectId = pid;
     projects[pid].deckIds.push(id);
   }
+
+  /* The personal space is created here rather than on demand so that it
+     exists before anything can route to it, and so a restored backup from
+     before it existed comes back with it. Added after the deckIds rebuild
+     above on purpose: it owns no decks, and giving it one is store.heal()'s
+     job, which is where the "every project has somewhere to put a card"
+     invariant already lives. */
+  if (!projects[PERSONAL_PROJECT_ID]) projects[PERSONAL_PROJECT_ID] = makePersonalProject();
 
   const notes = (src.notes || []).map((n) => upgradeNote(n as LegacyNoteV3, activeProjectId));
 

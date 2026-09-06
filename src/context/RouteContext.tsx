@@ -26,6 +26,7 @@
  * ========================================================================== */
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import * as store from "@/services/store";
+import { isPersonalProject } from "@/lib/migrate";
 
 export type View = "home" | "drill" | "cards" | "chat" | "journal" | "exam";
 
@@ -147,9 +148,14 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   const switchProject = useCallback(
     (projectId: string) => {
       store.setActiveProject(projectId);
-      go({ projectId, conversationId: null, journalDay: null, examId: null });
+      /* The personal space has no decks worth reviewing, no goals and no
+         journal — it exists so a question can be asked without filing it
+         anywhere. Landing on home there would show an empty dashboard and
+         make it look broken, so it lands where the only thing in it lives. */
+      const view = isPersonalProject(projectId) ? "chat" : route.view;
+      go({ view, projectId, conversationId: null, journalDay: null, examId: null });
     },
-    [go]
+    [go, route.view]
   );
 
   return (

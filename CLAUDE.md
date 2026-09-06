@@ -57,6 +57,25 @@ navigation scrolling off the page, and it is a rule, not an accident. Putting
 navigation inside `.app-scroll` reintroduces a bug this shell was built to
 kill.
 
+**There is one project that is not a project.** `#/p/personal` is the space for
+chats that belong to no body of work — the ChatGPT-shaped default, next to the
+projects rather than inside them. It is a real `Project` record with a literal
+id rather than a nullable `projectId`, deliberately: `projects[c.projectId]` is
+read in a dozen places and a null there is how you white-screen this app. What
+makes it a space and not a project is presentation only — `projects.list()`
+leaves it out (read it with `projects.personal()`), the switcher gives it its
+own row with no edit or archive, `archiveProject` refuses it, and
+`switchProject` lands it on chat. `lib/migrate.ts` creates it, so a restored
+backup from before it existed comes back with it.
+
+**Every project is guaranteed a deck of its own, and that is load-bearing.**
+`deck()` is read as non-null in a dozen components and `pool()` returns
+`[deck()]`. `ensureActiveDeck()` in `store.ts` is the single place that keeps
+the promise; the fallback it replaced reached outside the project
+(`Object.keys(db.decks)[0]`), so a project with no decks — which is every
+project `createProject` has ever made — showed and drilled another project's
+cards. Never widen that fallback past `decksOf(activeProjectId)`.
+
 **A crash in `Shell`/`Sidebar` white-screens the whole app.** There is no
 error boundary, and `Sidebar` now calls `store.counts()` and
 `journalStore.unrolledEntries()` on every render in every view. Anything those

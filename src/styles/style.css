@@ -2595,6 +2595,42 @@ a {
   font-size: var(--t-xs);
   padding: var(--s-2) var(--s-3);
 }
+/* Personal is a space, not a project, and the menu says so structurally: it
+   sits above the heading with an icon where the others have none, so the eye
+   reads two kinds of thing rather than one list with an odd first entry. */
+.proj-switch-item.personal {
+  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-1);
+}
+.proj-switch-icon {
+  flex: 0 0 auto;
+  width: 22px;
+  color: var(--ink-3);
+}
+.proj-switch-item.personal.on .proj-switch-icon {
+  color: var(--accent);
+}
+.proj-switch-group {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: var(--s-3) var(--s-2) var(--s-1);
+  margin-top: var(--s-1);
+  border-top: 1px solid var(--rule-soft);
+}
+.proj-switch-empty {
+  font-family: var(--sans);
+  font-size: var(--t-2xs);
+  color: var(--ink-3);
+  padding: var(--s-2);
+}
+/* The one space whose monogram is a glyph: it is always the same space, so it
+   is worth recognising rather than reading. */
+.proj-switch-mono.personal {
+  background: var(--accent-10);
+  color: var(--accent);
+}
 
 /* ------------------------------------------- chat pane inside the sheet -- */
 .chat {

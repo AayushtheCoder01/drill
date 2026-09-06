@@ -1,5 +1,13 @@
 /* ============================================================================
- * ProjectSwitcher — pick, create, rename and archive projects.
+ * ProjectSwitcher — pick a space: Personal, or one of your projects.
+ *
+ * Two groups, not one list. A project is a body of work with goals, decks and
+ * a journal; Personal is where a question goes when it is just a question, and
+ * putting it in the same list as "Distributed Systems" would make it look like
+ * a project you had forgotten to name. It gets its own row above the rule, no
+ * edit or archive actions — there is always exactly one and it cannot be put
+ * away — and switching into it lands on chat rather than the review loop,
+ * because there is nothing there to review.
  *
  * A self-contained popover rather than a Sheet pane: the review loop and chat
  * are separate provider trees (App.tsx only wraps the drill view in
@@ -9,6 +17,7 @@
  * ========================================================================== */
 import { useEffect, useRef, useState } from "react";
 import * as store from "@/services/store";
+import * as projects from "@/services/projects";
 import { useDrillStore } from "@/hooks/useDrillStore";
 import { useRoute } from "@/context/RouteContext";
 import Icon from "./ui/Icon";
@@ -36,9 +45,11 @@ export default function ProjectSwitcher({ variant = "bar" }: { variant?: "bar" |
   }, [open]);
 
   const activeP = store.activeProject();
-  const projects = Object.values(store.projects())
-    .filter((p) => !p.archived || p.id === activeP.id)
-    .sort((a, b) => a.created - b.created);
+  const personal = projects.personal();
+  const onPersonal = projects.isPersonalProject(activeP.id);
+  /* list() already leaves the personal space out — it is a space, not a body
+     of work, and it is rendered above as its own row. */
+  const list = projects.list();
 
   const [dialog, setDialog] = useState<
     | null
@@ -108,7 +119,7 @@ export default function ProjectSwitcher({ variant = "bar" }: { variant?: "bar" |
       store.archiveProject(id, false);
       return;
     }
-    const others = projects.filter((x) => x.id !== id && !x.archived);
+    const others = list.filter((x) => x.id !== id && !x.archived);
     if (!others.length) {
       window.alert("Can't archive the only project.");
       return;
@@ -118,7 +129,7 @@ export default function ProjectSwitcher({ variant = "bar" }: { variant?: "bar" |
   }
 
   function confirmArchive(id: string) {
-    const others = projects.filter((x) => x.id !== id && !x.archived);
+    const others = list.filter((x) => x.id !== id && !x.archived);
     store.archiveProject(id, true);
     setDialog(null);
     if (id === activeP.id && others.length) switchProject(others[0].id);
@@ -126,12 +137,18 @@ export default function ProjectSwitcher({ variant = "bar" }: { variant?: "bar" |
 
   return (
     <div className={"proj-switch " + variant + (open ? " open" : "")} ref={ref}>
-      <button className="proj-switch-btn" onClick={() => setOpen((v) => !v)} title={"Project: " + activeP.name}>
+      <button
+        className="proj-switch-btn"
+        onClick={() => setOpen((v) => !v)}
+        title={onPersonal ? "Personal — chats outside any project" : "Project: " + activeP.name}
+      >
         {/* The monogram is what is left of the project in the collapsed rail,
             so it is always rendered rather than swapped in — there is nothing
-            to pop when the labels fade out beside it. */}
-        <span className="proj-switch-mono" aria-hidden="true">
-          {activeP.name.trim().charAt(0) || "?"}
+            to pop when the labels fade out beside it. Personal gets a glyph
+            instead of a letter: it is the one space that is always the same
+            one, so it is worth being recognisable rather than spelled. */}
+        <span className={"proj-switch-mono" + (onPersonal ? " personal" : "")} aria-hidden="true">
+          {onPersonal ? <Icon name="bubble" size={13} /> : activeP.name.trim().charAt(0) || "?"}
         </span>
         <span className="proj-switch-name">{activeP.name}</span>
         <Icon name="chevron" size={11} className="chev" />
@@ -139,7 +156,19 @@ export default function ProjectSwitcher({ variant = "bar" }: { variant?: "bar" |
       {open && (
         <div className="proj-switch-menu">
           <div className="proj-switch-list">
-            {projects.map((p) => (
+            <button
+              className={"proj-switch-item personal" + (onPersonal ? " on" : "")}
+              onClick={() => pick(personal.id)}
+            >
+              <Icon name="bubble" size={14} className="proj-switch-icon" />
+              <span className="grow">
+                <span className="t">{personal.name}</span>
+                <span className="s">{personal.blurb}</span>
+              </span>
+            </button>
+
+            <div className="proj-switch-group">Projects</div>
+            {list.map((p) => (
               <button key={p.id} className={"proj-switch-item" + (p.id === activeP.id ? " on" : "")} onClick={() => pick(p.id)}>
                 <span className="grow">
                   <span className="t">
@@ -158,6 +187,7 @@ export default function ProjectSwitcher({ variant = "bar" }: { variant?: "bar" |
                 </span>
               </button>
             ))}
+            {!list.length && <div className="proj-switch-empty">No projects yet — everything is personal.</div>}
           </div>
           <button className="proj-switch-new" onClick={startNewProject}>
             <Icon name="plus" size={13} /> New project

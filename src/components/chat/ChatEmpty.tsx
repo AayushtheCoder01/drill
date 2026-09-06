@@ -5,8 +5,17 @@
  * and gets you a Wikipedia paragraph; these seed the modes that are actually
  * worth the tokens, and three of the six only exist because the app knows
  * your decks.
+ *
+ * Which is exactly why the personal space gets a different set. "Work on my
+ * weak spots · 0 leeches" is not a starter there, it is an advertisement for
+ * an empty room — Personal has no decks by design, and offering the three
+ * deck-shaped openers would be the app promising something it cannot do. The
+ * headline promise changes with it, for the same reason: a fresh personal
+ * chat cannot see decks or weak cards, and saying it can would be the first
+ * thing it got wrong.
  * ========================================================================== */
 import * as store from "@/services/store";
+import { isPersonalProject } from "@/services/projects";
 import type { CreateOpts } from "@/services/chatStore";
 import Icon, { type IconName } from "../ui/Icon";
 
@@ -19,8 +28,9 @@ interface Props {
 export default function ChatEmpty({ ready, onStart, onPrefill }: Props) {
   const counts = store.counts();
   const stats = store.stats();
+  const personal = isPersonalProject(store.get().activeProjectId);
 
-  const starters: { t: string; s: string; icon: IconName; go: () => void }[] = [
+  const deckStarters: { t: string; s: string; icon: IconName; go: () => void }[] = [
     {
       t: "Work on my weak spots",
       s: `${stats.leech} leech${stats.leech === 1 ? "" : "es"} · finds what they have in common instead of drilling them`,
@@ -43,6 +53,9 @@ export default function ChatEmpty({ ready, onStart, onPrefill }: Props) {
           { title: "Quiz session", personaId: "socratic", context: [{ kind: "due", deckId: null }] }
         )
     },
+  ];
+
+  const always: { t: string; s: string; icon: IconName; go: () => void }[] = [
     {
       t: "Explain something new",
       s: "From first principles, with a worked example",
@@ -73,16 +86,22 @@ export default function ChatEmpty({ ready, onStart, onPrefill }: Props) {
     }
   ];
 
+  /* Deck-shaped openers first where there are decks, and not at all where
+     there are none. */
+  const starters = personal ? always : [...deckStarters, ...always];
+
   return (
     <div className="chat-empty">
       <div className="chat-empty-icon">
         <Icon name="bubble" size={28} />
       </div>
-      <h2>What are we working on?</h2>
+      <h2>{personal ? "What's on your mind?" : "What are we working on?"}</h2>
       <p>
-        {ready.ok
-          ? "This chat can see your decks, your weak cards and your insight log — and anything it tells you can become flashcards in one click."
-          : ready.why}
+        {!ready.ok
+          ? ready.why
+          : personal
+            ? "A chat that belongs to nothing. Nothing here is filed against a project — and anything it tells you can still become flashcards in one click."
+            : "This chat can see your decks, your weak cards and your insight log — and anything it tells you can become flashcards in one click."}
       </p>
       <div className="starters">
         {starters.map((s) => (
