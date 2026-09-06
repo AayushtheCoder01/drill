@@ -101,7 +101,7 @@ export default function GlobalScope() {
       .finally(() => setTesting(false));
   }
 
-  function toggle(key: "recall" | "mark" | "interleave" | "followups") {
+  function toggle(key: "recall" | "mark" | "interleave" | "followups" | "autoTitle") {
     store.updateSettings({ [key]: !s[key] });
   }
 
@@ -232,6 +232,12 @@ export default function GlobalScope() {
         sub="Costs a second request after every reply. Off at low effort regardless."
         on={s.followups}
         onToggle={() => toggle("followups")}
+      />
+      <SwitchRow
+        title="Name conversations automatically"
+        sub="One extra request per new thread, never per message. Off names it from your first line instead."
+        on={s.autoTitle}
+        onToggle={() => toggle("autoTitle")}
       />
 
       <div className="srow">

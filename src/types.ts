@@ -136,6 +136,12 @@ export interface Settings {
    *  follow-up questions. Off by default: one message should be one request
    *  unless you have said otherwise. Also forced off at low effort. */
   followups: boolean;
+  /** Whether to spend one request naming a new conversation from its opening
+   *  exchange. On by default, because it is one request per *thread* and a
+   *  sidebar of "New chat" is unusable. Off falls back to a title written
+   *  from the first message locally — see lib/title. Either way it is
+   *  attempted at most once per conversation. */
+  autoTitle: boolean;
   /** Appearance — applied at runtime via lib/theme.ts, not baked into the
    *  stylesheet, so a new option here never needs a CSS release. */
   theme: Theme;

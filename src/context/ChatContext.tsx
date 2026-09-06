@@ -27,6 +27,7 @@ import { loadPricing, priceForModel } from "@/services/pricing";
 import { buildContext } from "@/lib/chatContext";
 import { getPersona } from "@/lib/personas";
 import { budgetFor, deepSteps } from "@/lib/effort";
+import { localTitle } from "@/lib/title";
 import type { Effort } from "@/types/core";
 import { costOf } from "@/lib/tokens";
 import { resolveBackend, resolveEffort, resolveModel } from "@/lib/resolveSetting";
@@ -440,28 +441,48 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [buildMessages, rerender]
   );
 
-  /* ---- auto-title after the first exchange ---- */
+  /* ---- auto-title after the first exchange ----
+
+     Exactly one attempt, ever. The guard used to be `c.titled`, which is only
+     set when a title comes back, so a model that returned nothing usable —
+     routine once a reasoning scratchpad meets a small token cap — left the
+     thread untitled and this ran again on the next message, and the next.
+     That is the "one direct message, two requests" bug: the second request
+     was this, firing forever.
+
+     So the flag now records *that we asked*, not that it worked, and a reply
+     with no title in it falls back to a title written from the opening
+     message locally. Which is also the whole mechanism when auto-titling is
+     off: the thread still gets a name, it just costs nothing. */
   const maybeTitle = useCallback(
     async (c: Conversation) => {
       if (c.titled || c.turns.length < 2) return;
       const firstUser = c.turns.find((t) => t.role === "user");
       const firstAsst = c.turns.find((t) => t.role === "assistant");
       if (!firstUser || !firstAsst) return;
-      try {
-        const title = await AI.generateTitle(
-          chatStore.activeContent(firstUser),
-          chatStore.activeContent(firstAsst),
-          { backend: c.backend, model: c.model }
-        );
-        if (title) {
-          c.title = title;
-          c.titled = true;
-          chatStore.persist(c, true);
-          rerender();
+
+      // Claimed before the await, so a second reply landing while this call is
+      // still in flight cannot start a third request for the same title.
+      c.titled = true;
+
+      let title = "";
+      if (store.settings().autoTitle) {
+        try {
+          title = await AI.generateTitle(chatStore.activeContent(firstUser), chatStore.activeContent(firstAsst), {
+            backend: c.backend,
+            model: c.model
+          });
+        } catch {
+          /* an unnamed conversation is a cosmetic problem, not a failure */
         }
-      } catch {
-        /* an unnamed conversation is a cosmetic problem, not a failure */
       }
+      if (!title) title = localTitle(chatStore.activeContent(firstUser));
+
+      // No text to name it after (an attachment sent alone) keeps the
+      // placeholder, and the flag still stands: asking again would not help.
+      if (title) c.title = title;
+      chatStore.persist(c, true);
+      rerender();
     },
     [rerender]
   );

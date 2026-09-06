@@ -17,6 +17,7 @@ import * as usageLog from "@/services/usageLog";
 import { loadPricing, priceForModel } from "@/services/pricing";
 import { costOf } from "@/lib/tokens";
 import { memoryBrief, type BriefOpts } from "@/lib/memoryBrief";
+import { cleanTitle } from "@/lib/title";
 import { BACKENDS, BACKEND_ORDER, isAbort } from "./backends";
 import type {
   BackendType,
@@ -723,8 +724,16 @@ export function tutorSystem(card: Card): string {
 /* ------------------------------------------------------- chat utilities -- */
 
 /** Name a conversation from its opening exchange. Deliberately cheap: low
- *  temperature, tiny budget, and truncated inputs — this runs on every new
- *  thread and nobody wants to pay tutor rates for a sidebar label. */
+ *  temperature and truncated inputs — this runs on every new thread and
+ *  nobody wants to pay tutor rates for a sidebar label.
+ *
+ *  The budget is not as tiny as it looks like it should be, and that is the
+ *  point. It was 24 tokens: invisible to a model that answers in four words,
+ *  and entirely spent on the scratchpad by a model that thinks first — which
+ *  returned nothing, left the conversation untitled, and so tried again on
+ *  the next message, and the one after. One unwanted request per thread had
+ *  quietly become one per message. Returns "" when the reply still holds no
+ *  title; lib/title's localTitle answers that, not a second call. */
 export async function generateTitle(userMsg: string, assistantMsg: string, override?: Override): Promise<string> {
   const out = await chat(
     [
@@ -736,14 +745,10 @@ export async function generateTitle(userMsg: string, assistantMsg: string, overr
       },
       { role: "user", content: `USER: ${userMsg.slice(0, 800)}\n\nASSISTANT: ${assistantMsg.slice(0, 800)}` }
     ],
-    { temperature: 0.2, maxTokens: 24, label: "title" },
+    { temperature: 0.2, maxTokens: 192, label: "title" },
     override
   );
-  return out
-    .trim()
-    .replace(/^["'`#\s]+|["'`.\s]+$/g, "")
-    .split("\n")[0]
-    .slice(0, 60);
+  return cleanTitle(out);
 }
 
 /** Three next questions worth asking. Returned as plain strings; a model that
