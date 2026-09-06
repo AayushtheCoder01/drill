@@ -14,6 +14,7 @@ import { describeSource, retrieveForSource } from "@/lib/chatContext";
 import { originLabel, resolveBackend, resolveEffort, resolveModel } from "@/lib/resolveSetting";
 import type { RetrievalTrace, ScoreComponents } from "@/lib/memoryRetrieval";
 import { useChat } from "@/context/ChatContext";
+import Section from "./Section";
 import SelectRow from "../ui/SelectRow";
 import ModelPicker from "../ui/ModelPicker";
 import type { BackendType, Effort } from "@/types";
@@ -67,7 +68,8 @@ export default function ConversationScope() {
   }
 
   return (
-    <div>
+    <>
+      <Section title="How it answers" sub="The persona sets the system prompt. Custom instructions replace it outright.">
       <label className="f">Mode</label>
       <div className="personagrid">
         {PERSONAS.map((p) => (
@@ -88,13 +90,15 @@ export default function ConversationScope() {
       <label className="f">Custom instructions — overrides the mode</label>
       <textarea
         className="fi"
-        style={{ minHeight: 90 }}
         value={customPrompt}
         placeholder={getPersona(c.personaId).prompt.slice(0, 140) + "…"}
         onChange={(e) => setCustomPrompt(e.target.value)}
         onBlur={() => update({ systemPrompt: customPrompt.trim() })}
       />
 
+      </Section>
+
+      <Section title="Model for this thread" sub="Conversation beats project beats global — the badge on each row says which level is in force.">
       <SelectRow
         title="Backend"
         origin={`from ${originLabel(rBackend.from)}`}
@@ -131,6 +135,9 @@ export default function ConversationScope() {
         </div>
       )}
 
+      </Section>
+
+      <Section title="Sampling" sub="How literal the model is, and how long it is allowed to run on.">
       <label className="f">Temperature</label>
       <div className="range">
         <input type="range" min={0} max={1} step={0.05} value={c.temperature} onChange={(e) => update({ temperature: parseFloat(e.target.value) })} />
@@ -149,7 +156,12 @@ export default function ConversationScope() {
         onChange={(e) => update({ maxTokens: Math.max(256, parseInt(e.target.value, 10) || 4096) })}
       />
 
-      <label className="f">What the model can see</label>
+      </Section>
+
+      <Section
+        title="What it can see"
+        sub="Rebuilt from your decks and memory every time you send, so it always reflects today's progress rather than the day the thread started."
+      >
       <div className="personagrid">
         <button
           className={"personaopt" + (hasSource((s) => s.kind === "today") ? " on" : "")}
@@ -191,7 +203,7 @@ export default function ConversationScope() {
       </div>
 
       {memSource && (
-        <div style={{ marginBottom: 16 }}>
+        <div className="setrow">
           <label className="f">Why these were picked — scored against your last message</label>
           {!memoryTrace || !memoryTrace.picked.length ? (
             <div className="hintline">Nothing scores high enough yet — memory needs a keyword overlap, a pin, or recent use to surface.</div>
@@ -207,9 +219,7 @@ export default function ConversationScope() {
         </div>
       )}
 
-      <label className="f" style={{ marginTop: 16 }}>
-        Attach a whole deck
-      </label>
+      <label className="f">Attach a whole deck</label>
       <select
         className="fi"
         value=""
@@ -243,9 +253,7 @@ export default function ConversationScope() {
         </>
       )}
 
-      <div className="mini-note" style={{ marginTop: 18 }}>
-        Context is rebuilt from your decks and memory every time you send, so it always reflects today's progress.
-      </div>
-    </div>
+      </Section>
+    </>
   );
 }

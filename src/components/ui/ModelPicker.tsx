@@ -42,7 +42,7 @@ export default function ModelPicker({
 
   return (
     <SettingRow title={title} sub={sub} origin={origin}>
-      <input className="fi mono" style={{ marginBottom: 8 }} list={listId} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+      <input className="fi mono" list={listId} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
       <datalist id={listId}>
         {models.map((m) => (
           <option key={m} value={m} />

@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
 
 /** The shared shell every settings row sits in: title, optional subtitle,
- *  an optional provenance badge ("from Project"), and the control itself. */
+ *  an optional provenance badge ("from Project"), and the control itself.
+ *
+ *  The look was inline `style={{}}` props until the settings rework, which is
+ *  the one thing CONTRIBUTING forbids outright — a component may set a
+ *  measured value inline, never a look. It is `.setrow` in style.css now. */
 export default function SettingRow({
   title,
   sub,
@@ -14,18 +18,12 @@ export default function SettingRow({
   children: ReactNode;
 }) {
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-        <label className="f" style={{ margin: 0 }}>
-          {title}
-        </label>
-        {origin && (
-          <span className="tagmini" style={{ margin: 0 }}>
-            {origin}
-          </span>
-        )}
+    <div className="setrow">
+      <div className="setrow-head">
+        <label className="f">{title}</label>
+        {origin && <span className="tagmini">{origin}</span>}
       </div>
-      {sub && <div className="hintline" style={{ margin: "2px 0 8px" }}>{sub}</div>}
+      {sub && <div className="setrow-sub">{sub}</div>}
       {children}
     </div>
   );

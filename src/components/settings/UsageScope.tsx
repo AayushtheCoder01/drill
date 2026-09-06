@@ -14,6 +14,7 @@ import * as usageLog from "@/services/usageLog";
 import type { UsageRow } from "@/services/usageLog";
 import { formatCost, formatTokens } from "@/lib/tokens";
 import { useStoreSync } from "@/hooks/useStoreSync";
+import Section from "./Section";
 
 const RANGES: [number, string][] = [
   [1, "Today"],
@@ -76,7 +77,10 @@ export default function UsageScope() {
   const byFeature = usageLog.rollup(span, (r) => r.label);
 
   return (
-    <>
+    <Section
+      title="What this has cost"
+      sub="Every call the app makes, not just chat — cards, journal, distill and exam go through the same seam and are counted here."
+    >
       <div className="seg">
         {RANGES.map(([v, label]) => (
           <button key={v} className={days === v ? "on" : ""} onClick={() => setDays(v)}>
@@ -111,7 +115,7 @@ export default function UsageScope() {
           <Group title="By feature" sub="What is doing the spending." rows={byFeature} name={(r) => r.label} />
           <Group title="By model" sub="What each model costs you." rows={byModel} name={(r) => r.model} />
 
-          <div className="btnrow" style={{ marginTop: "var(--s-5)" }}>
+          <div className="btnrow usage-clear">
             {confirming ? (
               <>
                 <button
@@ -135,6 +139,6 @@ export default function UsageScope() {
           </div>
         </>
       )}
-    </>
+    </Section>
   );
 }

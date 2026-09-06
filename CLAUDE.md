@@ -209,6 +209,10 @@ The driven tab is `visibilityState: "hidden"`, and that changes real behaviour:
   driving the app inside a sized same-origin iframe.
 - A page-level `transform: scale()` used to fit a screenshot corrupts every
   `getBoundingClientRect()` measurement. Clear it before measuring.
+- **`el.blur()` fires no `focusout`**, so a React `onBlur` handler never runs
+  and a commit-on-blur field looks like it silently drops the edit. `el.focus()`
+  does work — `document.activeElement` confirms it — which makes this
+  convincing. Dispatch `new FocusEvent("focusout", {bubbles: true})` by hand.
 
 ### React 18 StrictMode is on
 
@@ -229,4 +233,19 @@ its listener to nothing and never runs again.
 - No new runtime dependencies without a reason that survives
   `CONTRIBUTING.md`'s "deliberately not here" list.
 - Settings must actually be read by something. A dial that is editable,
-  persisted and wired to nothing is a bug, not a placeholder.
+  persisted and wired to nothing is a bug, not a placeholder — and so is the
+  inverse, which the settings rework turned up two of: `settings.effort` and
+  `settings.autonomy` were the bottom of an inheritance chain the send path
+  read, while the project and conversation pickers offered "inherit from
+  global" for a value with no global control anywhere. Both are in the Chat
+  category now.
+- **Settings commit on blur. There is no Save button.** There used to be one,
+  and it applied to seven of the fifteen controls on the screen while the rest
+  wrote through immediately, with nothing saying which was which — so editing
+  a number and closing the panel silently discarded it. `ui/TextRow.tsx` is
+  the field that keeps the rule; do not add a field that batches into a Save.
+- **One settings navigation, `settings/SettingsHome.tsx`.** All three surfaces
+  (the review loop's sheet, the journal/exam modal, chat's drawer) render it,
+  and chat's only difference is `withConversation`, which prepends the thread's
+  own scope to the same category list. Conversation, project and global are one
+  inheritance chain, so they read as one list rather than three tab strips.

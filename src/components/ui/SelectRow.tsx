@@ -20,7 +20,7 @@ export default function SelectRow({
 }) {
   return (
     <SettingRow title={title} sub={sub} origin={origin}>
-      <select className="fi" style={{ marginBottom: 0 }} value={value} onChange={(e) => onChange(e.target.value)}>
+      <select className="fi" value={value} onChange={(e) => onChange(e.target.value)}>
         {placeholder !== undefined && <option value="">{placeholder}</option>}
         {options.map((o) => (
           <option key={o.value} value={o.value}>

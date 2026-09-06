@@ -2311,6 +2311,175 @@ a {
   border-right: none;
 }
 
+/* ============================================================================
+ * Settings — a category rail and one page at a time.
+ *
+ * The old shape was three tabs where the first held fifteen unrelated
+ * controls in one scroll. The nav is a wrapping row of pills rather than a
+ * left rail because every surface settings opens in is narrow — a sheet, a
+ * modal, a 380px chat drawer — and a rail that has to collapse below 600px is
+ * two layouts to maintain for one list of eight words.
+ * ========================================================================== */
+.setpage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.setnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+  padding-bottom: var(--s-3);
+  margin-bottom: var(--s-4);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.setnav-btn {
+  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--ink-3);
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  padding: var(--s-1) var(--s-3);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--fast), color var(--fast), border-color var(--fast);
+}
+.setnav-btn:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+.setnav-btn.on {
+  background: var(--accent-10);
+  border-color: var(--accent-45);
+  color: var(--accent);
+}
+
+/* A section is a heading, a sentence, and the controls it explains. The rule
+   above it is what turns a run of them into a document rather than a list. */
+.sset + .sset {
+  margin-top: var(--s-6);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--rule-soft);
+}
+.sset-h {
+  font-family: var(--serif);
+  font-size: var(--t-lg);
+  font-weight: 400;
+  color: var(--ink);
+  margin: 0;
+  letter-spacing: var(--track-tight);
+}
+.sset-s {
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  line-height: 1.55;
+  color: var(--ink-3);
+  margin: var(--s-1) 0 var(--s-4);
+  max-width: 46ch;
+}
+.sset-note {
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  line-height: 1.55;
+  color: var(--ink-3);
+  margin: calc(var(--s-3) * -1) 0 var(--s-4);
+}
+.sset-note.ok {
+  color: var(--green);
+}
+.sset-note.warn {
+  color: var(--amber);
+}
+/* The headline numbers on the data page: what you have made, so "all of this
+   lives in one browser" lands as a quantity rather than a caveat. */
+.sset-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-5);
+  padding: var(--s-4);
+  margin-bottom: var(--s-4);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-3);
+  background: var(--page-2);
+}
+.sset-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sset-facts b {
+  font-family: var(--mono);
+  font-size: var(--t-lg);
+  font-weight: 400;
+  color: var(--ink);
+}
+.sset-facts span {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* The shell every settings row sits in. These were inline styles on
+   SettingRow, which is the one thing the stylesheet rule in CONTRIBUTING
+   forbids — a component may set a measured value inline, never a look. */
+.setrow {
+  margin-bottom: var(--s-4);
+}
+.setrow-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-3);
+}
+.setrow-head .f {
+  margin: 0;
+}
+.setrow-head .tagmini {
+  margin: 0;
+}
+.setrow-sub {
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  line-height: 1.55;
+  color: var(--ink-3);
+  margin: 2px 0 var(--s-2);
+}
+.setrow .fi {
+  margin-bottom: 0;
+}
+.setrow-inline {
+  display: flex;
+  gap: var(--s-2);
+}
+.setrow-inline .fi {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The list of things a space owns — knowledge, decks. Rows are records, not
+   buttons, so they do not take the pointer the rest of .item does. */
+.setlist {
+  margin-bottom: var(--s-3);
+}
+.list .item.static {
+  cursor: default;
+}
+.hidden-file {
+  display: none;
+}
+.usage-clear {
+  margin-top: var(--s-5);
+}
+/* A select that sizes to its longest option instead of the row, for the
+   "Move to…" picker sitting beside a deck name. */
+select.fi.auto {
+  width: auto;
+  margin: 0;
+}
+
 /* -------------------------------------------------------- settings rows -- */
 .srow {
   display: flex;

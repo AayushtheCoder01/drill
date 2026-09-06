@@ -1,9 +1,9 @@
 /* ============================================================================
  * SettingsModal — settings reachable from the journal and exam views, which
- * have no SheetProvider to hang a pane off. Same GlobalProjectTabs content
- * as SettingsPanel, in a stand-alone .sheet like CardsModal/DistillReview.
+ * have no SheetProvider to hang a pane off. Same SettingsHome content as
+ * SettingsPanel, in a stand-alone .sheet like CardsModal/DistillReview.
  * ========================================================================== */
-import GlobalProjectTabs from "./GlobalProjectTabs";
+import SettingsHome from "./SettingsHome";
 import Icon from "../ui/Icon";
 
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
@@ -17,13 +17,13 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       <div className="sheet-inner">
         <div className="sheet-head">
           <h3>Settings</h3>
-          <span className="sub">global · project</span>
+          <span className="sub">everything, by category</span>
           <button className="iconbtn" onClick={onClose} aria-label="Close">
             <Icon name="close" />
           </button>
         </div>
         <div className="sheet-body">
-          <GlobalProjectTabs />
+          <SettingsHome />
         </div>
       </div>
     </div>

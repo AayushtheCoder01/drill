@@ -23,7 +23,6 @@ export default function NumberRow({
     <SettingRow title={title} sub={sub} origin={origin}>
       <input
         className="fi mono"
-        style={{ marginBottom: 0 }}
         type="number"
         min={min}
         max={max}

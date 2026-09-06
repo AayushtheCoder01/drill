@@ -19,10 +19,9 @@ export default function SecretRow({
   const [show, setShow] = useState(false);
   return (
     <SettingRow title={title} sub={sub} origin={origin}>
-      <div style={{ display: "flex", gap: 6 }}>
+      <div className="setrow-inline">
         <input
           className="fi mono"
-          style={{ marginBottom: 0, flex: 1 }}
           type={show ? "text" : "password"}
           placeholder={placeholder}
           value={value}
