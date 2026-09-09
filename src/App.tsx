@@ -146,18 +146,25 @@ export default function App() {
       });
   }, []);
 
-  /* The usage ledger writes on a debounce, and unlike conversations it is
-     written from every view, not just chat — so the flush lives here rather
-     than in ChatContext, which only mounts for one of them. */
+  /* Both the usage ledger and the database itself write on a debounce, and
+     both are written from every view rather than just chat — so the flush
+     lives here rather than in ChatContext, which only mounts for one of them.
+     The database was missing from this until now: store.save() waits 90ms so
+     a burst of edits is one write, which meant grading a card and closing the
+     tab inside that window lost the grade outright. */
   useEffect(() => {
+    const flush = () => {
+      store.flush();
+      usageLog.flushAll();
+    };
     const onHide = () => {
-      if (document.visibilityState === "hidden") usageLog.flushAll();
+      if (document.visibilityState === "hidden") flush();
     };
     document.addEventListener("visibilitychange", onHide);
-    window.addEventListener("pagehide", usageLog.flushAll);
+    window.addEventListener("pagehide", flush);
     return () => {
       document.removeEventListener("visibilitychange", onHide);
-      window.removeEventListener("pagehide", usageLog.flushAll);
+      window.removeEventListener("pagehide", flush);
     };
   }, []);
 

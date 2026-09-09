@@ -4,6 +4,7 @@
  * ========================================================================== */
 import * as U from "@/lib/util";
 import { idbAll, idbDelete, idbPut, STORE_EXAMS } from "./idb";
+import * as persistence from "./persistence";
 import type { Difficulty, Exam, ExamQuestion, ExamScope } from "@/types/exam";
 
 let items: Exam[] = [];
@@ -43,7 +44,7 @@ export async function reload(): Promise<void> {
 }
 
 function persist(e: Exam): void {
-  void idbPut(STORE_EXAMS, e).catch((err) => console.error("exam save failed", err));
+  void persistence.guard("exam", idbPut(STORE_EXAMS, e));
   notify();
 }
 
@@ -93,6 +94,6 @@ export function recordAnswer(exam: Exam, questionId: string, answer: string, res
 
 export function remove(id: string): void {
   items = items.filter((e) => e.id !== id);
-  void idbDelete(STORE_EXAMS, id).catch(() => undefined);
+  void persistence.guard("exam", idbDelete(STORE_EXAMS, id));
   notify();
 }

@@ -1,6 +1,7 @@
 import * as store from "@/services/store";
 import { useSheet } from "@/context/SheetContext";
 import { useRoute } from "@/context/RouteContext";
+import { streaks } from "@/lib/activity";
 import Icon from "./ui/Icon";
 
 export default function Done() {
@@ -11,14 +12,16 @@ export default function Done() {
   const decks = store.pool();
   let seen = 0,
     total = 0,
-    reviews = 0,
-    streak = 0;
+    reviews = 0;
   decks.forEach((d) => {
     seen += Object.keys(d.srs).length;
     total += d.cards.length;
     reviews += d.meta.reviews;
-    streak = Math.max(streak, d.meta.streak);
   });
+  /* The same computed, project-scoped streak Home and the rail show. It used
+     to be max(deck.meta.streak), which is a different number arrived at a
+     different way and disagreed with both. */
+  const streak = streaks(store.logOf(store.projectDecks())).current;
 
   const cap = store.settings().newPerDay || 10;
   let head: string, body: string;

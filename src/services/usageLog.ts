@@ -14,6 +14,7 @@
  * undefined` forever — unknown is not zero, and summing must preserve that.
  * ========================================================================== */
 import { STORE_USAGE, idbAll, idbClear, idbPut } from "./idb";
+import * as persistence from "./persistence";
 import type { TokenUsage } from "@/types";
 
 export interface UsageRow {
@@ -143,7 +144,7 @@ function persist(day: string): void {
     setTimeout(() => {
       pending.delete(day);
       const rec = days.get(day);
-      if (rec) void idbPut(STORE_USAGE, rec).catch(() => undefined);
+      if (rec) void persistence.guard("usage record", idbPut(STORE_USAGE, rec));
     }, 400)
   );
 }
@@ -154,7 +155,7 @@ export function flushAll(): void {
   for (const [day, t] of pending) {
     clearTimeout(t);
     const rec = days.get(day);
-    if (rec) void idbPut(STORE_USAGE, rec).catch(() => undefined);
+    if (rec) void persistence.guard("usage record", idbPut(STORE_USAGE, rec));
   }
   pending.clear();
 }

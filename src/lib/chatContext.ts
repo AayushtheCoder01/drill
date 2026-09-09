@@ -195,7 +195,14 @@ export function renderSource(src: ContextSource, queryText = "", opts: RenderOpt
   }
 
   if (src.kind === "due") {
-    const decks = src.deckId ? [db.decks[src.deckId]].filter(Boolean) : store.pool();
+    /* decksOf(projectId), not pool(), for both of the reasons the comment on
+       "weak" above gives and one more. pool() reads db.activeProjectId, so a
+       conversation belonging to one project, opened while another was active,
+       attached the *other* project's due cards; and pool() honours the review
+       loop's mixing switch, so what a chat could see depended on a setting
+       that has nothing to do with chat — turn mixing off and "due now"
+       silently narrowed to one deck. */
+    const decks = src.deckId ? [db.decks[src.deckId]].filter(Boolean) : store.decksOf(projectId);
     const parts: string[] = [];
     for (const d of decks) {
       const due = dueCards(d);

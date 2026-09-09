@@ -215,7 +215,10 @@ export default function ChatView() {
         cmd: "/quiz",
         desc: "Get quizzed on what is due right now",
         run: (arg: string) => {
-          const counts = store.counts();
+          /* Scoped to the project, matching the { kind: "due" } source this
+             is about to attach — the guard and the attachment have to agree
+             or /quiz refuses on a project that has plenty due. */
+          const counts = store.counts(store.decksOf(store.get().activeProjectId));
           if (!counts.due && !counts.newLeft) {
             toast("Nothing due — try /weak instead");
             return;

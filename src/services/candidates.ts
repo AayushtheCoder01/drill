@@ -10,6 +10,7 @@ import * as U from "@/lib/util";
 import * as store from "./store";
 import * as memoryStore from "./memoryStore";
 import { idbAll, idbDelete, idbPut, STORE_CAND } from "./idb";
+import * as persistence from "./persistence";
 import type { Autonomy, Memory, MemoryCandidate, MemoryOrigin, MemoryScope, MemoryType } from "@/types";
 
 let items: MemoryCandidate[] = [];
@@ -139,14 +140,14 @@ export function propose(drafts: ProposeInput[]): ProposeResult {
   }
 
   items.push(...queued);
-  for (const c of queued) void idbPut(STORE_CAND, c).catch(() => undefined);
+  for (const c of queued) void persistence.guard("memory candidate", idbPut(STORE_CAND, c));
   if (made.length) notify();
   return { committed, queued };
 }
 
 function drop(id: string): void {
   items = items.filter((c) => c.id !== id);
-  void idbDelete(STORE_CAND, id).catch(() => undefined);
+  void persistence.guard("memory candidate", idbDelete(STORE_CAND, id));
 }
 
 /** Commits the candidate as real memory, retiring whatever it supersedes,

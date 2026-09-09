@@ -4,6 +4,7 @@
  *   .app                     fixed, a row: rail on the left, everything else
  *     <Sidebar/>             the one navigation
  *     .app-main              a column
+ *       <SaveAlarm/>         only when a write has failed: the one alarm
  *       .topbar              only under 900px: the drawer handle
  *       .app-body            a row
  *         .app-col           a column
@@ -23,6 +24,8 @@ import { useDrillStore } from "@/hooks/useDrillStore";
 import type { View } from "@/context/RouteContext";
 import { applyAppearance } from "@/lib/theme";
 import Sidebar from "./Sidebar";
+import ErrorGuard from "./ui/ErrorGuard";
+import SaveAlarm from "./ui/SaveAlarm";
 import ShortcutsModal from "./ui/ShortcutsModal";
 import SettingsSurface from "./settings/SettingsSurface";
 import Icon from "./ui/Icon";
@@ -159,6 +162,19 @@ export default function Shell({
       {drawer && <div className="nav-scrim" onClick={() => setDrawer(false)} />}
 
       <div className="app-main">
+        {/* Outside .app-scroll like the sidebar and the dock, and for a
+            stronger version of the same reason: a warning that the app is
+            failing to save your work must not be something you can scroll
+            past. Renders nothing at all in the normal case.
+
+            Guarded because there is still no error boundary above Shell, and
+            the one component whose entire job is to appear when things have
+            gone wrong is the last one that should be able to white-screen the
+            app on its way in. */}
+        <ErrorGuard>
+          <SaveAlarm />
+        </ErrorGuard>
+
         <div className="topbar">
           <button className="iconbtn" onClick={toggle} aria-label="Open navigation" aria-expanded={drawer}>
             <Icon name="panel" />

@@ -200,7 +200,26 @@ what follows is the list as it actually stands on 2026-09-06.*
   `draftActions` live in `ChatContext` state; leaving chat and coming back
   loses an unsent choice. Long-standing, minor, one fix for all four.
 - **Phase 9 (capture bridge) and Phase 11 (auto-backup to disk) are not
-  started**, and cache tuning from Phase 10 is not either.
+  started**, and cache tuning from Phase 10 is not either. Phase 11 is now the
+  most valuable of the three: see below.
+- **The review log lives in localStorage, and that is the wrong drawer.**
+  Decks, scheduling and the whole review log share one ~5MB origin quota,
+  because `store.ts` is synchronous and everything reads `db.log` without
+  awaiting. A year of daily review is fifteen to twenty thousand entries, and
+  every recall attempt carried up to 260 characters of text — so heavy users
+  reached the wall, and until 2026-09-09 the save path swallowed the failure
+  and the app carried on looking healthy while nothing was written.
+
+  That is fixed the honest way for now: writes report, `saveNow()` sheds and
+  retries, `lib/logBudget.ts` owns what may be given up, and `SaveAlarm` says
+  so across every section. The *real* fix is to move `log` into IndexedDB,
+  where the chat, journal, memory and exam stores already live and the quota
+  is two orders of magnitude larger. That is a migration with real risk on a
+  database people already have years in, so it wants doing deliberately and
+  not as a side effect of something else.
+- **Two tabs still overwrite each other.** Detected and warned about, not
+  merged. A real fix needs either a lock (Web Locks API, no Safari before 15.4)
+  or per-record writes, which is the same IndexedDB move as above.
 
 ---
 

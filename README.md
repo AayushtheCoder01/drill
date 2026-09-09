@@ -450,6 +450,29 @@ journal, memory and usage to one JSON, and **Restore from a backup…** on the
 same page reads it back, showing you what it replaces first. Progress survives
 restarts but not clearing site data. Back up now and then.
 
+**A session's work disappeared / my streak reset** — read the banner across the
+top of the app if there is one; it says which of these happened.
+
+- *"Drill cannot save to this browser."* The store this browser gives a site is
+  full, or switched off. Nothing has been written since the time it names, and
+  it will go when the tab closes. Download the backup it offers **first**, then
+  fix the cause. Drill sheds the recall text from old reviews automatically to
+  buy room; when that is not enough it says so instead of carrying on quietly,
+  which is what it used to do.
+- *"Drill is open in another tab."* Each tab keeps its own copy of everything
+  and saves all of it, so the last one you close overwrites the others. Close
+  the rest and reload. This is the one that looks the most like magic.
+- *No banner at all, and it happened while the app was closed.* The browser
+  evicted the site. **Settings → Data → Ask now** gets it to promise not to —
+  press the button rather than trusting the automatic request, because Firefox
+  raises a prompt and a prompt with no click behind it is dismissed unseen.
+
+**The activity calendar is blank but I have been reviewing** — the calendar,
+the streak and every figure on Home are scoped to the project in the sidebar,
+and the log is filed by deck. If your reviews belong to another project, Home
+now says so under the grid instead of showing an empty year. Switch project in
+the sidebar.
+
 **My conversations are gone but my cards are fine** — they live in different
 stores. Cards are in localStorage; conversations are in IndexedDB, because
 transcripts are far larger than localStorage's quota allows. Clearing site data
@@ -465,7 +488,11 @@ is left alone deliberately. Ask it to use `$$…$$` on its own line.
 
 No telemetry, no analytics, nothing phones home. Your cards and progress live in
 your browser's localStorage, your conversations in its IndexedDB, and neither
-goes anywhere else. Your API key is stored in the same browser (or in
+goes anywhere else. That is also the whole of the durability story, so Drill
+asks the browser for persistent storage (again, from a button, in
+**Settings → Data**), shows how full the small drawer is, and puts an alarm
+across the top of every section the moment a write fails rather than logging it
+to a console you do not have open. Your API key is stored in the same browser (or in
 `config.local.json`, which is gitignored) and is sent only to the backend you
 picked. With Ollama or llama.cpp, nothing leaves the machine at all.
 

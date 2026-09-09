@@ -14,6 +14,7 @@ import * as U from "@/lib/util";
 import * as FSRS from "@/lib/fsrs";
 import * as CFG from "@/lib/config";
 import * as storage from "./storage";
+import * as logBudget from "@/lib/logBudget";
 import * as migrate from "@/lib/migrate";
 import { SEED_DECK } from "@/lib/seed";
 import { normaliseCardHtml } from "@/lib/cardFormat";
@@ -196,19 +197,151 @@ function normLang(v: unknown): "english" | "hinglish" {
 }
 
 /* ---------- persistence ---------- */
+
+/**
+ * What happened the last time the database was written.
+ *
+ * This exists because the previous version of saveNow() was three lines with
+ * a `catch` that called console.error and returned. localStorage gives an
+ * origin about 5MB and the review log grows inside it forever, so "the drawer
+ * is full" is not a theoretical failure here — it is the failure. And it
+ * looked *identical to success* from every seat in the app: you kept
+ * reviewing, the numbers kept moving because they are computed from memory,
+ * and the hour was gone the moment you reloaded.
+ *
+ * So a failed save is state, it survives until a save succeeds, and Shell
+ * renders it across the top of every section until it is dealt with. There is
+ * nothing clever about that; the bug was that nothing rendered it at all.
+ */
+export interface SaveState {
+  ok: boolean;
+  reason: storage.WriteFailure | null;
+  message: string;
+  /** When the current state began. */
+  at: number;
+  /** Size of the last attempted write, in characters. */
+  bytes: number;
+  /** Reviews forgotten by an emergency trim this session, if any. Surfaced
+   *  because losing history quietly is what got us here. */
+  dropped: number;
+  /** True once a quota failure has been recovered from by shedding weight —
+   *  the save worked, but the drawer is full and the next one may not. */
+  tight: boolean;
+}
+
+let saveState: SaveState = { ok: true, reason: null, message: "", at: 0, bytes: 0, dropped: 0, tight: false };
+
+export function getSaveState(): SaveState {
+  return saveState;
+}
+
+/** Clears the alarm after the user has taken a backup. The underlying
+ *  condition is unchanged — this only says "I have seen it". */
+export function acknowledgeSaveState(): void {
+  if (saveState.ok && !saveState.tight && !saveState.dropped) return;
+  saveState = { ...saveState, tight: false, dropped: 0 };
+  notify();
+}
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 export function save(): void {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(saveNow, 90);
 }
+
+/** Write, and if the drawer is full make room and try again — cheapest loss
+ *  first. See lib/logBudget for what each step costs you. */
 export function saveNow(): void {
-  if (saveTimer) clearTimeout(saveTimer);
-  try {
-    storage.write(JSON.stringify(db));
-  } catch (e) {
-    // toast wiring happens in the UI layer; surface via console as a fallback
-    console.error("Save failed", e);
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
   }
+  const before = saveState;
+  let dropped = 0;
+  let tight = false;
+
+  let result = storage.write(JSON.stringify(db));
+
+  if (!result.ok && result.reason === "quota") {
+    /* Step one: the recall text on older entries. Nothing reads it past the
+       last few days, and it is most of the log's weight. */
+    const shed = logBudget.shedAttempts(db.log);
+    if (shed.shed > 0) {
+      db.log = shed.log;
+      tight = true;
+      result = storage.write(JSON.stringify(db));
+    }
+  }
+
+  if (!result.ok && result.reason === "quota") {
+    /* Step two: actually forget the oldest reviews. This loses history the
+       activity grid draws, so it is last and it is reported. */
+    const cut = logBudget.capLog(db.log, logBudget.LOG_EMERGENCY);
+    if (cut.dropped > 0) {
+      db.log = cut.log;
+      dropped = cut.dropped;
+      tight = true;
+      result = storage.write(JSON.stringify(db));
+    }
+  }
+
+  saveState = result.ok
+    ? {
+        ok: true,
+        reason: null,
+        message: "",
+        at: tight || dropped ? Date.now() : before.at,
+        bytes: result.bytes,
+        dropped: before.dropped + dropped,
+        tight: tight || before.tight
+      }
+    : {
+        ok: false,
+        reason: result.reason,
+        message: result.message,
+        at: before.ok ? Date.now() : before.at,
+        bytes: result.bytes,
+        dropped: before.dropped + dropped,
+        tight: true
+      };
+
+  if (!result.ok) console.error("Drill could not save", result.reason, result.message);
+
+  /* Only when something actually changed: saveNow runs on every grade, and a
+     notify per save would double every render in the review loop. */
+  if (
+    saveState.ok !== before.ok ||
+    saveState.tight !== before.tight ||
+    saveState.dropped !== before.dropped ||
+    saveState.reason !== before.reason
+  ) {
+    notify();
+  }
+}
+
+/**
+ * Write immediately if a debounced save is pending.
+ *
+ * save() waits 90ms so a burst of edits is one write. Grading a card and
+ * closing the tab inside that window used to lose the grade outright — the
+ * usage ledger had a pagehide flush and the database, which is the part you
+ * would actually miss, did not.
+ */
+export function flush(): void {
+  if (saveTimer) saveNow();
+}
+
+/** Ordinary log hygiene, run after every grade. Shedding is invisible — it
+ *  only touches text nothing can still read — and the cap is generous enough
+ *  that a normal user never reaches it. */
+function keepLogInBudget(): void {
+  if (db.log.length > logBudget.LOG_MAX) {
+    const cut = logBudget.capLog(db.log);
+    db.log = cut.log;
+    if (cut.dropped) saveState = { ...saveState, dropped: saveState.dropped + cut.dropped };
+  }
+  const shed = logBudget.shedAttempts(db.log);
+  if (shed.shed > 0) db.log = shed.log;
 }
 
 export function get(): DrillDB {
@@ -291,6 +424,7 @@ export function currentInterval(st: SRSState | null | undefined): number {
  *  (ease 2.5 -> D 5, higher ease -> easier card -> lower D). */
 export function migrateV2(o: LegacyDBv2): LegacyDBv3 {
   const st = o.settings || {};
+  const legacy = o as LegacyDBv2 & { log?: unknown; notes?: unknown };
   const n: LegacyDBv3 = {
     v: 3,
     active: o.active,
@@ -302,8 +436,13 @@ export function migrateV2(o: LegacyDBv2): LegacyDBv3 {
       newPerDay: (st.newPerDay as number) || 10,
       tutor: (st.tutor as string) || DEFAULT_TUTOR
     },
-    log: [],
-    notes: []
+    /* These two were `[]`, which meant upgrading from v2 silently deleted
+       every review you had ever logged and every insight you had written
+       down — the activity grid came back empty and the streak came back
+       zero, on a database that had years in it. The shapes are unchanged
+       between v2 and v3; only the deck's scheduling needed converting. */
+    log: Array.isArray(legacy.log) ? (legacy.log as LegacyDBv3["log"]) : [],
+    notes: Array.isArray(legacy.notes) ? (legacy.notes as LegacyDBv3["notes"]) : []
   };
   for (const id of Object.keys(o.decks || {})) {
     const d: LegacyDeckV2 = o.decks[id];
@@ -470,9 +609,49 @@ export function init(cfg?: DrillConfig): DrillDB {
      heal onto a deck from a *different* project than db.activeProjectId. */
   if (!db.projects[db.activeProjectId]) db.activeProjectId = Object.keys(db.projects)[0];
   ensureActiveDeck();
+  watchOtherTabs();
   saveNow();
   notify();
   return db;
+}
+
+/* ---------- two tabs, one drawer ---------- */
+
+let foreignWriteAt = 0;
+let watching = false;
+
+/** True once another tab has written the database out from under this one. */
+export function otherTabWriting(): boolean {
+  return foreignWriteAt > 0;
+}
+
+/**
+ * Notice when a second tab is writing the same database.
+ *
+ * Every tab holds its own copy of `db` in memory and every save serialises the
+ * whole thing, so two tabs open on Drill overwrite each other completely:
+ * whichever saves last wins, and everything the other one did since it loaded
+ * is gone. No error, no conflict, no trace — just an hour missing after you
+ * close the tab you were not looking at. It is the most confusing shape "data
+ * disappeared" can take, and there was nothing anywhere that would have told
+ * you.
+ *
+ * The `storage` event fires in *other* tabs of the same origin, never in the
+ * one that wrote, so this is exactly "somebody else is editing". Merging two
+ * divergent databases is not something to attempt silently; saying so, loudly
+ * and immediately, is.
+ */
+function watchOtherTabs(): void {
+  if (watching || typeof window === "undefined") return;
+  watching = true;
+  window.addEventListener("storage", (e: StorageEvent) => {
+    /* A `null` key is localStorage.clear() — worth the same warning, since
+       whatever cleared it has just taken this database with it. */
+    if (e.key !== null && e.key !== storage.STORAGE_KEY) return;
+    if (foreignWriteAt) return;
+    foreignWriteAt = Date.now();
+    notify();
+  });
 }
 
 /* ---------- projects ---------- */
@@ -756,10 +935,25 @@ export function pool(): Deck[] {
   return db.settings.mix && ids.length > 1 ? ids.map((id) => db.decks[id]) : [deck()];
 }
 
-/** New-cards-today counters reset at local midnight; the streak advances only
- *  if yesterday was actually worked. */
+/** Every deck in the active project, whatever the mixing switch says. The
+ *  scope for anything that is about the space you are working in rather than
+ *  about the queue in front of you. */
+export function projectDecks(): Deck[] {
+  return decksOf(db.activeProjectId);
+}
+
+/**
+ * New-cards-today counters reset at local midnight; the streak advances only
+ * if yesterday was actually worked.
+ *
+ * Over the project, not pool(). pool() is the active deck alone unless mixing
+ * is on, so every other deck in the project kept yesterday's `newToday` until
+ * the day you happened to select it — and `counts()` computes the new-card
+ * allowance from that field, so Home reported the wrong number of new cards
+ * for every deck you were not currently drilling.
+ */
 export function rollover(): void {
-  for (const d of pool()) {
+  for (const d of projectDecks()) {
     const m = d.meta;
     if (m.dayKey !== U.today()) {
       if (m.lastActive === U.yesterdayKey()) m.streak += 1;
@@ -776,12 +970,21 @@ export interface Counts {
   newLeft: number;
 }
 
-export function counts(): Counts {
+/**
+ * Which decks a readout is about.
+ *
+ * Defaults to pool() — the review loop's queue, meaning the active deck alone
+ * unless mixing is on. Home passes the whole project instead, because that
+ * page is about the project and reading the active deck's numbers under a
+ * project's name is how it ended up saying "12 reviewed today" directly above
+ * an empty activity grid.
+ */
+export function counts(decks: Deck[] = pool()): Counts {
   const now = Date.now();
   let due = 0,
     unseen = 0,
     newLeft = 0;
-  const p = pool();
+  const p = decks;
   for (const d of p) {
     let un = 0;
     for (const c of d.cards) {
@@ -890,7 +1093,12 @@ export function gradeCard(o: QueueItem, g: Grade, ctx: GradeContext = {}): SRSSt
   if (attempt) entry.a = attempt.slice(0, ATTEMPT_MAX);
   if (ctx.verdict) entry.v = ctx.verdict;
   db.log.push(entry);
-  if (db.log.length > 8000) db.log = db.log.slice(-6000);
+  /* This used to be `if (db.log.length > 8000) db.log = db.log.slice(-6000)`,
+     which threw away two thousand reviews at a stroke, without a word, and
+     took the early months off the activity grid with them. Shedding the
+     recall text buys back far more room than that trim ever did and loses
+     nothing anything can still read — see lib/logBudget. */
+  keepLogInBudget();
   const live = session();
   if (live) live.done += 1;
   save();
@@ -957,9 +1165,25 @@ export interface Stats {
   leech: number;
 }
 
-/** True retention counts only cards that were already in the review state —
- *  grading a card you are still learning says nothing about your memory. */
-export function stats(): Stats {
+/** Every log entry belonging to these decks. db.log is one flat list across
+ *  every project, so anything that reports "reviews" has to say which decks it
+ *  means or it reports somebody else's work. */
+export function logOf(decks: Deck[]): LogEntry[] {
+  const ids = new Set(decks.map((d) => d.id));
+  return db.log.filter((e) => ids.has(e.d));
+}
+
+/**
+ * True retention counts only cards that were already in the review state —
+ * grading a card you are still learning says nothing about your memory.
+ *
+ * Scoped to `decks`, and that is the fix for a real contradiction: the counts
+ * came from pool() while `rev`, `ok`, `last7` and `today` were read straight
+ * off the whole of db.log, so "reviewed today" included every other project
+ * and the deck figures beside it did not. On Home, where the activity grid is
+ * filtered to the project, the two disagreed on screen.
+ */
+export function stats(decks: Deck[] = pool()): Stats {
   const now = Date.now();
   const cut = now - 30 * DAY;
   let rev = 0,
@@ -967,7 +1191,7 @@ export function stats(): Stats {
     last7 = 0,
     todayN = 0;
   const midnight = new Date().setHours(0, 0, 0, 0);
-  for (const e of db.log) {
+  for (const e of logOf(decks)) {
     if (e.t >= cut && e.s === "review") {
       rev++;
       if (e.g > 1) ok++;
@@ -980,7 +1204,7 @@ export function stats(): Stats {
   let cards = 0,
     seen = 0,
     leech = 0;
-  for (const d of pool()) {
+  for (const d of decks) {
     cards += d.cards.length;
     for (const c of d.cards) {
       const s = d.srs[c.id];

@@ -646,6 +646,73 @@ button.rail-item:hover .rail-item-text {
   flex: 0 0 auto;
 }
 
+/* ------------------------------------------------------------ save alarm -- */
+/* The only thing in the app allowed to shout, and the only banner that is not
+   dismissible while the condition holds. It sits above .topbar and outside
+   .app-scroll for the same reason the sidebar does — a warning that your work
+   is not being written down must not be something you can scroll past.
+
+   Amber is "it still works but it is close"; red is "nothing is being saved".
+   The two are the same component because they are the same problem at two
+   distances, and a user who has learned to read the amber one already knows
+   where to look for the red. */
+.savealarm {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  flex: 0 0 auto;
+  padding: var(--s-3) var(--s-5);
+  border-bottom: 1px solid var(--amber-edge);
+  background: var(--amber-tint);
+  color: var(--ink);
+}
+.savealarm.bad {
+  border-bottom-color: var(--red-edge);
+  background: var(--red-tint);
+}
+.savealarm-mark {
+  color: var(--amber);
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.savealarm.bad .savealarm-mark {
+  color: var(--red);
+}
+.savealarm-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  line-height: 1.5;
+}
+.savealarm-txt strong {
+  font-weight: 500;
+}
+.savealarm-txt span {
+  color: var(--ink-2);
+  max-width: var(--measure);
+}
+.savealarm-acts {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+@media (max-width: 720px) {
+  /* Stacked rather than truncated: every word of this one matters. */
+  .savealarm {
+    flex-wrap: wrap;
+  }
+  .savealarm-acts {
+    width: 100%;
+    padding-left: calc(16px + var(--s-3));
+  }
+}
+
 /* Under 900px the rail leaves the flow and becomes a drawer over the page.
    `.topbar` is its handle, and exists only at this width. */
 .topbar {
@@ -2683,6 +2750,57 @@ a {
 .sset-note.warn {
   color: var(--amber);
 }
+/* How full the small drawer is. localStorage holds the decks, the scheduling
+   and the review log in about 5MB, and it is the one that overflows — so it
+   gets a bar, and the bar changes colour before the save starts failing
+   rather than after. */
+.quota {
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--page-2);
+  border: 1px solid var(--rule-soft);
+  overflow: hidden;
+  margin-bottom: var(--s-3);
+}
+.quota i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width var(--med) var(--ease);
+}
+.quota i.warm {
+  background: var(--amber);
+}
+.quota i.hot {
+  background: var(--red);
+}
+
+/* A numbered-feeling list that is actually prose: the four ways this app can
+   lose your work. Set as a list because it is read as a checklist, with the
+   lead-in of each line bold so it can be skimmed for the one that happened. */
+.guide {
+  margin: 0 0 var(--s-4);
+  padding-left: var(--s-4);
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  line-height: 1.6;
+  color: var(--ink-3);
+  max-width: var(--measure);
+}
+.guide li {
+  margin-bottom: var(--s-2);
+}
+.guide b {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.guide code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
 /* The headline numbers on the data page: what you have made, so "all of this
    lives in one browser" lands as a quantity rather than a caveat. */
 .sset-facts {

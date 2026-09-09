@@ -13,6 +13,7 @@
 import * as U from "@/lib/util";
 import * as store from "./store";
 import { idbAll, idbBulkPut, idbClear, idbDelete, idbGet, idbPut, STORE_CONV, STORE_META } from "./idb";
+import * as persistence from "./persistence";
 import { DEFAULT_PERSONA_ID, getPersona } from "@/lib/personas";
 import { markdownToText } from "@/lib/plaintext";
 import type { ChatMode, Conversation, ConversationMeta, ContextSource, Turn, Usage, Variant } from "@/types/chat";
@@ -82,8 +83,8 @@ export function persist(c: Conversation, immediate = false): void {
 
   const flush = () => {
     pending.delete(c.id);
-    void idbPut(STORE_CONV, c).catch((e) => console.error("conversation save failed", e));
-    void idbPut(STORE_META, metaOf(c)).catch(() => undefined);
+    void persistence.guard("conversation", idbPut(STORE_CONV, c));
+    void persistence.guard("conversation", idbPut(STORE_META, metaOf(c)));
   };
 
   const t = pending.get(c.id);
@@ -99,8 +100,8 @@ export function flushAll(): void {
     clearTimeout(t);
     const c = cache.get(id);
     if (c) {
-      void idbPut(STORE_CONV, c);
-      void idbPut(STORE_META, metaOf(c));
+      void persistence.guard("conversation", idbPut(STORE_CONV, c));
+      void persistence.guard("conversation", idbPut(STORE_META, metaOf(c)));
     }
   }
   pending.clear();
@@ -276,8 +277,8 @@ export function remove(id: string): void {
     clearTimeout(t);
     pending.delete(id);
   }
-  void idbDelete(STORE_CONV, id).catch(() => undefined);
-  void idbDelete(STORE_META, id).catch(() => undefined);
+  void persistence.guard("conversation", idbDelete(STORE_CONV, id));
+  void persistence.guard("conversation", idbDelete(STORE_META, id));
   notify();
 }
 

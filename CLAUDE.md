@@ -21,8 +21,8 @@ especially its **Project layout** section. Do not restate it here.
 npm run dev     # vite; usually :5173, falls back to :5174 if taken
 npm run lint    # tsc --noEmit. The only lint there is
 npm test        # tsx --test src/**/*.test.ts
-                # 124 tests: fsrs, cardFormat, memory*, effort, title,
-                # thinking, agent/loop, settings/catalogue
+                # 137 tests: fsrs, cardFormat, memory*, effort, title,
+                # thinking, agent/loop, settings/catalogue, logBudget, storage
 npm run build   # tsc -b && vite build
 ```
 
@@ -102,6 +102,39 @@ as the KaTeX-free counterpart to `lib/markdown.ts`.
 
 **Never string-splice HTML into rendered output.** Walk the DOM. Everything
 user- or model-supplied goes through `lib/markdown.ts` (DOMPurify) first.
+
+**A failed write is a value, never a `catch` that logs.** This app has no
+server, so a write that does not land is work that no longer exists — and it
+looks exactly like success from every seat in the UI, because every number on
+screen is computed from memory. Both halves of persistence used to swallow
+failures: `store.saveNow()` had a `catch` that called `console.error`, and all
+twelve IndexedDB writes had `.catch(() => undefined)` or no catch at all.
+localStorage gives an origin ~5MB and the review log grows inside it, so this
+was reachable, not theoretical — the user lost hours.
+
+The rules now: `storage.write()` returns a `WriteResult`; `saveNow()` escalates
+on quota (shed old recall text, then trim the log, then give up) and keeps
+`store.getSaveState()`; every IndexedDB write goes through
+`persistence.guard(area, promise)`; and `components/ui/SaveAlarm.tsx` — mounted
+by `Shell`, outside `.app-scroll`, in every section — renders any of it. **Do
+not add a write that cannot report.** `lib/logBudget.ts` owns what may be shed
+and `logBudget.test.ts` enforces that shedding never touches a field the grid,
+the streak or retention reads.
+
+**Two tabs overwrite each other completely.** Each holds its own `db` and
+serialises all of it on save, so the last tab to close wins. `store` listens
+for the `storage` event (which fires only in *other* tabs) and raises the same
+alarm. Merging is not attempted — saying so is.
+
+**One scope per screen.** `db.log` is one flat list across every project and
+the log is filed by *deck id*. `stats(decks)` and `counts(decks)` both default
+to `pool()` — the active deck alone unless mixing is on — so a page that is
+about a project must pass `store.projectDecks()` or it prints one scope's
+numbers under another's heading. Home did exactly that: "12 reviewed today"
+from every project, directly above an activity grid filtered to one. The
+streak has one definition, `lib/activity.ts`'s, computed from the log;
+`deck.meta.streak` is a per-deck counter that only advances for decks in
+`pool()` when `rollover()` runs, and it drifted from the computed one.
 
 **Keyboard bindings live in three places** and `components/ui/ShortcutsModal.tsx`
 is the published promise about all of them: `Shell.tsx` (ctrl+B, ctrl+\, ctrl+,

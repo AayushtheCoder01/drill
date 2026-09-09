@@ -309,7 +309,11 @@ export const SECTIONS = sections({
     cat: "data",
     title: "Your data",
     sub: "All of it lives in this browser. No account, no server, nothing uploaded — which is the point, and also the risk.",
-    finds: ["storage", "quota", "disk", "persistent", "eviction", "lost", "how much", "size", "origin", "port"]
+    finds: [
+      "storage", "quota", "disk", "full", "persistent", "persistence", "eviction", "evicted", "lost", "data loss",
+      "disappeared", "gone", "wiped", "cleared", "safe", "keep my data", "how much", "size", "origin", "port",
+      "incognito", "private window", "save failed", "cannot save"
+    ]
   },
   "data.backup": {
     cat: "data",

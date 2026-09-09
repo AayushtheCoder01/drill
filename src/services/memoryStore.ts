@@ -9,6 +9,7 @@
 import * as U from "@/lib/util";
 import { extractKeywords } from "@/lib/memoryRetrieval";
 import { idbAll, idbDelete, idbPut, STORE_MEM } from "./idb";
+import * as persistence from "./persistence";
 import type { Memory, MemoryOrigin, MemoryScope, MemorySource, MemoryType } from "@/types";
 
 let items: Memory[] = [];
@@ -63,7 +64,7 @@ function persistChanged(m: Memory): void {
  *  scored higher on *both* recency and usage next time, and the top few never
  *  rotated out. See lib/memoryRetrieval.ts. */
 function persistOnly(m: Memory): void {
-  void idbPut(STORE_MEM, m).catch((e) => console.error("memory save failed", e));
+  void persistence.guard("memory", idbPut(STORE_MEM, m));
   notify();
 }
 
@@ -223,7 +224,7 @@ export function restore(id: string): void {
  *  retires, it never calls this. */
 export function remove(id: string): void {
   items = items.filter((m) => m.id !== id);
-  void idbDelete(STORE_MEM, id).catch(() => undefined);
+  void persistence.guard("memory", idbDelete(STORE_MEM, id));
   notify();
 }
 

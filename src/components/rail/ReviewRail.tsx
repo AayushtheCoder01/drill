@@ -12,19 +12,24 @@
 import * as store from "@/services/store";
 import { useDrillStore } from "@/hooks/useDrillStore";
 import { useSheet } from "@/context/SheetContext";
+import { streaks } from "@/lib/activity";
 import { DAY, stripTags } from "@/lib/util";
 import { RailBar, RailEmpty, RailFigure, RailGroup, RailItem, RailList, RailSub, RailWeek } from "./Rail";
 
 /** Seven booleans, oldest first, ending today: was anything reviewed that day?
- *  Read straight off the review log rather than stored anywhere. */
+ *  Read straight off the review log rather than stored anywhere.
+ *
+ *  Scoped to what you are actually drilling. It read the whole of db.log
+ *  before, so a week spent in another project lit this one's streak up — and
+ *  disagreed with Home, which has always filtered. */
 function weekOfActivity(): boolean[] {
-  const db = store.get();
+  const log = store.logOf(store.projectDecks());
   const midnight = new Date().setHours(0, 0, 0, 0);
   const days: boolean[] = [];
   for (let i = 6; i >= 0; i--) {
     const from = midnight - i * DAY;
     const to = from + DAY;
-    days.push(db.log.some((e) => e.t >= from && e.t < to));
+    days.push(log.some((e) => e.t >= from && e.t < to));
   }
   return days;
 }
@@ -54,7 +59,13 @@ export default function ReviewRail() {
   const session = store.session();
   const week = weekOfActivity();
   const worst = worstCards(4);
-  const streak = Math.max(0, ...store.pool().map((d) => d.meta.streak || 0));
+  /* Computed from the log by the same function Home uses, over the same
+     project scope, rather than read off `deck.meta.streak`. The stored
+     counter is per deck and only advances for decks that happen to be in
+     pool() when rollover() runs, so it drifted — Home said "day 6" and this
+     said "3 days", about the same week, on the same screen if you had both
+     open. START-HERE §2.6: never memorise what can be computed. */
+  const streak = streaks(store.logOf(store.projectDecks())).current;
   const retention = s.rev > 0 ? Math.round((s.ok / s.rev) * 100) : null;
   const target = store.settings().sessionSize || 10;
 

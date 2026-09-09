@@ -113,11 +113,20 @@ export default function HomeView() {
 
   /* db.log is global — one line per grade, whatever project it belonged to.
      Everything on this page is scoped to the project in the sidebar, so the
-     log is filtered the same way before any of it is counted. */
-  const log = db.log.filter((e) => deckIds.has(e.d));
+     log is filtered the same way before any of it is counted.
 
-  const s = store.stats();
-  const counts = store.counts();
+     stats() and counts() are handed the same decks for the same reason. Left
+     to their defaults they read pool(), which is the *active deck* unless
+     mixing is on, and their review counts came off the whole of db.log — so
+     this page used to print "12 reviewed today" from every project you own
+     directly above an activity grid that showed only this one, and an empty
+     grid read as "nothing written down yet" while the figure above it said
+     otherwise. One scope, one story. */
+  const log = db.log.filter((e) => deckIds.has(e.d));
+  const elsewhere = db.log.length - log.length;
+
+  const s = store.stats(decks);
+  const counts = store.counts(decks);
   const session = store.session();
   const { current: streak, longest, activeDays } = streaks(log);
   const retention = s.rev > 0 ? Math.round((s.ok / s.rev) * 100) : null;
@@ -164,7 +173,9 @@ export default function HomeView() {
      named, not softened. */
   const epigraph =
     log.length === 0
-      ? "Nothing written down yet. Every book starts on a blank page."
+      ? elsewhere > 0
+        ? `Nothing in ${project.name} yet — your ${elsewhere.toLocaleString()} reviews so far belong to other projects.`
+        : "Nothing written down yet. Every book starts on a blank page."
       : streak >= 2
         ? `Day ${streak} without a gap.` + (streak >= longest ? " Your longest run yet." : ` Your best is ${longest}.`)
         : streak === 1
@@ -258,8 +269,28 @@ export default function HomeView() {
             />
           </div>
 
-          <Section title="Activity" note={`${activeDays} active ${activeDays === 1 ? "day" : "days"}`}>
+          {/* An empty grid is ambiguous — it looks the same whether you have
+              never reviewed anything or your history is filed under another
+              project — so it says which. Reading a blank calendar as "you
+              have done nothing" when you have done thousands is the version
+              of this that makes the page feel broken. */}
+          <Section
+            title="Activity"
+            note={
+              activeDays > 0
+                ? `${activeDays} active ${activeDays === 1 ? "day" : "days"}`
+                : elsewhere > 0
+                  ? "none in this project"
+                  : undefined
+            }
+          >
             <ActivityGrid log={log} />
+            {activeDays === 0 && elsewhere > 0 && (
+              <p className="home-empty">
+                {elsewhere.toLocaleString()} review{elsewhere === 1 ? "" : "s"} are logged against decks in your
+                other projects. Switch project in the sidebar to see them.
+              </p>
+            )}
           </Section>
 
           <Section title="Contents">

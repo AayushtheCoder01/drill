@@ -83,9 +83,14 @@ function DeckRow({ deck, others, onGone }: { deck: Deck; others: Project[]; onGo
         )}
       </div>
 
+      {/* No streak here on purpose. deck.meta.streak is a per-deck counter
+          that only advances while that deck is in the queue, so printing it
+          beside the one Home and the rail compute from the log gives two
+          different answers to the same question in the same session. The
+          streak has one definition; it lives in lib/activity. */}
       <div className="deckrow-meta">
-        {deck.cards.length} {deck.cards.length === 1 ? "card" : "cards"} · {seen} seen
-        {deck.meta.streak ? ` · ${deck.meta.streak} day streak` : ""}
+        {deck.cards.length} {deck.cards.length === 1 ? "card" : "cards"} · {seen} seen ·{" "}
+        {deck.meta.reviews.toLocaleString()} reviews
       </div>
 
       <div className="btnrow">

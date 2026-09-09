@@ -12,6 +12,14 @@
  * site data takes everything. Months of memory and review history is the one
  * thing in this app that cannot be regenerated, so the app asks for
  * persistent storage on first run and can report what it was granted.
+ *
+ * **write() returns a result rather than throwing.** It used to throw, into a
+ * `catch` in store.saveNow() that logged to the console and carried on. So the
+ * one failure that matters — localStorage full, which is reachable here
+ * because a year of review log lives in the same 5MB as the decks — looked
+ * exactly like a successful save from every seat in the app. You kept
+ * reviewing, nothing was written, and the session was gone on reload. A
+ * failure has to be a value the caller must look at.
  * ========================================================================== */
 
 const KEY = "mldrill:v3";
@@ -35,8 +43,63 @@ export function readLegacy(): string | null {
   }
 }
 
-export function write(json: string): void {
-  localStorage.setItem(KEY, json);
+/* ----------------------------------------------------------------- writing -- */
+
+export type WriteFailure = "quota" | "blocked" | "unknown";
+
+export type WriteResult =
+  | { ok: true; bytes: number }
+  | { ok: false; reason: WriteFailure; message: string; bytes: number };
+
+/**
+ * Which kind of failure this was, because the two need different answers: a
+ * quota failure is recoverable by shedding weight and retrying, and a blocked
+ * one (private window, third-party storage blocked, storage disabled) never
+ * will be, so retrying it just burns the main thread on every keystroke.
+ *
+ * The name is checked before the code because Safari and Firefox both use
+ * legacy numeric codes with their own spellings — 22 in Chrome and Safari,
+ * 1014 in Firefox — and a browser that reports neither still has the name.
+ */
+export function classifyWriteError(e: unknown): WriteFailure {
+  const err = e as { name?: string; code?: number } | null;
+  const name = err?.name || "";
+  if (
+    name === "QuotaExceededError" ||
+    name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+    err?.code === 22 ||
+    err?.code === 1014
+  ) {
+    return "quota";
+  }
+  if (name === "SecurityError" || name === "InvalidAccessError" || name === "TypeError") return "blocked";
+  return "unknown";
+}
+
+export function write(json: string): WriteResult {
+  const bytes = json.length;
+  try {
+    localStorage.setItem(KEY, json);
+    return { ok: true, bytes };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: classifyWriteError(e),
+      message: e instanceof Error ? e.message : String(e),
+      bytes
+    };
+  }
+}
+
+/** Size of what is actually on disk for the main database, in characters.
+ *  Used by the Data page to say how close to the wall you are, and by the
+ *  save path to report what it was trying to write when it failed. */
+export function storedBytes(): number | null {
+  try {
+    return localStorage.getItem(KEY)?.length ?? 0;
+  } catch {
+    return null;
+  }
 }
 
 /* ------------------------------------------------------ migration backup -- */
@@ -96,10 +159,17 @@ export interface StorageHealth {
 }
 
 /**
- * Ask the browser to exempt this origin from eviction. Chrome grants it
- * silently for installed or frequently-visited sites, Firefox prompts, Safari
- * decides on its own. A refusal is normal and not an error — the app keeps
- * working, it just also keeps recommending an export.
+ * Ask the browser to exempt this origin from eviction.
+ *
+ * Chrome grants it silently for installed or frequently-visited sites,
+ * Firefox prompts, Safari decides on its own. A refusal is normal and not an
+ * error — the app keeps working, it just also keeps recommending an export.
+ *
+ * Called twice on purpose: once at boot, where Chrome's heuristics can say
+ * yes without bothering anyone, and again from an actual button in
+ * Settings → Data. The second one is the one that works in Firefox, because
+ * a permission prompt raised without a user gesture is dismissed before
+ * anybody sees it — which is why "we already ask at startup" was not enough.
  */
 export async function requestPersistence(): Promise<boolean> {
   try {

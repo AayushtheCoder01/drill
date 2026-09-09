@@ -8,6 +8,7 @@
  * ========================================================================== */
 import * as U from "@/lib/util";
 import { idbAll, idbDelete, idbPut, STORE_JOURNAL, STORE_ROLLUPS } from "./idb";
+import * as persistence from "./persistence";
 import type { JournalEntry, JournalSummary, PeriodRollup, RawLog } from "@/types/journal";
 
 let entries: JournalEntry[] = [];
@@ -50,7 +51,7 @@ export async function reload(): Promise<void> {
 
 function persistEntry(e: JournalEntry): void {
   e.updated = Date.now();
-  void idbPut(STORE_JOURNAL, e).catch((err) => console.error("journal save failed", err));
+  void persistence.guard("journal entry", idbPut(STORE_JOURNAL, e));
   notify();
 }
 
@@ -131,7 +132,7 @@ export function markDistilled(entry: JournalEntry, memoryIds: string[], cardIds:
 
 export function remove(id: string): void {
   entries = entries.filter((e) => e.id !== id);
-  void idbDelete(STORE_JOURNAL, id).catch(() => undefined);
+  void persistence.guard("journal entry", idbDelete(STORE_JOURNAL, id));
   notify();
 }
 
@@ -144,12 +145,12 @@ export function listRollups(projectId: string): PeriodRollup[] {
 export function createRollup(input: Omit<PeriodRollup, "id" | "created">): PeriodRollup {
   const r: PeriodRollup = { ...input, id: U.uuid(), created: Date.now() };
   rollups.push(r);
-  void idbPut(STORE_ROLLUPS, r).catch((e) => console.error("rollup save failed", e));
+  void persistence.guard("rollup", idbPut(STORE_ROLLUPS, r));
   for (const eid of input.entryIds) {
     const e = get(eid);
     if (e) {
       e.rolledUpIn = r.id;
-      void idbPut(STORE_JOURNAL, e).catch(() => undefined);
+      void persistence.guard("journal entry", idbPut(STORE_JOURNAL, e));
     }
   }
   notify();

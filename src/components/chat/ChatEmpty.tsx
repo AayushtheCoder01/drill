@@ -26,8 +26,13 @@ interface Props {
 }
 
 export default function ChatEmpty({ ready, onStart, onPrefill }: Props) {
-  const counts = store.counts();
-  const stats = store.stats();
+  /* The project's decks, not pool(). These numbers describe what the starter
+     beside them will attach, and the sources it attaches are project-scoped —
+     so reading them off the active deck made the label disagree with the
+     thing it labelled the moment mixing was off. */
+  const projectDecks = store.decksOf(store.get().activeProjectId);
+  const counts = store.counts(projectDecks);
+  const stats = store.stats(projectDecks);
   const personal = isPersonalProject(store.get().activeProjectId);
 
   const deckStarters: { t: string; s: string; icon: IconName; go: () => void }[] = [

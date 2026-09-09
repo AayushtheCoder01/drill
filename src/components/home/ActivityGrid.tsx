@@ -47,7 +47,11 @@ export default function ActivityGrid({ log, weeks = 53 }: { log: LogEntry[]; wee
 
   const cols = grid(log, weeks);
   const months = monthLabels(cols);
-  const total = log.length;
+  /* Summed from the squares actually drawn, not `log.length`. The legend says
+     "in the last year" and the log goes back further than the grid does, so
+     reading the whole log put a number under the calendar that the calendar
+     did not contain. */
+  const total = cols.reduce((n, col) => n + col.reduce((m, c) => m + c.count, 0), 0);
   const track = { gridTemplateColumns: `repeat(${weeks}, minmax(0, 1fr))` };
 
   return (
@@ -87,7 +91,10 @@ export default function ActivityGrid({ log, weeks = 53 }: { log: LogEntry[]; wee
       )}
 
       <div className="act-legend">
-        <span>{total.toLocaleString()} reviews in the last year</span>
+        <span>
+          {total.toLocaleString()} review{total === 1 ? "" : "s"} in the last year
+          {log.length > total ? ` · ${(log.length - total).toLocaleString()} older` : ""}
+        </span>
         <span className="act-key">
           Less
           {[0, 1, 2, 3, 4].map((l) => (
