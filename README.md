@@ -457,6 +457,14 @@ Backends, decks and bug reports all welcome — see
 [CONTRIBUTING.md](CONTRIBUTING.md). Adding a backend is one object in
 `src/services/ai/backends.ts` with two methods.
 
+## Contact
+
+Bugs and feature requests are best as
+[GitHub issues](https://github.com/AayushtheCoder01/drill/issues), so the
+answer is there for whoever hits the same thing next. For anything else —
+questions, ideas, or if you are using Drill for something and want to say so —
+mail <aayushkumarkumar1234@gmail.com>.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
