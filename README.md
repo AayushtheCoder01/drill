@@ -39,6 +39,13 @@ openrouter.ai.
   with variant history, edit and resend, branch a tangent into its own thread,
   full-text search across every conversation, attachments, `ctrl+K` command
   palette, token and cost accounting.
+- **It survives a bad connection** — rate limits and gateway errors are retried
+  with backoff (respecting `Retry-After`), but never once the reply has started
+  arriving, because a stream cannot be resumed. If one dies part-way you keep
+  what came through, with a "cut short" note and a Retry; if the tab closes
+  mid-reply, the thread says so instead of leaving a blank bubble. A key that
+  is simply wrong still fails immediately — retrying that would only make you
+  wait for the same answer.
 
 ### Review
 

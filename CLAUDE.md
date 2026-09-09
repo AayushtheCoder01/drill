@@ -21,9 +21,9 @@ especially its **Project layout** section. Do not restate it here.
 npm run dev     # vite; usually :5173, falls back to :5174 if taken
 npm run lint    # tsc --noEmit. The only lint there is
 npm test        # tsx --test src/**/*.test.ts
-                # 163 tests: fsrs, cardFormat, memory*, effort, title,
+                # 175 tests: fsrs, cardFormat, memory*, effort, title,
                 # thinking, agent/loop, settings/catalogue, logBudget,
-                # storage, activity, gaps
+                # storage, activity, gaps, retry
 npm run build   # tsc -b && vite build
 ```
 
@@ -177,6 +177,24 @@ everybody until the catalogue lands. Only a catalogue hit produces a "no".
 Ask `availability(id, supports, model)` in `lib/chatActions.ts` — never
 `backend.supports` directly — because the send path filters on the same call
 and the two must not disagree.
+
+**Chat retries, but never a stream that has spoken.** `lib/retry.ts` owns the
+policy (retryable statuses, backoff, `Retry-After`); `postWithRetry` in
+`backends.ts` owns the loop and the abortable sleep. The rule that matters is
+`started()`: both streaming adapters pass a closure over their own accumulator,
+and once one token has reached the caller the request is never repeated —
+restarting a stream either duplicates what is on screen or throws it away.
+A failure after that point keeps the partial instead: `run()` in ChatContext
+saves `acc` as a variant *and* sets `turn.error`, and MessageTurn renders the
+reply with a "Cut short" strip under it rather than replacing four paragraphs
+with a red box. `send()` guards on `busy` for the same family of reasons — the
+composer disables its button, but starters, slash commands, follow-up chips and
+the palette all reach `send()` too, and a second `run()` overwrites `abortRef`
+and leaves the first request unstoppable.
+
+An assistant turn with no variants and no error is a reply that was in flight
+when the app went away; `chatStore.repair()` names it so the UI offers Retry
+instead of a blank bubble it used to give a blank variant to.
 
 **The learner model is one description, in one file, fed by the loop.**
 `lib/memoryBrief.ts`'s `learnerBlocks()` is the only place that says how a

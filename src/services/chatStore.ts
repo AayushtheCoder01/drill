@@ -161,11 +161,27 @@ export async function load(id: string): Promise<Conversation | null> {
  *  why chat has never needed a bulk migration. v1 additions: projectId,
  *  effort, pinnedAttachments, rolledUpThrough. */
 function repair(c: Conversation): Conversation {
-  c.turns = (c.turns || []).map((t) => ({
-    ...t,
-    variants: t.variants && t.variants.length ? t.variants : [{ content: "", createdAt: t.createdAt || Date.now() }],
-    active: Math.min(Math.max(t.active || 0, 0), Math.max((t.variants || []).length - 1, 0))
-  }));
+  c.turns = (c.turns || []).map((t) => {
+    const has = !!(t.variants && t.variants.length);
+    /* An assistant turn with no variants and no error is a reply that was in
+       flight when the app went away — a reload, a closed tab, a crash. The
+       turn is written before the request is made, so it survives; the reply
+       does not.
+
+       It used to be given a blank variant like any other, which made it
+       indistinguishable from an answer that was genuinely empty: the bubble
+       rendered with nothing in it, no explanation, and no Retry, because the
+       "failed" state is *no variants at all*. Naming it is what puts the
+       Retry button back. */
+    if (!has && t.role === "assistant" && !t.error) {
+      return { ...t, variants: [], active: 0, error: "Interrupted — the app closed while this reply was arriving." };
+    }
+    return {
+      ...t,
+      variants: has ? t.variants : [{ content: "", createdAt: t.createdAt || Date.now() }],
+      active: Math.min(Math.max(t.active || 0, 0), Math.max((t.variants || []).length - 1, 0))
+    };
+  });
   c.context = c.context || [];
   c.usage = c.usage || { promptTokens: 0, completionTokens: 0 };
   c.personaId = c.personaId || DEFAULT_PERSONA_ID;

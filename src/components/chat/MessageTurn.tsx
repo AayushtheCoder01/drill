@@ -164,8 +164,16 @@ export default function MessageTurn({
   }
 
   /* An assistant turn with no variants yet and nothing streaming is a request
-     that failed before producing anything. */
+     that failed before producing anything — the error replaces the reply,
+     because there is no reply.
+
+     A turn that has *both* a variant and an error is the other shape: the
+     stream died part-way, and what arrived before it broke is kept. That one
+     renders the reply and says underneath that it stopped early, because four
+     paragraphs of a five-paragraph answer are worth reading and used to be
+     replaced by a red box. */
   const failed = !isUser && !streaming && turn.variants.length === 0;
+  const cutShort = !isUser && !streaming && !!turn.error && turn.variants.length > 0;
 
   return (
     <div className={`turn ${isUser ? "user" : "assistant"}${turn.starred ? " starred" : ""}`}>
@@ -325,6 +333,13 @@ export default function MessageTurn({
           <button className="tact danger" onClick={onDelete} title="Delete message">
             <Icon name="close" size={11} />
           </button>
+        </div>
+      )}
+
+      {cutShort && (
+        <div className="chat-err cut-short">
+          <span style={{ flex: 1 }}>Cut short — {turn.error}</span>
+          <button onClick={onRetry}>Retry</button>
         </div>
       )}
 

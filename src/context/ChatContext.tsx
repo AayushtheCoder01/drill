@@ -17,6 +17,7 @@ import {
   useSyncExternalStore,
   type ReactNode
 } from "react";
+import * as U from "@/lib/util";
 import * as store from "@/services/store";
 import * as chatStore from "@/services/chatStore";
 import * as memoryStore from "@/services/memoryStore";
@@ -41,6 +42,16 @@ import type { BackendType, ChatMessage, Citation, Memory } from "@/types";
 /** A one-off backend/model for a single regenerate call — applied to that
  *  variant only, never written to conversation.backend/model. */
 type ModelOverride = { backend?: BackendType | ""; model?: string };
+
+/** The empty reply a request is about to fill in.
+ *
+ *  One factory rather than the two identical literals send() and editUserTurn()
+ *  each carried — which had drifted to the point of both falling back to
+ *  `String(Math.random())` for an id, a value that can repeat and is used to
+ *  find the turn again. `U.uuid()` is what the rest of the app uses. */
+function blankAssistantTurn(): Turn {
+  return { id: U.uuid(), role: "assistant", variants: [], active: 0, createdAt: Date.now() };
+}
 
 /**
  * The agent loop mid-flight, for the "what is it doing" panel.
@@ -473,6 +484,28 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           }
         } else {
           const msg = (e as Error).message || "Request failed";
+          /* Whatever streamed in before it broke is kept, exactly as it is on
+             the abort path — "half an explanation is still worth reading" is
+             not less true when the connection dropped than when you pressed
+             stop, and this branch is the one that actually happens. A stream
+             that dies four paragraphs into an answer used to lose all four
+             and show a red box.
+
+             The error rides *with* the variant rather than instead of it, so
+             the turn renders the partial reply and says underneath that it
+             was cut off. Retry replaces the turn, so nothing is orphaned. */
+          if (acc.trim()) {
+            targetTurn.variants.push({
+              content: acc,
+              model: runModel,
+              usage,
+              elapsed: Date.now() - started,
+              createdAt: Date.now(),
+              trace,
+              citations
+            });
+            targetTurn.active = targetTurn.variants.length - 1;
+          }
           targetTurn.error = msg;
           setError(msg);
           chatStore.persist(c, true);
@@ -553,6 +586,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const send = useCallback(
     async (text: string, attachments?: Attachment[]) => {
+      /* The composer disables its button while a reply streams, but send() is
+         also reached from starters, slash commands, follow-up chips and the
+         command palette — and a second run() would overwrite abortRef with
+         its own controller, leaving the first request live with nothing able
+         to stop it, both of them writing variants and both fighting over the
+         streaming buffer. The guard belongs here, next to the state it
+         protects, not in each of the six callers. */
+      if (busy) return;
+
       let c = conversation;
       if (!c) {
         // A model picked on the empty screen has to survive the conversation
@@ -565,20 +607,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       if (!body && !attachments?.length) return;
 
       chatStore.addTurn(c, chatStore.makeTurn("user", body, attachments));
-      const assistant: Turn = {
-        id: crypto.randomUUID ? crypto.randomUUID() : String(Math.random()),
-        role: "assistant",
-        variants: [],
-        active: 0,
-        createdAt: Date.now()
-      };
+      const assistant = blankAssistantTurn();
       c.turns.push(assistant);
       chatStore.persist(c);
       rerender();
 
       await run(c, assistant, c.turns.length - 2);
     },
-    [conversation, openChat, run, rerender, withDrafts]
+    [busy, conversation, openChat, run, rerender, withDrafts]
   );
 
   const stop = useCallback(() => {
@@ -611,13 +647,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       turn.active = turn.variants.length - 1;
       chatStore.truncateAfter(c, idx);
 
-      const assistant: Turn = {
-        id: crypto.randomUUID ? crypto.randomUUID() : String(Math.random()),
-        role: "assistant",
-        variants: [],
-        active: 0,
-        createdAt: Date.now()
-      };
+      const assistant = blankAssistantTurn();
       c.turns.push(assistant);
       chatStore.persist(c);
       rerender();

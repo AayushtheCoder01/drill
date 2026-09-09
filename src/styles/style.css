@@ -3423,6 +3423,18 @@ select.fi.auto {
   border-left-color: var(--amber);
   color: var(--amber);
 }
+/* The same strip under a reply that arrived but stopped early. Amber rather
+   than red, and below the text rather than in place of it: the answer is
+   still there and still worth reading, and only the ending is missing. A
+   half-written explanation used to be replaced entirely by a red box. */
+.chat-err.cut-short {
+  border-left-color: var(--amber);
+  color: var(--ink-3);
+  margin: var(--s-3) 0 0;
+}
+.chat-err.cut-short button {
+  color: var(--amber);
+}
 .mini-note {
   font-family: var(--sans);
   font-size: var(--t-xs);

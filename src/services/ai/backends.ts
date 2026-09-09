@@ -17,6 +17,7 @@
  * the same BackendDef shape and swap fetch() targets for calls to your API.
  * ========================================================================== */
 import { CHAT_ACTIONS, availability, type ChatActionId } from "@/lib/chatActions";
+import { MAX_ATTEMPTS, jitter, planRetry } from "@/lib/retry";
 import type { AIContext, BackendDef, BackendType, ChatMessage, ChatOpts, Citation, TokenUsage, WireToolCall } from "@/types";
 
 /** True for the exception fetch throws when an AbortSignal fires. Callers
@@ -235,7 +236,7 @@ function shortErr(t: string): string {
 }
 
 /** Turn a failed response into something that names the actual fix. */
-function httpError(label: string, res: Response, body: string): Error {
+function httpError(label: string, res: Response, body: string, tried = ""): Error {
   const detail = shortErr(body);
   if (res.status === 401 || res.status === 403) {
     return new Error(label + " rejected the key (" + res.status + "). Check it in Settings — " + detail);
@@ -244,9 +245,104 @@ function httpError(label: string, res: Response, body: string): Error {
     return new Error(label + " 404 — usually a model name that does not exist on this backend. " + detail);
   }
   if (res.status === 429) {
-    return new Error(label + " rate limit or out of credit (429). " + detail);
+    return new Error(label + " rate limit or out of credit (429)" + tried + ". " + detail);
   }
-  return new Error(label + " " + res.status + " — " + detail);
+  /* A thread that outgrew its model is the one 400 with an obvious fix, and
+     "400 — invalid_request_error" is the least useful way to say it. The
+     wording is checked rather than an error code because every provider
+     spells the code differently and they all put the words in the message. */
+  if (res.status === 400 && /context|token|too long|maximum.*length/i.test(body)) {
+    return new Error(
+      "This conversation is now longer than " +
+        label +
+        " will accept in one request. Lower Effort in the composer to send less " +
+        "history, pick a model with a bigger context window, or branch from a message part-way up to carry " +
+        "the thread on in a fresh one. — " +
+        detail
+    );
+  }
+  return new Error(label + " " + res.status + tried + " — " + detail);
+}
+
+/**
+ * Wait, unless the user stopped it first.
+ *
+ * A plain setTimeout would hold the Stop button hostage for the length of the
+ * backoff: you press stop, nothing happens for four seconds, and then the
+ * request you cancelled goes out anyway.
+ */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new DOMException("Aborted", "AbortError"));
+    const t = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    function onAbort() {
+      clearTimeout(t);
+      reject(new DOMException("Aborted", "AbortError"));
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/**
+ * POST, and try again when the failure is the kind that might not repeat.
+ *
+ * Nothing in this app retried anything before, so a 429 from a free tier — the
+ * most ordinary failure a chat client meets — ended the message and left the
+ * user to press Retry by hand. So did a gateway 502 and a wifi handover.
+ *
+ * `started()` is the safety rail, and it is the whole reason this lives here
+ * rather than around `chat()`. Once a single token has reached the caller the
+ * request is no longer repeatable: restarting it would either duplicate what
+ * was already shown or throw it away. Both streaming adapters pass a closure
+ * over their own accumulator, so the rule is enforced by the thing that knows.
+ */
+async function postWithRetry(
+  url: string,
+  init: RequestInit,
+  label: string,
+  signal: AbortSignal | undefined,
+  started: () => boolean,
+  /** A backend's own wording for a status the generic message would fumble —
+   *  Ollama's 404 is "you have not pulled that model", not "bad model name".
+   *  Returning null falls through to httpError. */
+  mapError?: (res: Response, body: string) => Error | null
+): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    let res: Response | null = null;
+    let networkError: unknown;
+
+    try {
+      res = await fetch(url, init);
+    } catch (e) {
+      if (isAbort(e)) throw e;
+      networkError = e;
+    }
+
+    if (res && res.ok) return res;
+
+    const plan = planRetry({
+      attempt,
+      status: res?.status,
+      retryAfter: res?.headers.get("retry-after"),
+      networkError: !res,
+      started: started()
+    });
+
+    if (!plan.retry) {
+      if (!res) throw reachError(label, url, networkError);
+      const body = await res.text().catch(() => "");
+      throw mapError?.(res, body) || httpError(label, res, body, attempt > 1 ? ` (tried ${attempt} times)` : "");
+    }
+
+    /* The body of a failed attempt is never read, so it has to be released
+       explicitly or the connection is held until GC gets round to it. */
+    if (res) void res.body?.cancel().catch(() => undefined);
+    console.warn(`${label}: ${plan.reason}; retrying (${attempt}/${MAX_ATTEMPTS - 1})`);
+    await sleep(jitter(plan.delayMs), signal);
+  }
 }
 
 /** A network-level failure gives no status and no body. For a local server
@@ -341,22 +437,16 @@ function openAICompatible(
          here; OpenRouter deprecated it and returns usage unconditionally. */
       applyActions(body, opts.actions, id, ctx.model);
 
-      let res: Response;
-      try {
-        res = await fetch(url, {
-          method: "POST",
-          headers: headerFn(ctx),
-          body: JSON.stringify(body),
-          signal: opts.signal
-        });
-      } catch (e) {
-        if (isAbort(e)) throw e;
-        throw reachError(label, url, e);
-      }
-      if (!res.ok) {
-        const t = await res.text().catch(() => "");
-        throw httpError(label, res, t);
-      }
+      /* Tracks whether anything has reached the caller, so the retry loop can
+         refuse to restart a stream that has already put text on the screen. */
+      let delivered = false;
+      const res = await postWithRetry(
+        url,
+        { method: "POST", headers: headerFn(ctx), body: JSON.stringify(body), signal: opts.signal },
+        label,
+        opts.signal,
+        () => delivered
+      );
       if (!opts.onToken) {
         const j = await res.json();
         const u = readOpenAIUsage(j);
@@ -403,6 +493,7 @@ function openAICompatible(
         if (d.reasoning || d.reasoning_content) reasoned = true;
         if (d.content) {
           out += d.content;
+          delivered = true;
           opts.onToken!(d.content, out);
         }
       });
@@ -526,25 +617,26 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
       if (opts.maxTokens) (body.options as Record<string, unknown>).num_predict = opts.maxTokens;
       applyActions(body, opts.actions, "ollama", ctx.model);
 
-      let res: Response;
-      try {
-        res = await fetch(url, {
+      /* Retried like the hosted backends, and not only for symmetry: a local
+         server that is still loading a model into memory refuses with a 5xx,
+         and asking again a second later is exactly the right answer. */
+      let delivered = false;
+      const res = await postWithRetry(
+        url,
+        {
           method: "POST",
           headers: { "Content-Type": "application/json", ...ctx.headers },
           body: JSON.stringify(body),
           signal: opts.signal
-        });
-      } catch (e) {
-        if (isAbort(e)) throw e;
-        throw reachError("Ollama", url, e);
-      }
-      if (!res.ok) {
-        const t = await res.text().catch(() => "");
-        if (res.status === 404) {
-          throw new Error('Ollama has no model called "' + ctx.model + '". Pull it first:  ollama pull ' + ctx.model);
-        }
-        throw httpError("Ollama", res, t);
-      }
+        },
+        "Ollama",
+        opts.signal,
+        () => delivered,
+        (r) =>
+          r.status === 404
+            ? new Error('Ollama has no model called "' + ctx.model + '". Pull it first:  ollama pull ' + ctx.model)
+            : null
+      );
       const reportOllamaUsage = (j: { prompt_eval_count?: number; eval_count?: number }) => {
         if (!opts.onUsage) return;
         if (j.prompt_eval_count == null && j.eval_count == null) return;
@@ -563,6 +655,7 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
         const t = (j.message && j.message.content) || j.response;
         if (t) {
           out += t;
+          delivered = true;
           opts.onToken!(t, out);
         }
       });
