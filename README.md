@@ -47,8 +47,16 @@ openrouter.ai.
   aims every interval at your target retention.
 - **Free recall** — you type the answer from memory before the card flips.
   Recognising an answer is not remembering it.
-- **AI marking** — the model compares your attempt to the card, names what you
-  left out, and *suggests* a grade. You still press the button.
+- **AI marking that remembers** — the model compares your attempt to the card,
+  names what you left out, and *suggests* a grade. You still press the button.
+  What it named is kept: it sees your history with that card next time ("you
+  are making the same substitution error"), and the phrases it keeps writing
+  down are clustered into what you are currently getting wrong.
+- **Every AI call knows your gaps** — that cluster goes into the system prompt
+  of the card writer, the marker, the exam generator, the tutor, chat and the
+  follow-up suggestions. Cards get written at the thing you keep missing rather
+  than at the topic in general. The rail beside the card shows you the same
+  list, so what the app tells you and what it tells the model are one answer.
 - **Interleaving** — consecutive cards from the same section get shuffled apart,
   and "Mix all decks" drills everything due together.
 - **Leech repair** — a card that lapses four times gets flagged, and the fix

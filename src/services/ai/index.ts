@@ -278,9 +278,36 @@ function parseMarkResult(out: string): MarkResult {
   return j;
 }
 
-export async function markRecall(card: Card, attempt: string): Promise<MarkResult> {
+/** What this learner has already got wrong on this exact card. */
+export interface RecallHistory {
+  /** Times this card has been failed outright. */
+  lapses: number;
+  /** What the marker said was missing, on previous attempts at this card. */
+  priorMisses: string[];
+}
+
+export async function markRecall(card: Card, attempt: string, history?: RecallHistory): Promise<MarkResult> {
+  /* A repeated mistake is a different thing from a fresh one, and saying so
+     is most of how it gets fixed — so the marker is shown what it said last
+     time rather than meeting every attempt as if it were the first. */
+  const prior =
+    history && (history.lapses > 0 || history.priorMisses.length)
+      ? "\n\nTHEIR HISTORY WITH THIS CARD:\n" +
+        (history.lapses > 0 ? `Failed outright ${history.lapses} time${history.lapses === 1 ? "" : "s"} before.\n` : "") +
+        (history.priorMisses.length
+          ? "Previously missed:\n" + history.priorMisses.map((m) => "- " + m).join("\n") + "\n"
+          : "") +
+        "If they are making the same mistake again, say so in `note` — naming a repeat is worth more than " +
+        "marking it fresh. If they have fixed something they used to miss, say that instead."
+      : "";
   const usr =
-    "CARD FRONT:\n" + U.stripTags(card.q) + "\n\nCARD BACK (the truth):\n" + U.stripTags(card.a) + "\n\nTHEIR ATTEMPT:\n" + attempt;
+    "CARD FRONT:\n" +
+    U.stripTags(card.q) +
+    "\n\nCARD BACK (the truth):\n" +
+    U.stripTags(card.a) +
+    "\n\nTHEIR ATTEMPT:\n" +
+    attempt +
+    prior;
   const sys = withMemory(MARK_SYS, U.stripTags(card.q) + " " + U.stripTags(card.a));
   const out = await chat([{ role: "system", content: sys }, { role: "user", content: usr }], {
     temperature: 0.1,
@@ -765,11 +792,20 @@ export async function suggestFollowups(
       [
         {
           role: "system",
+          /* The brief without memory: the goals and — the point of this — what
+             they are currently getting wrong. Follow-ups were generated from
+             the last four messages alone, so the app's best suggestion for
+             "what should I ask next" was made by the only call in the system
+             that had no idea what the learner keeps failing. The tail is
+             sliced before the system message, so it could not inherit it
+             either. */
           content:
+            memoryBrief({ memories: false }).text +
             "Given the end of a tutoring conversation, propose three follow-up questions the learner " +
             "should ask next. Favour questions that go deeper into the mechanism, probe an edge case, or " +
-            "connect the idea to something adjacent — not questions already answered. Each under 12 words, " +
-            "written in the learner's voice. Reply ONLY with a JSON array of three strings."
+            "connect the idea to something adjacent — not questions already answered. Where one of their " +
+            "standing gaps above is relevant to what is being discussed, aim a question at it. Each under " +
+            "12 words, written in the learner's voice. Reply ONLY with a JSON array of three strings."
         },
         { role: "user", content: tail.map((m) => `${m.role.toUpperCase()}: ${m.content.slice(0, 1200)}`).join("\n\n") }
       ],

@@ -1070,6 +1070,8 @@ export function nextDue(): string | null {
  *  sentence they actually wrote, short enough that a year of them still fits
  *  in localStorage beside everything else. */
 const ATTEMPT_MAX = 260;
+const MISSING_MAX = 3;
+const MISSING_CHARS = 90;
 
 /** What happened around the grade, beyond the grade itself: what they wrote
  *  from memory and what the marker made of it. Optional — grading without
@@ -1077,6 +1079,9 @@ const ATTEMPT_MAX = 260;
 export interface GradeContext {
   attempt?: string;
   verdict?: MarkResult["verdict"];
+  /** What the marker said was left out. Kept, not just shown — see
+   *  LogEntry.m and lib/gaps. */
+  missing?: string[];
 }
 
 /** Record a grade. Returns the new scheduling state. */
@@ -1092,6 +1097,12 @@ export function gradeCard(o: QueueItem, g: Grade, ctx: GradeContext = {}): SRSSt
   const attempt = (ctx.attempt || "").trim();
   if (attempt) entry.a = attempt.slice(0, ATTEMPT_MAX);
   if (ctx.verdict) entry.v = ctx.verdict;
+  /* Capped the same way the attempt is: three short phrases is what the
+     marker is asked for, and a model that ignores that must not be able to
+     put a paragraph into every log entry. */
+  if (ctx.missing?.length) {
+    entry.m = ctx.missing.slice(0, MISSING_MAX).map((x) => String(x).slice(0, MISSING_CHARS));
+  }
   db.log.push(entry);
   /* This used to be `if (db.log.length > 8000) db.log = db.log.slice(-6000)`,
      which threw away two thousand reviews at a stroke, without a word, and
@@ -1163,6 +1174,32 @@ export interface Stats {
   cards: number;
   seen: number;
   leech: number;
+}
+
+/**
+ * What the marker has already said about one card, most recent first.
+ *
+ * The recall marker used to see the front, the back and the attempt, and
+ * nothing else — so a learner making the same substitution error for the
+ * fourth week running was marked as if it were the first time. Naming a
+ * repeated mistake is most of how it gets fixed, and the app already had the
+ * evidence: it just never handed it over.
+ */
+export function priorMisses(deckId: string, cardId: string, limit = 4): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (let i = db.log.length - 1; i >= 0 && out.length < limit; i--) {
+    const e = db.log[i];
+    if (e.d !== deckId || e.c !== cardId || !e.m) continue;
+    for (const m of e.m) {
+      const key = m.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(m.trim());
+      if (out.length >= limit) break;
+    }
+  }
+  return out;
 }
 
 /** Every log entry belonging to these decks. db.log is one flat list across

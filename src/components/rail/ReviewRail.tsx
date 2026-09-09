@@ -19,6 +19,7 @@ import { useDrillStore } from "@/hooks/useDrillStore";
 import { useStoreSync } from "@/hooks/useStoreSync";
 import { useSheet } from "@/context/SheetContext";
 import { streaks, week as weekOf } from "@/lib/activity";
+import { gapsFrom } from "@/lib/gaps";
 import { stripTags } from "@/lib/util";
 import { RailBar, RailEmpty, RailFigure, RailGroup, RailItem, RailList, RailSub, RailWeek } from "./Rail";
 
@@ -62,6 +63,7 @@ export default function ReviewRail() {
   const days = activity.daysFor(db.activeProjectId);
   const { active: week, total: weekTotal } = weekOf(days);
   const worst = worstCards(4);
+  const gaps = gapsFrom(store.logOf(store.projectDecks()), { limit: 4 });
   /* One definition of a streak, in lib/activity, over the whole project's
      activity. It was max(deck.meta.streak) — a stored per-deck counter that
      only advances for decks in pool() when rollover() runs — so it drifted
@@ -132,6 +134,26 @@ export default function ReviewRail() {
               {`against a ${Math.round(store.settings().retention * 100)}% target · ${s.rev} graded`}
             </RailSub>
           </>
+        )}
+      </RailGroup>
+
+      {/* Concepts, not cards. "Keeps slipping" below counts lapses per card,
+          which tells you *what* to redo; this says what you keep getting
+          wrong across all of them, which is the thing worth actually going
+          and learning. Same clustering the tutor, the card writer and the
+          exam generator are now given — so what the app tells you and what it
+          tells the model are one answer. */}
+      <RailGroup title="What you keep missing">
+        {gaps.length === 0 ? (
+          <RailEmpty>
+            Nothing recurring yet. Turn on AI marking in Settings and this fills in as you write answers.
+          </RailEmpty>
+        ) : (
+          <RailList>
+            {gaps.map((g) => (
+              <RailItem key={g.text} mark={`${g.n}×`} text={g.text} />
+            ))}
+          </RailList>
         )}
       </RailGroup>
 

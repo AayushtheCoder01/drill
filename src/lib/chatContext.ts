@@ -16,7 +16,7 @@ import * as memoryStore from "@/services/memoryStore";
 import * as journalStore from "@/services/journalStore";
 import * as U from "@/lib/util";
 import { retrieve, type RetrievalTrace } from "@/lib/memoryRetrieval";
-import { memoryLine, poolFor } from "@/lib/memoryBrief";
+import { learnerBlocks, memoryLine, poolFor, wrapLearner } from "@/lib/memoryBrief";
 import { renderToday } from "@/lib/dayBrief";
 import type { ContextSource } from "@/types/chat";
 import type { Card, Deck, Memory, MemoryScope, SRSState } from "@/types";
@@ -288,21 +288,20 @@ export function buildContext(
     })
     .filter((b): b is string => !!b);
 
-  /* Project.goals is documented as "injected verbatim as the project header on
-     every turn" and was, in fact, read by exactly one function — the journal
-     writer. It is the most useful sentence available about someone, so it
-     goes first, above everything derived. */
-  const goals = store.get().projects[projectId]?.goals?.trim();
-  const header = goals ? `What this learner is working toward, in their own words: ${goals}` : "";
+  /* Who the learner is, from the one function that answers that — their
+     goals and what they are currently getting wrong. This used to be a
+     `header` const built here: the goals line phrased differently from
+     memoryBrief's, under an identical banner, with no gaps at all. Two
+     descriptions of the same person, and only one of them ever got improved.
 
-  if (!blocks.length && !header) return { system: persona + "\n\n" + SAVE_PROTOCOL, memories };
+     `memories: false` because this builder retrieves its own, per source and
+     under three caps; everything else about the learner comes from there. */
+  const { blocks: learner } = learnerBlocks({ projectId, memories: false });
+
+  if (!blocks.length && !learner.length) return { system: persona + "\n\n" + SAVE_PROTOCOL, memories };
   const context =
-    "=== CONTEXT ON THIS LEARNER ===\n" +
-    (header ? header + (blocks.length ? "\n\n" : "") : "") +
-    blocks.join("\n\n") +
-    "\n=== END CONTEXT ===\n\n" +
-    "Use this to pitch your answers correctly. Do not recite it back at them or mention that you were " +
-    "given it unless they ask what you can see.";
+    wrapLearner([...learner, ...blocks]) +
+    "Do not mention that you were given it unless they ask what you can see.";
   const system = (persona ? persona + "\n\n" + context : context) + "\n\n" + SAVE_PROTOCOL;
   return { system, memories };
 }

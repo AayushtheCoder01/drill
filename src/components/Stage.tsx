@@ -51,7 +51,10 @@ export default function Stage() {
     if (!lastAttempt || !store.settings().mark || !AI.ready().ok) return;
     let cancelled = false;
     setMarking("loading");
-    AI.markRecall(current.def, lastAttempt)
+    AI.markRecall(current.def, lastAttempt, {
+      lapses: current.st?.lapses || 0,
+      priorMisses: store.priorMisses(current.deck.id, current.def.id)
+    })
       .then((j) => {
         if (cancelled) return;
         review.setMark(j);

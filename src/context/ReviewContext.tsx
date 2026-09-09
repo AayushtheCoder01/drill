@@ -57,7 +57,12 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
          can read back what you were thinking. */
       store.gradeCard(current, g, {
         attempt: lastAttempt || attempt,
-        verdict: lastMark?.verdict
+        verdict: lastMark?.verdict,
+        /* The marker's diagnosis, kept rather than shown once and dropped.
+           It is the most specific thing anything in this app ever says about
+           what the learner does not understand, and every AI call used to
+           start again without it — see lib/gaps. */
+        missing: lastMark?.missing
       });
       const tag = current.def.tag;
       setLastTag(tag);

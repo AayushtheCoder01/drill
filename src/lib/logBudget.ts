@@ -54,10 +54,14 @@ export const LOG_MAX = 20000;
 export const LOG_EMERGENCY = 2500;
 
 /**
- * Strip the recall text (and the marker's verdict, which is meaningless
- * without it) from every entry older than the most recent `keep` that carry
- * one. Returns a new array only when something changed, so an unchanged log
- * costs one pass and no allocation.
+ * Strip the recall text from every entry older than the most recent `keep`
+ * that carry one, along with the marker's verdict and diagnosis, which are
+ * about text that is no longer there. Returns a new array only when something
+ * changed, so an unchanged log costs one pass and no allocation.
+ *
+ * The window is what bounds lib/gaps: a confusion is only a current gap if it
+ * has recurred recently, so the analysis wants a window anyway and shedding
+ * one is not a loss.
  */
 export function shedAttempts(log: LogEntry[], keep = ATTEMPT_WINDOW): { log: LogEntry[]; shed: number } {
   /* Counted from the end so "the most recent `keep`" means the most recent
@@ -87,7 +91,7 @@ export function shedAttempts(log: LogEntry[], keep = ATTEMPT_WINDOW): { log: Log
   const out = log.map((e, i) => {
     if (!e.a || keepFrom.has(i)) return e;
     shed++;
-    const { a: _a, v: _v, ...rest } = e;
+    const { a: _a, v: _v, m: _m, ...rest } = e;
     return rest as LogEntry;
   });
 

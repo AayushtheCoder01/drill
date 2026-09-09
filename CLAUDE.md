@@ -21,9 +21,9 @@ especially its **Project layout** section. Do not restate it here.
 npm run dev     # vite; usually :5173, falls back to :5174 if taken
 npm run lint    # tsc --noEmit. The only lint there is
 npm test        # tsx --test src/**/*.test.ts
-                # 151 tests: fsrs, cardFormat, memory*, effort, title,
+                # 163 tests: fsrs, cardFormat, memory*, effort, title,
                 # thinking, agent/loop, settings/catalogue, logBudget,
-                # storage, activity
+                # storage, activity, gaps
 npm run build   # tsc -b && vite build
 ```
 
@@ -177,6 +177,28 @@ everybody until the catalogue lands. Only a catalogue hit produces a "no".
 Ask `availability(id, supports, model)` in `lib/chatActions.ts` — never
 `backend.supports` directly — because the send path filters on the same call
 and the two must not disagree.
+
+**The learner model is one description, in one file, fed by the loop.**
+`lib/memoryBrief.ts`'s `learnerBlocks()` is the only place that says how a
+learner is described to a model — goals, what they are currently getting
+wrong, what is remembered. `memoryBrief()` wraps it for `services/ai` (card
+writing, marking, journal, distill, exam, the tutor); `buildContext` in
+`lib/chatContext.ts` composes it with chat's per-source blocks and wraps once
+with `wrapLearner()`. There were two of these, emitting the same banner and a
+differently-phrased goals line from different code, so an improvement landed
+in one path and not the other.
+
+`lib/gaps.ts` is the fed-by-the-loop half. `AI.markRecall` returns
+`missing: [...]` — the most specific thing anything in this app ever says
+about what someone does not understand — and it used to be rendered under the
+card for a few seconds and dropped. It is on `LogEntry.m` now, clustered into
+recurring confusions, and in front of every AI call. **Computed, never
+memorised** (§2.6): a confusion that stops recurring stops being mentioned,
+which is only free because it is derived from a window of the log. Two traps
+if you touch the clustering: match on a *ratio*, not a count of shared words
+("chain rule ordering" and "product rule ordering" share two), and match
+against each cluster's fixed seed, not its accumulated union, or a gap stops
+recognising itself after four recordings. `gaps.test.ts` holds both.
 
 **Backends and credentials.** `services/ai/backends.ts` holds one entry per
 provider — OpenRouter, Groq, Ollama, and a generic OpenAI-compatible one — and
