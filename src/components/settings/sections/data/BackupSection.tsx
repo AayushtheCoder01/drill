@@ -101,10 +101,7 @@ export default function BackupSection() {
   }
 
   return (
-    <Section
-      title="Back up and restore"
-      sub="One file with everything in it: decks, scheduling, chats, journal, memory and usage. This is how Drill moves to another browser, another machine, or back from a browser that cleared its storage."
-    >
+    <Section id="data.backup">
       <div className="list">
         <Item
           title="Back up everything"

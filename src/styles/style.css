@@ -1716,8 +1716,31 @@ a {
   color: var(--accent);
   text-underline-offset: 2px;
 }
+/* A button that has to read as a word inside a sentence. `.linkbtn` is the
+   other kind of link — uppercase mono with a hit area, for a row of small
+   actions under a record — and setting one of those mid-paragraph reads as a
+   shout. Used for the cross-references between settings pages, where the
+   sentence saying where something lives may as well take you there. */
+.textlink {
+  display: inline;
+  border: none;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
 
 /* ---------------------------------------------------------------- lists -- */
+/* A heading between two ruled lists needs air above it or it reads as another
+   row of the list it follows. Used by the review Menu and the deck switcher,
+   where a short list of signposts into Settings sits under one of real
+   actions and has to be visibly a different kind of thing. */
+.list + .label {
+  margin-top: var(--s-5);
+}
 /* A list is a ruled column, not a stack of boxes: one hairline between rows,
    no border round each. This is the single biggest change in feel across
    the panes, and the reason the sheets stopped looking like card soup. */
@@ -1778,6 +1801,27 @@ a {
   align-items: center;
   transform: rotate(-90deg);
   transition: color var(--fast), transform var(--fast);
+}
+/* Set off from the readout above it — this was an inline margin on two
+   elements in StatsPane, which is the one thing the stylesheet rule forbids:
+   a component may set a measured value inline, never a look. */
+.stat-hint {
+  margin-top: var(--s-4);
+}
+
+/* A word at the end of a row saying what state it is in — "drilling", "in
+   the mix". Not `.go`, which is rotated to point a chevron at the row and
+   would set the word on its side. */
+.item .state {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.item.on .state {
+  color: var(--accent);
 }
 .item:hover .go {
   color: var(--ink);
@@ -2312,26 +2356,65 @@ a {
 }
 
 /* ============================================================================
- * Settings — a category rail and one page at a time.
+ * Settings — a grouped rail and one page at a time.
  *
  * The old shape was three tabs where the first held fifteen unrelated
- * controls in one scroll. The nav is a wrapping row of pills rather than a
- * left rail because every surface settings opens in is narrow — a sheet, a
- * modal, a 380px chat drawer — and a rail that has to collapse below 600px is
- * two layouts to maintain for one list of eight words.
+ * controls in one scroll. The one after that was a wrapping row of pills,
+ * which was right while there were five pages and became a tag cloud at nine.
+ *
+ * So there are two shapes of the same list, and only two. Wide enough for a
+ * column beside the page, the rail is a grouped list that holds still while
+ * the page scrolls — the same rule as the app shell, one level in: navigation
+ * you can scroll away from is navigation you have to scroll back to. Under
+ * 860px there is no room for the column, and the identical markup falls back
+ * to the pill row it used to be.
+ *
+ * Only the page scrolls. .set-host replaces .sheet-body for this one panel
+ * precisely so the search box and the rail are outside the scroller.
  * ========================================================================== */
-.setpage {
+.set-sheet {
+  max-width: var(--page-wide);
+}
+.set-host {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+.setpage {
+  flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.setshell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.setbody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--s-5);
 }
 .setnav {
   display: flex;
   flex-wrap: wrap;
   gap: var(--s-1);
-  padding-bottom: var(--s-3);
-  margin-bottom: var(--s-4);
+  flex: 0 0 auto;
+  padding: 0 var(--s-5) var(--s-3);
   border-bottom: 1px solid var(--rule-soft);
+}
+/* Collapsed, a group heading in a row of pills would read as another pill. */
+.setnav-group {
+  display: contents;
+}
+.setnav-group .label {
+  display: none;
 }
 .setnav-btn {
   border: 1px solid transparent;
@@ -2343,6 +2426,7 @@ a {
   padding: var(--s-1) var(--s-3);
   cursor: pointer;
   white-space: nowrap;
+  text-align: left;
   transition: background var(--fast), color var(--fast), border-color var(--fast);
 }
 .setnav-btn:hover {
@@ -2355,16 +2439,53 @@ a {
   color: var(--accent);
 }
 
-/* The search box, and why settings has one at all: every category is a
-   single word you have to guess right, and the app has already lost a
-   feature to that — backup and restore sat in the review loop's menu while
-   the person who needed it went looking under Settings. */
+@media (min-width: 860px) {
+  .setshell {
+    flex-direction: row;
+    align-items: stretch;
+  }
+  .setnav {
+    flex: 0 0 12.5rem;
+    flex-wrap: nowrap;
+    flex-direction: column;
+    gap: 0;
+    overflow-y: auto;
+    padding: var(--s-5) var(--s-4) var(--s-5) var(--s-5);
+    border-bottom: none;
+    border-right: 1px solid var(--rule-soft);
+  }
+  .setnav-group {
+    display: block;
+  }
+  .setnav-group + .setnav-group {
+    margin-top: var(--s-4);
+  }
+  .setnav-group .label {
+    display: block;
+    margin: 0 0 var(--s-2) var(--s-3);
+  }
+  .setnav-btn {
+    display: block;
+    width: 100%;
+    border-radius: var(--r-2);
+    font-size: var(--t-sm);
+    padding: var(--s-2) var(--s-3);
+  }
+}
+
+/* The search box, and why settings has one at all: every page is a single
+   word you have to guess right, and the app has already lost a feature to
+   that — backup and restore sat in the review loop's menu while the person
+   who needed it went looking under Settings. It is outside the scroller with
+   the rail, because a search you have to scroll up to reach is a search you
+   use once. */
 .setsearch {
   display: flex;
   align-items: center;
   gap: var(--s-2);
+  flex: 0 0 auto;
   padding: 0 var(--s-3);
-  margin-bottom: var(--s-3);
+  margin: var(--s-5) var(--s-5) var(--s-4);
   border: 1px solid var(--rule-soft);
   border-radius: var(--r-full);
   background: var(--page-2);
@@ -2373,6 +2494,14 @@ a {
 }
 .setsearch:focus-within {
   border-color: var(--accent-45);
+}
+.setsearch-count {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
 }
 .setsearch-in {
   flex: 1;
@@ -2393,14 +2522,18 @@ a {
   appearance: none;
 }
 
-/* Results replace the pills rather than filtering them in place: a pill is
-   one word, and one word does not tell you whether what you are hunting for
-   is on that page. */
+/* Results take the whole panel rather than filtering the rail in place: a
+   rail entry is one word, and one word does not tell you whether what you
+   are hunting for is on that page. A row is a *group of settings*, not a
+   page, and it says which page it is on above its own name — the answer to
+   "where is the retention dial" is two lines, not one. */
 .setfound {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  margin-bottom: var(--s-4);
-  border-bottom: 1px solid var(--rule-soft);
+  overflow-y: auto;
+  padding: 0 var(--s-5) var(--s-5);
 }
 .setfound-row {
   display: flex;
@@ -2420,6 +2553,13 @@ a {
 .setfound-row:hover {
   background: var(--surface-2);
 }
+.setfound-where {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--accent);
+}
 .setfound-row .t {
   font-family: var(--sans);
   font-size: var(--t-sm);
@@ -2430,6 +2570,7 @@ a {
   font-size: var(--t-xs);
   line-height: 1.5;
   color: var(--ink-3);
+  max-width: var(--measure);
 }
 
 /* Restoring replaces everything, so the confirmation shows both sides of the
@@ -2491,6 +2632,27 @@ a {
   margin-top: var(--s-6);
   padding-top: var(--s-5);
   border-top: 1px solid var(--rule-soft);
+}
+/* Landing here from a search result. The margin keeps the heading clear of
+   the scroller's top edge when it is jumped to; the mark says which of the
+   five groups on the page answered what you typed, and then gets out of the
+   way, because a highlight that stays is a highlight you have to dismiss. */
+.sset {
+  scroll-margin-top: var(--s-4);
+}
+.sset.found {
+  animation: sset-found 1.6s var(--ease);
+}
+@keyframes sset-found {
+  0%,
+  70% {
+    background: var(--accent-10);
+    box-shadow: 0 0 0 var(--s-3) var(--accent-10);
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 var(--s-3) transparent;
+  }
 }
 .sset-h {
   font-family: var(--serif);
@@ -2593,6 +2755,100 @@ a {
    buttons, so they do not take the pointer the rest of .item does. */
 .setlist {
   margin-bottom: var(--s-3);
+}
+
+/* A deck as a record you can edit rather than a row with a menu: the name is
+   the field, and everything that can happen to the deck is under it, spelled
+   out. The destructive pair says what it is about to destroy rather than
+   asking "are you sure" — the number of cards is the part that decides it. */
+.decklist {
+  margin-bottom: var(--s-4);
+}
+.deckrow {
+  padding: var(--s-4) 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.deckrow:first-child {
+  padding-top: 0;
+}
+.deckrow-head {
+  display: flex;
+  gap: var(--s-2);
+  align-items: center;
+}
+.deckrow-head .fi {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.deckrow-meta {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: var(--s-2) 0 var(--s-3);
+}
+
+/* The run transcript. One call is a summary line you can open; opened, it is
+   the messages as they were sent, in mono, wrapped — this is the screen you
+   read when you do not believe what the model was told. */
+.tr-call {
+  border-bottom: 1px solid var(--rule-soft);
+}
+.tr-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  width: 100%;
+  padding: var(--s-3) var(--s-2);
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--fast);
+}
+.tr-head:hover {
+  background: var(--surface-2);
+}
+.tr-head .tagmini {
+  margin: 0;
+}
+.tr-head .s {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.tr-body {
+  padding: 0 var(--s-2) var(--s-3);
+}
+.tr-msg {
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  line-height: 1.6;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: var(--s-2) 0;
+  border-top: 1px solid var(--rule-soft);
+}
+.tr-msg b {
+  display: block;
+  font-weight: 400;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+}
+.tr-msg.reply {
+  color: var(--green);
+}
+
+/* Pushed to the end of its row so the count lines up down the list. */
+.mem-uses {
+  margin-left: auto;
 }
 .list .item.static {
   cursor: default;

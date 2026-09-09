@@ -1,10 +1,13 @@
 /* ============================================================================
- * MemoryPanel — browse, filter, edit, pin and retire memory.
+ * MemoryStore — browse, filter, edit, pin and retire everything remembered.
  *
- * Nothing here is auto-written except through Distill; "+ Add memory" is the
- * manual path the type system calls `source: "manual"`. Consolidate reuses
- * RollupDiff (see journal/RollupDiff.tsx) — same shape of approval, whether
- * it came from a weekly rollup or a stand-alone tidy-up.
+ * Nothing here is auto-written except through Distill; "+ Add" is the manual
+ * path the type system calls `source: "manual"`. Consolidate reuses RollupDiff
+ * (see journal/RollupDiff.tsx) — same shape of approval, whether it came from
+ * a weekly rollup or a stand-alone tidy-up.
+ *
+ * Was a sheet pane in the review loop, which meant the answer to "what does it
+ * know about me" was only available from the one screen that never asks.
  * ========================================================================== */
 import { useState } from "react";
 import * as store from "@/services/store";
@@ -12,15 +15,15 @@ import * as memoryStore from "@/services/memoryStore";
 import * as AI from "@/services/ai";
 import { useToast } from "@/context/ToastContext";
 import { useStoreSync } from "@/hooks/useStoreSync";
-import SheetShell from "../SheetShell";
-import SwitchRow from "../ui/SwitchRow";
-import RollupDiff from "../journal/RollupDiff";
+import SwitchRow from "../../../ui/SwitchRow";
+import RollupDiff from "../../../journal/RollupDiff";
+import Section from "../../Section";
 import type { MemoryDiffLine } from "@/types/journal";
 import type { MemoryScope, MemoryType } from "@/types";
 
 const TYPES: MemoryType[] = ["profile", "preference", "goal", "convention", "understanding", "open", "reference"];
 
-export default function MemoryPanel() {
+export default function MemoryStore() {
   useStoreSync(memoryStore);
   const toast = useToast();
   const projectId = store.get().activeProjectId;
@@ -79,19 +82,19 @@ export default function MemoryPanel() {
   }
 
   return (
-    <SheetShell title="Memory" sub={`${shown.length} shown`}>
-      <div className="seg" style={{ marginBottom: 10 }}>
+    <Section id="memory.store" title={`What it knows (${shown.length})`}>
+      <div className="seg">
         <button className={scopeFilter === "all" ? "on" : ""} onClick={() => setScopeFilter("all")}>
           All
         </button>
         <button className={scopeFilter === "global" ? "on" : ""} onClick={() => setScopeFilter("global")}>
-          Global
+          About you
         </button>
         <button className={scopeFilter === "project" ? "on" : ""} onClick={() => setScopeFilter("project")}>
-          Project
+          This project
         </button>
       </div>
-      <select className="fi" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as "all" | MemoryType)}>
+      <select className="fi" aria-label="Filter by type" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as "all" | MemoryType)}>
         <option value="all">Every type</option>
         {TYPES.map((t) => (
           <option key={t} value={t}>
@@ -99,11 +102,16 @@ export default function MemoryPanel() {
           </option>
         ))}
       </select>
-      <SwitchRow title="Show retired" sub="includes memory superseded or retired by consolidation" on={showInactive} onToggle={() => setShowInactive((v) => !v)} />
+      <SwitchRow
+        title="Show retired"
+        sub="Includes memory superseded or retired by consolidation."
+        on={showInactive}
+        onToggle={() => setShowInactive((v) => !v)}
+      />
 
-      <div className="btnrow" style={{ margin: "14px 0" }}>
+      <div className="btnrow">
         <button className="btn sm" onClick={() => setAdding((v) => !v)}>
-          {adding ? "Cancel" : "+ Add memory"}
+          {adding ? "Cancel" : "+ Add a memory"}
         </button>
         <button className="btn sm" disabled={consolBusy} onClick={consolidate}>
           {consolBusy ? "Checking…" : "Consolidate project memory"}
@@ -112,15 +120,15 @@ export default function MemoryPanel() {
 
       {adding && (
         <div className="prop">
-          <div className="seg" style={{ marginBottom: 8 }}>
+          <div className="seg">
             <button className={newScope === "project" ? "on" : ""} onClick={() => setNewScope("project")}>
-              Project
+              This project
             </button>
             <button className={newScope === "global" ? "on" : ""} onClick={() => setNewScope("global")}>
-              Global
+              About you
             </button>
           </div>
-          <select className="fi" value={newType} onChange={(e) => setNewType(e.target.value as MemoryType)}>
+          <select className="fi" aria-label="Type" value={newType} onChange={(e) => setNewType(e.target.value as MemoryType)}>
             {TYPES.map((t) => (
               <option key={t} value={t}>
                 {t}
@@ -140,7 +148,7 @@ export default function MemoryPanel() {
             {editingId === m.id ? (
               <>
                 <textarea className="fi" value={editText} onChange={(e) => setEditText(e.target.value)} autoFocus />
-                <div className="btnrow" style={{ marginTop: 0 }}>
+                <div className="btnrow">
                   <button className="btn sm pri" onClick={() => saveEdit(m.id)}>
                     Save
                   </button>
@@ -152,12 +160,12 @@ export default function MemoryPanel() {
             ) : (
               <>
                 <span className="tagmini">
-                  {m.scope} · {m.type}
+                  {m.scope === "global" ? "about you" : "this project"} · {m.type}
                   {m.pinned ? " · pinned" : ""}
                   {!m.active ? " · retired" : ""}
                 </span>
                 <div className="qmini">{m.text}</div>
-                <div className="btnrow" style={{ marginTop: 8 }}>
+                <div className="btnrow">
                   <button
                     className="linkbtn"
                     onClick={() => {
@@ -179,9 +187,7 @@ export default function MemoryPanel() {
                       restore
                     </button>
                   )}
-                  <span className="s" style={{ marginLeft: "auto" }}>
-                    used {m.useCount}×
-                  </span>
+                  <span className="s mem-uses">used {m.useCount}×</span>
                 </div>
               </>
             )}
@@ -191,8 +197,14 @@ export default function MemoryPanel() {
       </div>
 
       {consolDiff && (
-        <RollupDiff title="Consolidate memory" sub="review before it changes memory" diff={consolDiff} projectId={projectId} onClose={() => setConsolDiff(null)} />
+        <RollupDiff
+          title="Consolidate memory"
+          sub="review before it changes memory"
+          diff={consolDiff}
+          projectId={projectId}
+          onClose={() => setConsolDiff(null)}
+        />
       )}
-    </SheetShell>
+    </Section>
   );
 }

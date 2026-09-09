@@ -47,6 +47,9 @@ src/
     Sidebar.tsx     the one navigation — open / icon rail / mobile drawer.
     ui/Icon.tsx     the whole icon set, one grid and one stroke weight.
     chat/           the chat platform.
+    settings/       the one settings panel. catalogue.ts declares every page and
+                     every group on it as pure data — names, blurbs, and the words
+                     search matches — and is the only place to add either.
   styles/
     tokens.css      the design system: two printings + the type/space/radius scales.
     style.css       shell, running head, page, and every shared surface.

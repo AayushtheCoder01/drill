@@ -2,6 +2,12 @@
  * SheetContext — which dialog is open. In the original app every dialog
  * rendered into one <div id="sheet">; here each "pane" is a component and
  * this context just tracks which one (plus its params) is current.
+ *
+ * Only the review loop mounts a SheetProvider, so a pane is only ever a
+ * *review* dialog. Three of them were not: the memory browser, the memory tray
+ * and the run transcript were app-wide things reachable from one section, and
+ * they are pages in Settings now. Anything that would be worth opening from
+ * chat, home, the journal or the exam view does not belong in this union.
  * ========================================================================== */
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import type { Card, QueueItem } from "@/types";
@@ -18,10 +24,7 @@ export type PaneState =
   | { name: "ai"; source?: string; sourceLabel?: string }
   | { name: "fix"; item: QueueItem }
   | { name: "notes"; card: Card | null }
-  | { name: "chat"; card: Card }
-  | { name: "memory" }
-  | { name: "candidates" }
-  | { name: "transcript" };
+  | { name: "chat"; card: Card };
 
 interface SheetCtx {
   pane: PaneState | null;

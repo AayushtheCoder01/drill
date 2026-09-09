@@ -29,10 +29,7 @@ export default function Appearance() {
 
   return (
     <>
-      <Section
-        title="Printing"
-        sub="Night is warm dark for evening sessions; Day is warm paper. Same design, same type — only the ink and the paper swap."
-      >
+      <Section id="appearance.printing">
         <div className="seg">
           {THEMES.map((t) => (
             <button key={t.id} className={theme === t.id ? "on" : ""} onClick={() => apply({ theme: t.id })}>
@@ -50,7 +47,7 @@ export default function Appearance() {
         <AccentPicker value={s.accent} theme={theme} onChange={(v: Accent) => apply({ accent: v })} />
       </Section>
 
-      <Section title="Density and reading size" sub="Density trims the chrome; reading size scales card, journal and chat text only.">
+      <Section id="appearance.density">
         <div className="seg">
           {(["comfortable", "compact"] as Density[]).map((d) => (
             <button key={d} className={s.density === d ? "on" : ""} onClick={() => apply({ density: d })}>

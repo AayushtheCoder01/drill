@@ -1,13 +1,18 @@
 import * as store from "@/services/store";
 import { useSheet } from "@/context/SheetContext";
+import { useSettings } from "@/context/SettingsContext";
 import SheetShell from "../SheetShell";
 import Bars from "../ui/Bars";
 
 export default function StatsPane() {
-  const { open } = useSheet();
+  const { open, close } = useSheet();
+  const settings = useSettings();
   const s = store.stats();
   const ret = s.rev ? Math.round((s.ok / s.rev) * 100) : null;
 
+  /* The low-retention case names a dial, so it takes you to it. A readout
+     that says "try a higher target in Settings" and leaves you to find which
+     of nine pages holds it is half a sentence. */
   const hint =
     ret === null
       ? "Retention shows up once you have reviews on scheduled cards."
@@ -15,7 +20,7 @@ export default function StatsPane() {
       ? "Above your target — the scheduler will stretch intervals out."
       : ret >= 85
       ? "Right where FSRS aims. Leave it alone."
-      : "Below target. Either the cards are overloaded (split them) or intervals are too long — try a higher target in Settings.";
+      : "Below target. Either the cards are overloaded (split them) or the intervals are too long.";
 
   return (
     <SheetShell title="Where you're at" sub={store.settings().mix ? "all decks" : store.deck().name}>
@@ -55,12 +60,27 @@ export default function StatsPane() {
         <span>{s.leech}</span>
       </div>
 
-      <div className="hintline" style={{ marginTop: 16 }}>
+      <div className="hintline stat-hint">
         {hint}
+        {ret !== null && ret < 85 && (
+          <>
+            {" "}
+            <button
+              className="textlink"
+              onClick={() => {
+                close();
+                settings.open("review", "review.scheduling");
+              }}
+            >
+              Raise the target retention
+            </button>
+            .
+          </>
+        )}
       </div>
 
       {s.leech > 0 && (
-        <div className="btnrow" style={{ marginTop: 14 }}>
+        <div className="btnrow stat-hint">
           <button className="btn sm danger" onClick={() => open({ name: "library", filter: "", mode: "leech" })}>
             See the {s.leech} leeches
           </button>

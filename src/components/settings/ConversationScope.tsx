@@ -76,7 +76,7 @@ export default function ConversationScope() {
 
   return (
     <>
-      <Section title="How it answers" sub="The persona sets the system prompt. Custom instructions replace it outright.">
+      <Section id="conversation.persona">
       <label className="f">Mode</label>
       <div className="personagrid">
         {PERSONAS.map((p) => (
@@ -105,7 +105,7 @@ export default function ConversationScope() {
 
       </Section>
 
-      <Section title="Model for this thread" sub="Conversation beats project beats global — the badge on each row says which level is in force.">
+      <Section id="conversation.model">
       <SelectRow
         title="Backend"
         origin={`from ${originLabel(rBackend.from)}`}
@@ -144,7 +144,7 @@ export default function ConversationScope() {
 
       </Section>
 
-      <Section title="Sampling" sub="How literal the model is, and how long it is allowed to run on.">
+      <Section id="conversation.sampling">
       <label className="f">Temperature</label>
       <div className="range">
         <input type="range" min={0} max={1} step={0.05} value={c.temperature} onChange={(e) => update({ temperature: parseFloat(e.target.value) })} />
@@ -165,10 +165,7 @@ export default function ConversationScope() {
 
       </Section>
 
-      <Section
-        title="What it can see"
-        sub="Rebuilt from your decks and memory every time you send, so it always reflects today's progress rather than the day the thread started."
-      >
+      <Section id="conversation.context">
       <div className="personagrid">
         <button
           className={"personaopt" + (hasSource((s) => s.kind === "today") ? " on" : "")}

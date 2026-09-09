@@ -109,10 +109,7 @@ export default function TransferSection() {
 
   return (
     <>
-      <Section
-        title="Export a piece"
-        sub="Readable, shareable files. None of these carries your chats, your memory or your review history — that is what the full backup above is for."
-      >
+      <Section id="data.export">
         <div className="list">
           <Item
             title="This deck"
@@ -153,10 +150,7 @@ export default function TransferSection() {
         </div>
       </Section>
 
-      <Section
-        title="Import cards"
-        sub={`A deck file, or a bare list of cards. They land in "${deck.name}" or in a deck of their own — nothing else in the app is touched.`}
-      >
+      <Section id="data.import" sub={`A deck file, or a bare list of cards. They land in “${deck.name}” or in a deck of their own — nothing else in the app is touched.`}>
         <textarea
           className="fi"
           placeholder='[{"tag":"Notation","q":"…","a":"<p>…</p>"}]'

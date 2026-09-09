@@ -9,9 +9,6 @@ import AIPane from "./panes/AIPane";
 import FixPane from "./panes/FixPane";
 import NotesPane from "./panes/NotesPane";
 import ChatPane from "./panes/ChatPane";
-import MemoryPanel from "./memory/MemoryPanel";
-import CandidateTray from "./memory/CandidateTray";
-import RunTranscript from "./RunTranscript";
 import ErrorGuard from "./ui/ErrorGuard";
 
 function renderPane(pane: PaneState) {
@@ -34,12 +31,6 @@ function renderPane(pane: PaneState) {
       return <NotesPane card={pane.card} />;
     case "chat":
       return <ChatPane card={pane.card} />;
-    case "memory":
-      return <MemoryPanel />;
-    case "candidates":
-      return <CandidateTray />;
-    case "transcript":
-      return <RunTranscript />;
     default:
       return null;
   }

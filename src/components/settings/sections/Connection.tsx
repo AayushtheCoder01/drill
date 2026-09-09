@@ -55,10 +55,8 @@ export default function Connection() {
   }
 
   return (
-    <Section
-      title="Connection"
-      sub="Every request goes straight from this browser to the provider you pick — there is no server in between, which is why the key lives here and not in an account."
-    >
+    <>
+    <Section id="connection.provider">
       <SelectRow
         title="Where inference runs"
         sub={r.backend.note}
@@ -97,15 +95,6 @@ export default function Connection() {
         onCommit={(v) => save({ baseUrl: v.trim() })}
       />
 
-      <ModelPicker
-        title="Default model"
-        sub="The bottom of the chain: a project or a conversation that has not pinned one falls through to this."
-        value={s.model}
-        placeholder={r.backend.defaultModel}
-        backend={(s.backend as BackendType) || undefined}
-        onChange={(v) => save({ model: v.trim() })}
-      />
-
       <div className="btnrow">
         <button className="btn sm" disabled={testing} onClick={test}>
           {testing ? "Testing…" : "Test connection"}
@@ -120,5 +109,16 @@ export default function Connection() {
 
       <p className="sset-note">Config loaded from: {CFG.sources().join(", ")}.</p>
     </Section>
+
+    <Section id="connection.model">
+      <ModelPicker
+        title="Model"
+        value={s.model}
+        placeholder={r.backend.defaultModel}
+        backend={(s.backend as BackendType) || undefined}
+        onChange={(v) => save({ model: v.trim() })}
+      />
+    </Section>
+    </>
   );
 }

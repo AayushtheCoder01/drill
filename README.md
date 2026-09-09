@@ -57,6 +57,25 @@ openrouter.ai.
 - **AI tutor** — "Go deeper" under any revealed answer, with three starters. If
   you wrote a recall attempt, it opens by critiquing *that*.
 
+### Settings
+
+One panel, the same one from all six sections (`ctrl + ,`), and everything is
+in it — no section keeps a settings menu of its own.
+
+- **Nine pages, grouped** — Connection, Chat and Memory; Review and the
+  project; Appearance, Usage and Data. Plus **This chat** while you are in a
+  conversation, because a thread, a project and the app are one inheritance
+  chain and every row says which level its value came from.
+- **Search finds the control, not the page** — type "backup", "retention",
+  "delete deck" or "what did it send" and it takes you to the group that holds
+  it, and marks it.
+- **No Save button** — every field commits when it loses focus or on Enter.
+  There used to be one, and it applied to seven of fifteen controls.
+- **Memory is a page** — the policy, what is waiting to be saved, and every
+  fact it already holds: editable, pinnable, retirable.
+- **Usage and the run transcript** — what every call cost, and exactly what
+  each one sent and got back.
+
 ---
 
 ## Quick start
@@ -346,9 +365,12 @@ src/
   hooks/                useDrillStore — the React binding onto the store singleton
   components/           the review loop and every sheet pane
     chat/               the chat platform
-    settings/           one settings panel for all six sections. registry.tsx
-                         declares the categories; SettingsSurface is the window,
-                         mounted once by Shell
+    settings/           one settings panel for all six sections. catalogue.ts
+                         declares every page and every group on it — names,
+                         blurbs and the words search matches — as pure data;
+                         registry.tsx joins that to the components; Section
+                         reads its heading from it; SettingsSurface is the
+                         window, mounted once by Shell
   styles/
     tokens.css           the design system: two printings, one type/space/radius
                           scale. Nothing downstream spells out a colour or a size

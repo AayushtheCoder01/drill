@@ -21,7 +21,8 @@ especially its **Project layout** section. Do not restate it here.
 npm run dev     # vite; usually :5173, falls back to :5174 if taken
 npm run lint    # tsc --noEmit. The only lint there is
 npm test        # tsx --test src/**/*.test.ts
-                # 99 tests: fsrs, cardFormat, memory*, effort, agent/loop
+                # 124 tests: fsrs, cardFormat, memory*, effort, title,
+                # thinking, agent/loop, settings/catalogue
 npm run build   # tsc -b && vite build
 ```
 
@@ -244,35 +245,48 @@ its listener to nothing and never runs again.
   `CONTRIBUTING.md`'s "deliberately not here" list.
 - Settings must actually be read by something. A dial that is editable,
   persisted and wired to nothing is a bug, not a placeholder — and so is the
-  inverse, which the settings rework turned up two of: `settings.effort` and
+  inverse, which this app has now produced three times: `settings.effort` and
   `settings.autonomy` were the bottom of an inheritance chain the send path
-  read, while the project and conversation pickers offered "inherit from
-  global" for a value with no global control anywhere. Both are in the Chat
-  category now.
+  read while no global control existed, and `settings.sessionSize` was read by
+  the rail and by `startSession()` with nothing anywhere able to write it.
+  There is a third shape, and it is the one this repo keeps hitting: a real
+  control, wired to a real value, in a surface five of the six sections do not
+  mount. `settings.mix` was that one.
 - **Settings commit on blur. There is no Save button.** There used to be one,
   and it applied to seven of the fifteen controls on the screen while the rest
   wrote through immediately, with nothing saying which was which — so editing
   a number and closing the panel silently discarded it. `ui/TextRow.tsx` is
   the field that keeps the rule; do not add a field that batches into a Save.
 - **One settings surface, and it is not a view.** `context/SettingsContext.tsx`
-  holds which category is open; `Shell` renders `settings/SettingsSurface.tsx`
-  once, so the same panel with the same navigation appears in all six sections
-  (`ctrl + ,`, the sidebar, chat's header button, the review Menu). It is
-  mounted from `Shell` rather than the app root deliberately — that is what puts
-  it inside `ChatProvider` in chat, so the "This chat" category has a
-  conversation to read. Conversation, project and global are one inheritance
-  chain, so they read as one list rather than three tab strips.
-- **Categories are declared once, in `settings/registry.tsx`.** Id, label,
-  blurb, search keywords and the render call live in one record. There used to
-  be four copies of the list inside `SettingsHome` — a union, a label map, an
-  order array and a switch — and getting three of the four right gave you a page
-  that was unreachable or unlabelled. A category that needs a context only one
-  view mounts declares `needs`, and is left out elsewhere rather than shown
-  empty. **Add a control, add the word someone would type to find it**: the
-  search box is the second line of defence against the failure that put backup
-  and restore in the review loop's Menu, where five of six sections could not
-  reach it.
-- **Anything data-shaped belongs in Settings → Data**, not in a section's own
-  menu. Backup, restore, import, export and the example decks are all there
-  (`settings/sections/data/`). They reach `useMaybeReview()` rather than
-  `useReview()` because settings opens far outside the review loop now.
+  holds which page is open and, optionally, which group on it to jump to;
+  `Shell` renders `settings/SettingsSurface.tsx` once, so the same panel with
+  the same navigation appears in all six sections (`ctrl + ,`, the sidebar,
+  chat's header button, the review Menu). It is mounted from `Shell` rather
+  than the app root deliberately — that is what puts it inside `ChatProvider`
+  in chat, so the "This chat" page has a conversation to read. Conversation,
+  project and global are one inheritance chain, so they read as one list
+  rather than three tab strips.
+- **The table of contents is `settings/catalogue.ts`, and it is pure data.**
+  Every page and every group on it — name, blurb, and the words search matches
+  — is declared there once. `registry.tsx` holds only the half that cannot be
+  data (the component to render). `Section` takes a catalogued `id` and reads
+  its own heading from it, so a group's words cannot drift from the words that
+  find it, and `catalogue.test.ts` fails the build if a page has no groups or a
+  group names a page that does not exist. **Add a control, add to that group's
+  `finds`** — search returns the *group*, scrolls to it and marks it, and it is
+  the second line of defence against the failure that put backup and restore in
+  the review loop's Menu, where five of six sections could not reach it.
+- **A section's own menu is for that section.** Anything worth opening from
+  chat, home, the journal or the exam view is a Settings page, not a pane —
+  the review loop's Menu was where backup, the memory browser, the memory tray
+  and the run transcript all ended up, which meant they existed from exactly
+  one of the six sections. `SheetContext`'s `PaneState` union is the fence:
+  a pane is a *review* dialog, and only the review loop mounts a
+  `SheetProvider`. What is left in that menu is two review things and
+  signposts. Settings pages reach `useMaybeReview()` rather than `useReview()`
+  because settings opens far outside the review loop.
+- **Two shapes of one rail, at 860px.** Wide, the settings rail is a grouped
+  column beside the page, and only the page scrolls — `.set-host` exists
+  instead of `.sheet-body` precisely so the search box and the rail stay put.
+  Narrow, the identical markup is the row of pills it used to be
+  (`.setnav-group { display: contents }`). Do not add a third.

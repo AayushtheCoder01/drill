@@ -27,10 +27,7 @@ export default function StorageFacts() {
   const nProjects = Object.keys(db.projects).length;
 
   return (
-    <Section
-      title="Your data"
-      sub="All of it lives in this browser. No account, no server, nothing uploaded — which is the point, and also the risk. Everything below is how you get it out of here and back again."
-    >
+    <Section id="data.storage">
       <div className="sset-facts">
         <div>
           <b>{nProjects}</b>

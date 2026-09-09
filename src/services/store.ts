@@ -508,6 +508,11 @@ export function setDeckProject(deckId: string, projectId: string): void {
   const to = db.projects[projectId];
   if (!to.deckIds.includes(deckId)) to.deckIds.push(deckId);
   to.updated = Date.now();
+  /* Moving the deck you are currently drilling leaves db.active naming a deck
+     that now belongs to somebody else, and pool() would go on serving its
+     cards from inside this project — the leak projects exist to prevent, by
+     the one route that could still cause it. */
+  ensureActiveDeck();
   saveNow();
   notify();
 }

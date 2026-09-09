@@ -1,70 +1,82 @@
+/* ============================================================================
+ * MenuPane — the review loop's own menu, and nothing else.
+ *
+ * It used to be a second navigation and a fourth settings surface. Half its
+ * rows were the sections that are already in the sidebar in every view —
+ * Journal, Exam, Chat, Cards — and another row opened the card writer that is
+ * the icon immediately to the left of the button you pressed to get here. The
+ * rest were app-wide things that existed *only* here, which is how backup and
+ * restore, everything the assistant remembers about you, and the transcript of
+ * what it just sent all ended up unreachable from five of the six sections.
+ *
+ * What is left is the two things that belong to a card in front of you, and
+ * signposts to where the rest went. The signposts are not decoration: the
+ * habit of coming here is real, and a habit that lands on nothing is how a
+ * feature gets lost a second time.
+ * ========================================================================== */
 import * as store from "@/services/store";
-import * as chatStore from "@/services/chatStore";
 import * as candidates from "@/services/candidates";
 import { useSheet } from "@/context/SheetContext";
-import { useRoute } from "@/context/RouteContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useStoreSync } from "@/hooks/useStoreSync";
 import SheetShell from "../SheetShell";
 import Item from "../ui/Item";
+import type { CatId, SectionId } from "@/components/settings/catalogue";
 
 export default function MenuPane() {
   const { open, close } = useSheet();
-  const { openCards, openChat, openJournal, openExam } = useRoute();
   const settings = useSettings();
   useStoreSync(candidates);
   const s = store.stats();
   const db = store.get();
-  const nDecks = store.decksOf(db.activeProjectId).length;
-  const nChats = chatStore.list().filter((m) => !m.archived && m.projectId === db.activeProjectId).length;
   const nPending = candidates.pending(db.activeProjectId).length;
+
+  /* Settings is a panel over the whole app, not a pane in this sheet, so the
+     sheet has to get out of the way first — two stacked scrims with the card
+     somewhere underneath is nobody's idea of a settings screen. */
+  function toSettings(cat?: CatId, at?: SectionId) {
+    close();
+    settings.open(cat, at);
+  }
 
   return (
     <SheetShell title={db.settings.mix ? "Mixed drilling" : store.deck().name} sub="menu">
       <div className="list">
-        <Item title="Where you're at" sub={`${s.seen} of ${s.cards} seen · ${s.today} reviews today`} onClick={() => open({ name: "stats" })} />
-        <Item title="Journal" sub="log the day, get a narrative, distill it into memory and cards" onClick={() => openJournal()} />
-        <Item title="Exam" sub="a generated, gradeable test over any window of time" onClick={() => openExam(null)} />
         <Item
-          title="Chat"
-          sub={
-            nChats
-              ? `${nChats} conversation${nChats === 1 ? "" : "s"} · knows your decks and weak spots`
-              : "ask, explore, and turn any answer into cards"
-          }
-          onClick={() => openChat(null)}
+          title="Where you're at"
+          sub={`${s.seen} of ${s.cards} seen · ${s.today} reviews today`}
+          onClick={() => open({ name: "stats" })}
         />
-        <Item title="Make cards with AI" sub="a topic, your notes, anything" onClick={() => open({ name: "ai" })} />
-        <Item
-          title={nPending ? `Memory tray · ${nPending} pending` : "Memory tray"}
-          sub={nPending ? "review what distill proposed" : "nothing waiting right now"}
-          onClick={() => open({ name: "candidates" })}
-        />
-        <Item title="Memory" sub="what the assistant knows about you and this project" onClick={() => open({ name: "memory" })} />
         <Item
           title="Insight log"
           sub={`${(db.notes || []).length} entries · turn any into cards`}
           onClick={() => open({ name: "notes", card: null })}
         />
-        <Item title="Cards" sub="every card in this project · search, filter, edit" onClick={() => openCards()} />
+      </div>
+
+      <div className="label">In Settings</div>
+      <div className="list">
         <Item
-          title="Decks"
-          sub={`${nDecks} deck${nDecks > 1 ? "s" : ""}${db.settings.mix ? " · mixing" : ""}`}
-          onClick={() => open({ name: "decks" })}
+          title={nPending ? `Memory · ${nPending} waiting for you` : "Memory"}
+          sub="what the assistant knows, what it wants to keep, and what it may keep"
+          onClick={() => toSettings("memory", nPending ? "memory.pending" : "memory.store")}
         />
-        {/* Backup, restore, import and export live in Settings now — this
-            menu is one section's menu, and they were unreachable from the
-            other five while they lived here. The row stays as a signpost so
-            the habit still lands somewhere. */}
+        <Item
+          title="What you drill"
+          sub="switch deck, mix them, set the size of a run"
+          onClick={() => toSettings("review", "review.queue")}
+        />
+        <Item
+          title="Run transcript"
+          sub="what every AI call sent and got back"
+          onClick={() => toSettings("usage", "usage.transcript")}
+        />
         <Item
           title="Backup, import and export"
-          sub="in Settings → Data · one file out, one file back in"
-          onClick={() => {
-            close();
-            settings.open("data");
-          }}
+          sub="one file out, one file back in"
+          onClick={() => toSettings("data", "data.backup")}
         />
-        <Item title="Run transcript" sub="what every AI call sent and got back" onClick={() => open({ name: "transcript" })} />
+        <Item title="Everything else" sub="one panel, searchable, from any section  ·  ctrl + ," onClick={() => toSettings()} />
       </div>
     </SheetShell>
   );

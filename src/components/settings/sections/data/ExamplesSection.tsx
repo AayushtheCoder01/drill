@@ -71,7 +71,7 @@ export default function ExamplesSection() {
   if (error && !list) return null;
 
   return (
-    <Section title="Example decks" sub="The decks that ship with Drill. Each one is added as a new deck in this project.">
+    <Section id="data.examples">
       {!list && <div className="empty">Looking…</div>}
       {list && (
         <div className="list">

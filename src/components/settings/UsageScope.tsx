@@ -8,6 +8,10 @@
  *
  * Two groupings of the same rows: by model (what is expensive) and by
  * feature (what is spending it). The second is usually the interesting one.
+ *
+ * The run transcript is the same ledger read the other way — what the call
+ * actually said, rather than what it cost — so it is the second group on this
+ * page rather than a row in a menu somewhere.
  * ========================================================================== */
 import { useState } from "react";
 import * as usageLog from "@/services/usageLog";
@@ -15,6 +19,7 @@ import type { UsageRow } from "@/services/usageLog";
 import { formatCost, formatTokens } from "@/lib/tokens";
 import { useStoreSync } from "@/hooks/useStoreSync";
 import Section from "./Section";
+import RunTranscript from "./sections/usage/RunTranscript";
 
 const RANGES: [number, string][] = [
   [1, "Today"],
@@ -77,10 +82,8 @@ export default function UsageScope() {
   const byFeature = usageLog.rollup(span, (r) => r.label);
 
   return (
-    <Section
-      title="What this has cost"
-      sub="Every call the app makes, not just chat — cards, journal, distill and exam go through the same seam and are counted here."
-    >
+    <>
+    <Section id="usage.cost">
       <div className="seg">
         {RANGES.map(([v, label]) => (
           <button key={v} className={days === v ? "on" : ""} onClick={() => setDays(v)}>
@@ -140,5 +143,8 @@ export default function UsageScope() {
         </>
       )}
     </Section>
+
+    <RunTranscript />
+    </>
   );
 }

@@ -24,6 +24,7 @@ import ModelPicker from "../ui/ModelPicker";
 import NumberRow from "../ui/NumberRow";
 import TextRow from "../ui/TextRow";
 import Section from "./Section";
+import DeckList from "./DeckList";
 import type { Autonomy, BackendType, Effort } from "@/types";
 import Icon from "../ui/Icon";
 
@@ -66,11 +67,11 @@ export default function ProjectScope({ projectId: given }: { projectId?: string 
   }
 
   const decks = store.decksOf(projectId);
-  const otherProjects = Object.values(store.projects()).filter((x) => x.id !== projectId && !x.archived);
 
   return (
     <>
       <Section
+        id="project.identity"
         title={personal ? "Personal" : "This project"}
         sub={
           personal
@@ -107,10 +108,7 @@ export default function ProjectScope({ projectId: given }: { projectId?: string 
         />
       </Section>
 
-      <Section
-        title="Defaults here"
-        sub="What a new conversation in this space starts from. Blank falls through to the global setting; a thread can override either."
-      >
+      <Section id="project.defaults">
         <SelectRow
           title="Backend"
           value={p.defaults.backend}
@@ -145,7 +143,7 @@ export default function ProjectScope({ projectId: given }: { projectId?: string 
         />
       </Section>
 
-      <Section title="Memory here" sub="A space can be stricter than the global policy, never looser.">
+      <Section id="project.memory">
         <SelectRow
           title="Autonomy"
           sub="How freely memory may be written without being asked."
@@ -173,10 +171,7 @@ export default function ProjectScope({ projectId: given }: { projectId?: string 
         />
       </Section>
 
-      <Section
-        title={`Knowledge (${p.knowledge.length})`}
-        sub="Attached to every conversation here, on every message. Pay for it once and it is always in front of the model — which also means you pay for it on every message."
-      >
+      <Section id="project.knowledge" title={`Knowledge (${p.knowledge.length})`}>
         <div className="list setlist">
           {p.knowledge.map((k) => (
             <div key={k.id} className="item static">
@@ -214,34 +209,14 @@ export default function ProjectScope({ projectId: given }: { projectId?: string 
         <input ref={fileRef} type="file" accept=".md,.txt,text/plain,text/markdown" className="hidden-file" onChange={onFile} />
       </Section>
 
-      {!personal && (
-        <Section title={`Decks (${decks.length})`} sub="What this project owns. Moving a deck takes its cards and its scheduling with it.">
-          <div className="list setlist">
-            {decks.map((d) => (
-              <div key={d.id} className="item static">
-                <span className="grow">
-                  <span className="t">{d.name}</span>
-                  <span className="s">{d.cards.length} cards</span>
-                </span>
-                {otherProjects.length > 0 && (
-                  <select
-                    className="fi auto"
-                    value=""
-                    onChange={(e) => {
-                      if (e.target.value) store.setDeckProject(d.id, e.target.value);
-                    }}
-                  >
-                    <option value="">Move to…</option>
-                    {otherProjects.map((op) => (
-                      <option key={op.id} value={op.id}>
-                        {op.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            ))}
-          </div>
+      {/* The personal space is not meant to own decks and starts with none —
+          but ensureActiveDeck() will make it one the moment somebody reviews
+          in it, and a deck you cannot rename or delete is worse than a section
+          you did not expect. So it is offered when there is something to
+          manage and hidden when there is not. */}
+      {(!personal || decks.length > 0) && (
+        <Section id="project.decks" title={`Decks (${decks.length})`}>
+          <DeckList projectId={projectId} />
         </Section>
       )}
     </>

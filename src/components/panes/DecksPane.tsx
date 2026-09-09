@@ -1,19 +1,38 @@
+/* ============================================================================
+ * DecksPane — which deck the next card comes from. A switcher, not a manager.
+ *
+ * It used to be both, and the manager half was the problem: making, renaming,
+ * emptying and destroying a deck sat behind three window.prompt() calls in a
+ * sheet the review loop is the only view that mounts, so from chat, home, the
+ * journal or the exam view none of it existed. That half is Settings →
+ * Project → Decks now, in a real form.
+ *
+ * What stays is the one question you ask *mid-session* — which of these am I
+ * drilling — because it is one click from the deck name in the running head
+ * and it should stay that way. "Mix all decks" stays with it because it is the
+ * same question asked once rather than a separate setting: picking a deck
+ * turns mixing off, and store.setActive() is what enforces that.
+ *
+ * Both controls have their proper home on the Review page, which is where the
+ * signpost at the foot goes. This is the shortcut, not the truth.
+ * ========================================================================== */
 import * as store from "@/services/store";
 import { useSheet } from "@/context/SheetContext";
 import { useReview } from "@/context/ReviewContext";
+import { useSettings } from "@/context/SettingsContext";
 import SheetShell from "../SheetShell";
 import SwitchRow from "../ui/SwitchRow";
-import Icon from "../ui/Icon";
+import Item from "../ui/Item";
 
 export default function DecksPane() {
   const { close } = useSheet();
   const review = useReview();
+  const settings = useSettings();
   const db = store.get();
-  const ids = store.decksOf(db.activeProjectId).map((d) => d.id);
+  const decks = store.decksOf(db.activeProjectId);
 
   function toggleMix() {
-    db.settings.mix = !db.settings.mix;
-    store.saveNow();
+    store.updateSettings({ mix: !db.settings.mix });
     review.refresh();
   }
 
@@ -23,86 +42,46 @@ export default function DecksPane() {
     review.refresh();
   }
 
-  function del(id: string) {
-    const dd = db.decks[id];
-    if (!window.confirm(`Delete "${dd.name}" and its ${dd.cards.length} cards? This cannot be undone.`)) return;
-    store.deleteDeck(id);
-    review.refresh();
-  }
-
-  function newDeck() {
-    const n = window.prompt("Name the new deck:", "");
-    if (!n) return;
-    store.addDeck(n, []);
-    close();
-    review.refresh();
-  }
-
-  function rename() {
-    const n = window.prompt("Rename deck:", store.deck().name);
-    if (!n) return;
-    store.renameDeck(db.active, n);
-  }
-
-  function resetProgress() {
-    const d = store.deck();
-    if (!window.confirm(`Clear scheduling for "${d.name}"? The cards stay, the progress goes.`)) return;
-    store.resetProgress(d);
-    review.refresh();
-  }
-
   return (
-    <SheetShell title="Decks" sub={`${ids.length} total`}>
+    <SheetShell title="What you're drilling" sub={`${decks.length} ${decks.length === 1 ? "deck" : "decks"}`}>
       <SwitchRow
         title="Mix all decks"
         sub={
-          ids.length > 1
-            ? "Interleaving beats blocking: one RCT put mixed practice at 61% vs 38% a month later. Turn this on once two decks share maths."
+          decks.length > 1
+            ? "Interleaving beats blocking: one RCT put mixed practice at 61% against 38% a month later. Turn this on once two decks share any maths."
             : "Needs a second deck before it does anything."
         }
         on={db.settings.mix}
         onToggle={toggleMix}
       />
 
-      <div className="list" style={{ marginTop: 14 }}>
-        {ids.map((id) => {
-          const d = db.decks[id];
+      <div className="list">
+        {decks.map((d) => {
+          const drilling = d.id === db.active && !db.settings.mix;
           return (
-            <button key={id} className={"item" + (id === db.active && !db.settings.mix ? " on" : "")} onClick={() => pick(id)}>
+            <button key={d.id} className={"item" + (drilling ? " on" : "")} onClick={() => pick(d.id)}>
               <span className="grow">
                 <span className="t">{d.name}</span>
                 <span className="s">
-                  {d.cards.length} cards · {Object.keys(d.srs).length} seen
+                  {d.cards.length} {d.cards.length === 1 ? "card" : "cards"} · {Object.keys(d.srs).length} seen
                 </span>
               </span>
-              {ids.length > 1 ? (
-                <span
-                  className="x"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    del(id);
-                  }}
-                >
-                  <Icon name="close" size={12} />
-                </span>
-              ) : (
-                <span className="x">·</span>
-              )}
+              <span className="state">{drilling ? "drilling" : db.settings.mix ? "in the mix" : ""}</span>
             </button>
           );
         })}
       </div>
 
-      <div className="btnrow" style={{ marginTop: 14 }}>
-        <button className="btn sm" onClick={newDeck}>
-          + New deck
-        </button>
-        <button className="btn sm" onClick={rename}>
-          Rename current
-        </button>
-        <button className="btn sm danger" onClick={resetProgress}>
-          Reset progress
-        </button>
+      <div className="label">In Settings</div>
+      <div className="list">
+        <Item
+          title="Make, rename and delete decks"
+          sub="and move one to another project, or clear its progress"
+          onClick={() => {
+            close();
+            settings.open("project", "project.decks");
+          }}
+        />
       </div>
     </SheetShell>
   );

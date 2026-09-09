@@ -1,10 +1,20 @@
 /* ============================================================================
- * Review — the spaced-repetition half: how a card is answered, how often it
- * comes back, and how the tutor talks while marking it.
+ * Review — the spaced-repetition half, in the order the questions get asked:
+ * what am I drilling, how much of it today, how often does it come back, how
+ * do I answer one, and who marks it.
+ *
+ * The first two groups used to live in the review loop itself. "Mix all decks"
+ * was a switch inside a sheet you reached from the deck name in the running
+ * head, which made it the one scheduling setting you could only change while
+ * you were reviewing; and the size of a run was a `sessionSize` field that the
+ * rail and `startSession()` both read while nothing anywhere could write it —
+ * a dead dial upside down, the exact failure CONTRIBUTING names.
  * ========================================================================== */
 import * as store from "@/services/store";
 import { clamp } from "@/lib/util";
 import { useDrillStore } from "@/hooks/useDrillStore";
+import { useMaybeReview } from "@/context/ReviewContext";
+import { useSettings } from "@/context/SettingsContext";
 import SwitchRow from "../../ui/SwitchRow";
 import TextRow from "../../ui/TextRow";
 import Section from "../Section";
@@ -17,33 +27,86 @@ const RETENTION_OPTS: [number, string, string][] = [
 ];
 
 export default function Review() {
-  useDrillStore();
+  const db = useDrillStore();
   const s = store.settings();
+  /* Settings opens far outside the review loop now, so the queue may not
+     exist to refresh. Changing the active deck from chat still has to write
+     through; it just has nothing to re-serve until you get there. */
+  const review = useMaybeReview();
+  const { open } = useSettings();
+  const decks = store.decksOf(db.activeProjectId);
+  const session = store.session();
+
+  function pickDeck(id: string) {
+    store.setActive(id);
+    review?.refresh();
+  }
+
+  function toggleMix() {
+    store.updateSettings({ mix: !s.mix });
+    review?.refresh();
+  }
 
   return (
     <>
-      <Section title="Answering" sub="What happens between seeing a question and grading yourself on it.">
+      <Section id="review.queue">
         <SwitchRow
-          title="Write it before you flip"
-          sub="Free recall beats recognising the answer. Ctrl+Enter checks."
-          on={s.recall}
-          onToggle={() => store.updateSettings({ recall: !s.recall })}
+          title="Mix every deck in this project"
+          sub={
+            decks.length > 1
+              ? "Interleaving beats blocking: one RCT put mixed practice at 61% against 38% a month later. Worth turning on once two decks share any maths."
+              : "Needs a second deck in this project before it does anything."
+          }
+          on={s.mix}
+          onToggle={toggleMix}
         />
-        <SwitchRow
-          title="AI marks what you wrote"
-          sub="Compares your attempt to the card and suggests a grade."
-          on={s.mark}
-          onToggle={() => store.updateSettings({ mark: !s.mark })}
-        />
-        <SwitchRow
-          title="Interleave sections"
-          sub="Avoids two cards from the same section back to back."
-          on={s.interleave}
-          onToggle={() => store.updateSettings({ interleave: !s.interleave })}
-        />
+
+        <div className="list setlist">
+          {decks.map((d) => {
+            const drilling = d.id === db.active && !s.mix;
+            return (
+              <button key={d.id} className={"item" + (drilling ? " on" : "")} onClick={() => pickDeck(d.id)}>
+                <span className="grow">
+                  <span className="t">{d.name}</span>
+                  <span className="s">
+                    {d.cards.length} {d.cards.length === 1 ? "card" : "cards"} · {Object.keys(d.srs).length} seen
+                  </span>
+                </span>
+                <span className="state">{drilling ? "drilling" : s.mix ? "in the mix" : ""}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="sset-note">
+          Picking one turns mixing off — “which deck” and “all of them” are the same question asked once. Making,
+          renaming and deleting decks is on{" "}
+          <button className="textlink" onClick={() => open("project", "project.decks")}>
+            the project's own page
+          </button>
+          .
+        </p>
       </Section>
 
-      <Section title="Scheduling" sub="How much comes back, and how soon. These feed FSRS directly.">
+      <Section id="review.run">
+        <TextRow
+          title="Cards in a run"
+          sub="Asking for a run puts a finish line on today. The queue keeps serving after it — you just get told you have arrived."
+          value={String(s.sessionSize || 10)}
+          type="number"
+          mono
+          onCommit={(v) => store.updateSettings({ sessionSize: clamp(parseInt(v, 10) || 10, 1, 500) })}
+        />
+        {session ? (
+          <p className="sset-note">
+            A run is going: {session.done} of {session.target} done. Changing the number above re-targets it without
+            losing what you have already reviewed.
+          </p>
+        ) : (
+          <p className="sset-note">No run today. Start one from the panel beside the card.</p>
+        )}
+      </Section>
+
+      <Section id="review.scheduling">
         <div className="srow">
           <span className="grow">
             <span className="t">Target retention</span>
@@ -78,7 +141,28 @@ export default function Review() {
         />
       </Section>
 
-      <Section title="The tutor" sub="Who is marking your answers, and in what language.">
+      <Section id="review.answering">
+        <SwitchRow
+          title="Write it before you flip"
+          sub="Free recall beats recognising the answer. Ctrl+Enter checks."
+          on={s.recall}
+          onToggle={() => store.updateSettings({ recall: !s.recall })}
+        />
+        <SwitchRow
+          title="AI marks what you wrote"
+          sub="Compares your attempt to the card and suggests a grade."
+          on={s.mark}
+          onToggle={() => store.updateSettings({ mark: !s.mark })}
+        />
+        <SwitchRow
+          title="Interleave sections"
+          sub="Avoids two cards from the same section back to back."
+          on={s.interleave}
+          onToggle={() => store.updateSettings({ interleave: !s.interleave })}
+        />
+      </Section>
+
+      <Section id="review.tutor">
         <div className="srow">
           <span className="grow">
             <span className="t">Language</span>

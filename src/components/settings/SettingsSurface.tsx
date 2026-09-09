@@ -6,18 +6,23 @@
  * review-loop sheet pane that no code had opened since the sheet router
  * gained it. Three surfaces meant three things could be true at once about
  * where a setting was, and the review loop's Menu quietly became a fourth
- * place settings-shaped things could live — which is where backup and restore
- * ended up, unreachable from five of the six sections.
+ * place settings-shaped things could live — which is where backup, memory and
+ * the run transcript ended up, unreachable from five of the six sections.
  *
  * Shell renders this, once, and Shell is the one component every section
- * agrees on. Rendering it here rather than at the app root is what lets a
- * category read a context its own view provides: in chat this sits inside
- * ChatProvider, so "This chat" has a conversation to configure.
+ * agrees on. Rendering it here rather than at the app root is what lets a page
+ * read a context its own view provides: in chat this sits inside ChatProvider,
+ * so "This chat" has a conversation to configure.
  *
- * SettingsHome is lazy on purpose. It reaches the pricing catalogue, the
- * usage ledger, the backup writer and every scope panel — none of which the
- * review loop's first paint should be waiting on, and none of which anyone
- * needs until they open this.
+ * The frame is not `.sheet-body`, which scrolls everything it holds. Settings
+ * scrolls only the page: the search box and the rail hold still, because a
+ * navigation you have to scroll back up to reach is the same bug the app shell
+ * was built to kill, one level in.
+ *
+ * SettingsHome is lazy on purpose. It reaches the pricing catalogue, the usage
+ * ledger, the memory store, the backup writer and every scope panel — none of
+ * which the review loop's first paint should be waiting on, and none of which
+ * anyone needs until they open this.
  * ========================================================================== */
 import { Suspense, lazy, useEffect, useRef } from "react";
 import { useSettings } from "@/context/SettingsContext";
@@ -31,9 +36,16 @@ export default function SettingsSurface() {
 
   /* Focus moves into the panel when it opens, so Escape and Tab land here
      rather than in whatever was behind it — and so a keyboard user is not
-     left tabbing through the page under the scrim. */
+     left tabbing through the page under the scrim.
+
+     Only when focus is not already inside, which settles two fights at once:
+     SettingsHome puts the caret in the search box on desktop, and it wins
+     whether it mounted with the panel or a chunk-load later; and switching
+     page does not yank the caret out of a field you were still typing in. */
   useEffect(() => {
-    if (cat) panelRef.current?.focus();
+    if (!cat) return;
+    const el = panelRef.current;
+    if (el && !el.contains(document.activeElement)) el.focus();
   }, [cat]);
 
   if (!cat) return null;
@@ -48,7 +60,7 @@ export default function SettingsSurface() {
         if (e.target === e.currentTarget) close();
       }}
     >
-      <div className="sheet-inner" ref={panelRef} tabIndex={-1}>
+      <div className="sheet-inner set-sheet" ref={panelRef} tabIndex={-1}>
         <div className="sheet-head">
           <h3>Settings</h3>
           <span className="sub">everything, by category</span>
@@ -56,7 +68,7 @@ export default function SettingsSurface() {
             <Icon name="close" />
           </button>
         </div>
-        <div className="sheet-body">
+        <div className="set-host">
           <Suspense fallback={<div className="empty">Opening…</div>}>
             <SettingsHome />
           </Suspense>

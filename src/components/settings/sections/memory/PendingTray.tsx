@@ -1,16 +1,19 @@
 /* ============================================================================
- * CandidateTray — the memory staging tray: accept, edit, reject, one at a
- * time or in bulk. Nothing here is memory until accepted (services/
- * candidates.ts).
+ * PendingTray — the memory staging tray: accept, edit, reject, one at a time
+ * or in bulk. Nothing here is memory until accepted (services/candidates.ts).
+ *
+ * Was a sheet pane in the review loop. Same code, minus its own window chrome:
+ * it is a group on the Memory page now, so it gets its heading from the
+ * catalogue like everything else.
  * ========================================================================== */
 import { useState } from "react";
 import * as store from "@/services/store";
 import * as candidates from "@/services/candidates";
 import { useToast } from "@/context/ToastContext";
 import { useStoreSync } from "@/hooks/useStoreSync";
-import SheetShell from "../SheetShell";
+import Section from "../../Section";
 
-export default function CandidateTray() {
+export default function PendingTray() {
   useStoreSync(candidates);
   const toast = useToast();
   const projectId = store.get().activeProjectId;
@@ -36,12 +39,12 @@ export default function CandidateTray() {
   }
 
   return (
-    <SheetShell title="Memory tray" sub={`${items.length} pending`}>
+    <Section id="memory.pending" title={items.length ? `Waiting for you (${items.length})` : undefined}>
       {items.length === 0 ? (
         <div className="empty">Nothing waiting. Distilling a journal entry proposes memory here.</div>
       ) : (
         <>
-          <div className="btnrow" style={{ marginBottom: 14 }}>
+          <div className="btnrow">
             <button className="btn pri sm" onClick={acceptAll}>
               Accept all
             </button>
@@ -55,7 +58,7 @@ export default function CandidateTray() {
                 {editingId === c.id ? (
                   <>
                     <textarea className="fi" value={editText} onChange={(e) => setEditText(e.target.value)} autoFocus />
-                    <div className="btnrow" style={{ marginTop: 0 }}>
+                    <div className="btnrow">
                       <button className="btn sm pri" onClick={() => acceptOne(c.id, editText)}>
                         Save &amp; accept
                       </button>
@@ -71,7 +74,7 @@ export default function CandidateTray() {
                       {c.supersedes ? " · replaces existing" : ""}
                     </span>
                     <div className="qmini">{c.text}</div>
-                    <div className="btnrow" style={{ marginTop: 8 }}>
+                    <div className="btnrow">
                       <button className="btn sm pri" onClick={() => acceptOne(c.id)}>
                         Accept
                       </button>
@@ -95,6 +98,6 @@ export default function CandidateTray() {
           </div>
         </>
       )}
-    </SheetShell>
+    </Section>
   );
 }

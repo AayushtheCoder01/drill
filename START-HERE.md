@@ -26,7 +26,7 @@
 | 3 | Memory core | **done** |
 | 4 | Distill — journal into memory and cards | **done** |
 | 5 | Exams | **done** |
-| 6 | Unified settings and the run transcript | **done** |
+| 6 | Unified settings and the run transcript | **done** — genuinely, 2026-09-09 |
 
 ### v2 — Depth
 | 7 | Chat on the journal | **done** |
@@ -708,6 +708,22 @@ card it came from.
 
 **Done when:** every setting lives in one place and states its origin, and any
 operation can be opened up to see exactly what it sent.
+
+**Finished 2026-09-09**, one phase late. Phase 6 shipped the panel and left
+four things outside it, all in the review loop's Menu — a sheet only the
+review loop mounts, so they existed from one of the six sections: backup and
+restore (moved in the settings rework), and then the memory browser, the memory
+tray and the run transcript. Deck management was a set of `window.prompt()`
+calls in the same place; "Mix all decks" was a switch you could only reach
+while reviewing; `settings.sessionSize` had no control at all.
+
+They are pages now — Memory of its own, decks under the project, the queue and
+the day's run under Review, the transcript under Usage — the rail is grouped
+and holds still while the page scrolls, and search returns the *group of
+settings* rather than the page it is on and scrolls to it. `settings/
+catalogue.ts` is the single declaration of all of it, pure data, held to its
+promises by `catalogue.test.ts`. What is left in the review Menu is statistics,
+the insight log, and signposts.
 
 ---
 
