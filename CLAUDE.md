@@ -21,8 +21,9 @@ especially its **Project layout** section. Do not restate it here.
 npm run dev     # vite; usually :5173, falls back to :5174 if taken
 npm run lint    # tsc --noEmit. The only lint there is
 npm test        # tsx --test src/**/*.test.ts
-                # 137 tests: fsrs, cardFormat, memory*, effort, title,
-                # thinking, agent/loop, settings/catalogue, logBudget, storage
+                # 151 tests: fsrs, cardFormat, memory*, effort, title,
+                # thinking, agent/loop, settings/catalogue, logBudget,
+                # storage, activity
 npm run build   # tsc -b && vite build
 ```
 
@@ -125,6 +126,20 @@ the streak or retention reads.
 serialises all of it on save, so the last tab to close wins. `store` listens
 for the `storage` event (which fires only in *other* tabs) and raises the same
 alarm. Merging is not attempted — saying so is.
+
+**Activity means every section, and it is derived.** `lib/activity.ts` (pure)
+turns timestamps into days, weeks and streaks; `services/activity.ts` gathers
+those timestamps from all six sections — reviews, cards written, notes,
+journal chunks, conversations, exams, project memory — and memoises the result
+against every store's `getVersion()`, because the review rail asks for it on
+every grade. **Call `activity.daysFor(projectId)`, never rebuild it.** Nothing
+is written down twice, so a day can never disagree with the section it came
+from, and history predating the change counts retroactively. It read `db.log`
+alone before, so an evening of journal, chat and an exam drew a blank square
+and broke the streak — an app telling you a productive day did not happen.
+`levelFor` gives anything at all level 1 on purpose: against a 200-review day
+a journal entry is 0.5%, and showing up has to be visible or the calendar is a
+chart of your heaviest days rather than a record of a habit.
 
 **One scope per screen.** `db.log` is one flat list across every project and
 the log is filed by *deck id*. `stats(decks)` and `counts(decks)` both default

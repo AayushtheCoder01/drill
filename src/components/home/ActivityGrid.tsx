@@ -1,18 +1,23 @@
 /* ============================================================================
- * ActivityGrid — a year of days, one square each.
+ * ActivityGrid — a year of days, one square each, in every colour the project
+ * comes in.
  *
  * The review queue never ends and never fills up, so there is no natural
  * picture of "how much have I actually done". This is that picture: the same
  * calendar-of-squares GitHub uses, because it answers the only two questions
  * worth asking of a habit — did I show up, and for how long in a row.
  *
+ * A square used to mean "cards graded", which made five of the six sections
+ * invisible here: a day of journal, chat and an exam drew a blank. It now
+ * means everything, and hovering one says what it was — because "you did 14
+ * things" is a worse answer than "9 reviewed, 3 written, a journal entry".
+ *
  * It never scrolls. The columns are fractions of whatever width the page has,
  * so a year always fits: the squares get smaller on a narrow window, and a
  * scrollbar never appears under the calendar to be dragged.
  * ========================================================================== */
 import { useEffect, useState } from "react";
-import { grid, monthLabels, type DayCell } from "@/lib/activity";
-import type { LogEntry } from "@/types";
+import { describeDay, grid, monthLabels, totalOf, type DayActivity, type DayCell } from "@/lib/activity";
 
 function title(c: DayCell): string {
   const when = new Date(c.ts).toLocaleDateString(undefined, {
@@ -22,10 +27,11 @@ function title(c: DayCell): string {
     year: "numeric"
   });
   if (c.future) return when;
-  return `${c.count} review${c.count === 1 ? "" : "s"} · ${when}`;
+  const day: DayActivity = { key: c.key, total: c.count, by: c.by };
+  return `${when} — ${describeDay(day, 4)}`;
 }
 
-export default function ActivityGrid({ log, weeks = 53 }: { log: LogEntry[]; weeks?: number }) {
+export default function ActivityGrid({ days, weeks = 53 }: { days: Map<string, DayActivity>; weeks?: number }) {
   /* One readout, not two. The cells used to carry a `title` as well, so the
      browser drew its own tooltip on top of this one a second later - the same
      sentence twice, in two different type styles. */
@@ -45,13 +51,14 @@ export default function ActivityGrid({ log, weeks = 53 }: { log: LogEntry[]; wee
     };
   }, [tip]);
 
-  const cols = grid(log, weeks);
+  const cols = grid(days, weeks);
   const months = monthLabels(cols);
-  /* Summed from the squares actually drawn, not `log.length`. The legend says
-     "in the last year" and the log goes back further than the grid does, so
-     reading the whole log put a number under the calendar that the calendar
-     did not contain. */
-  const total = cols.reduce((n, col) => n + col.reduce((m, c) => m + c.count, 0), 0);
+  /* Summed from the squares actually drawn, not from the whole history. The
+     legend says "in the last year" and the record goes back further than the
+     grid does, so reading everything put a number under the calendar that the
+     calendar did not contain. */
+  const shown = cols.reduce((n, col) => n + col.reduce((m, c) => m + c.count, 0), 0);
+  const all = totalOf(days);
   const track = { gridTemplateColumns: `repeat(${weeks}, minmax(0, 1fr))` };
 
   return (
@@ -67,7 +74,12 @@ export default function ActivityGrid({ log, weeks = 53 }: { log: LogEntry[]; wee
       {/* One flat grid rather than a div per week: the browser lays out 371
           squares in a single pass, and the month row above can address a
           column by number. */}
-      <div className="act-grid" style={track} role="img" aria-label={`${total} reviews over the last ${weeks} weeks`}>
+      <div
+        className="act-grid"
+        style={track}
+        role="img"
+        aria-label={`${shown} things done over the last ${weeks} weeks`}
+      >
         {cols.map((col, ci) =>
           col.map((c, ri) => (
             <i
@@ -92,8 +104,8 @@ export default function ActivityGrid({ log, weeks = 53 }: { log: LogEntry[]; wee
 
       <div className="act-legend">
         <span>
-          {total.toLocaleString()} review{total === 1 ? "" : "s"} in the last year
-          {log.length > total ? ` · ${(log.length - total).toLocaleString()} older` : ""}
+          {shown.toLocaleString()} thing{shown === 1 ? "" : "s"} done in the last year
+          {all > shown ? ` · ${(all - shown).toLocaleString()} older` : ""}
         </span>
         <span className="act-key">
           Less

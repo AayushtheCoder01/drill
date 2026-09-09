@@ -57,6 +57,18 @@ openrouter.ai.
 - **AI tutor** — "Go deeper" under any revealed answer, with three starters. If
   you wrote a recall attempt, it opens by critiquing *that*.
 
+### Home
+
+- **A calendar of everything** — a year of days, one square each, and a square
+  counts *anything* you did in the project: cards reviewed and written, notes,
+  journal entries, conversations, exams, memories saved. Hover a day to see
+  what it held.
+- **Today, in one row** — what you have done so far, broken down, each count a
+  door into the section that produced it.
+- **One streak** — computed from that same calendar, so it survives a day you
+  spent writing rather than drilling, and reads the same on Home, in the review
+  rail and on the finish screen.
+
 ### Settings
 
 One panel, the same one from all six sections (`ctrl + ,`), and everything is
@@ -467,11 +479,12 @@ top of the app if there is one; it says which of these happened.
   press the button rather than trusting the automatic request, because Firefox
   raises a prompt and a prompt with no click behind it is dismissed unseen.
 
-**The activity calendar is blank but I have been reviewing** — the calendar,
-the streak and every figure on Home are scoped to the project in the sidebar,
-and the log is filed by deck. If your reviews belong to another project, Home
-now says so under the grid instead of showing an empty year. Switch project in
-the sidebar.
+**The activity calendar is blank but I have been working** — the calendar, the
+streak and every figure on Home are scoped to the project in the sidebar, and
+the review log is filed by deck. If your work belongs to another project, Home
+says so under the grid instead of showing an empty year; switch project in the
+sidebar. The calendar counts every section, not just reviews, so a day spent
+in the journal or in chat still fills a square.
 
 **My conversations are gone but my cards are fine** — they live in different
 stores. Cards are in localStorage; conversations are in IndexedDB, because

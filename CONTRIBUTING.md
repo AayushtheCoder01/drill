@@ -27,8 +27,10 @@ dev`.
 
 ```
 src/
-  lib/            pure logic — util, fsrs, config, seed deck, markdown, personas.
-                   No DOM ownership, no React.
+  lib/            pure logic — util, fsrs, config, seed deck, markdown, personas,
+                   activity (days, streaks, the calendar). No DOM, no React, no
+                   services: services/activity.ts gathers the timestamps, lib
+                   turns them into days.
   services/
     store.ts       the Drill database: decks, cards, scheduling, stats. A module-level
                     singleton (not React state) so any component can read/write it.

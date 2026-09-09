@@ -1,4 +1,5 @@
 import * as store from "@/services/store";
+import * as activity from "@/services/activity";
 import { useSheet } from "@/context/SheetContext";
 import { useRoute } from "@/context/RouteContext";
 import { streaks } from "@/lib/activity";
@@ -18,10 +19,11 @@ export default function Done() {
     total += d.cards.length;
     reviews += d.meta.reviews;
   });
-  /* The same computed, project-scoped streak Home and the rail show. It used
-     to be max(deck.meta.streak), which is a different number arrived at a
-     different way and disagreed with both. */
-  const streak = streaks(store.logOf(store.projectDecks())).current;
+  /* The same computed, project-wide streak Home and the rail show — over
+     every section's activity, not just graded cards. It used to be
+     max(deck.meta.streak), a different number arrived at a different way,
+     and it disagreed with both. */
+  const streak = streaks(activity.daysFor(store.get().activeProjectId)).current;
 
   const cap = store.settings().newPerDay || 10;
   let head: string, body: string;

@@ -20,14 +20,16 @@ import * as chatStore from "@/services/chatStore";
 import * as journalStore from "@/services/journalStore";
 import * as examStore from "@/services/examStore";
 import * as memoryStore from "@/services/memoryStore";
+import * as activity from "@/services/activity";
 import { useDrillStore } from "@/hooks/useDrillStore";
 import { useStoreSync } from "@/hooks/useStoreSync";
 import { useRoute } from "@/context/RouteContext";
-import { streaks } from "@/lib/activity";
+import { streaks, today as todayOf, week as weekOf } from "@/lib/activity";
 import { ago } from "@/lib/util";
 import Shell from "../Shell";
 import Icon from "../ui/Icon";
 import ActivityGrid from "./ActivityGrid";
+import TodayStrip from "./TodayStrip";
 import HomeRail from "../rail/HomeRail";
 import "@/styles/home.css";
 
@@ -125,10 +127,19 @@ export default function HomeView() {
   const log = db.log.filter((e) => deckIds.has(e.d));
   const elsewhere = db.log.length - log.length;
 
+  /* Every day this project has had, from every section — reviews, cards
+     written, notes, journal, conversations, exams, memory. The service
+     memoises against every store's version, so this is one walk per actual
+     change rather than one per render; the useStoreSync calls above are what
+     make the change arrive here at all. */
+  const days = activity.daysFor(projectId);
+  const todayActivity = todayOf(days);
+
   const s = store.stats(decks);
   const counts = store.counts(decks);
   const session = store.session();
-  const { current: streak, longest, activeDays } = streaks(log);
+  const { current: streak, longest, activeDays } = streaks(days);
+  const week = weekOf(days);
   const retention = s.rev > 0 ? Math.round((s.ok / s.rev) * 100) : null;
 
   const cards = decks.reduce((n, d) => n + d.cards.length, 0);
@@ -172,15 +183,17 @@ export default function HomeView() {
      what makes it worth reading — so it must stay honest: a broken streak is
      named, not softened. */
   const epigraph =
-    log.length === 0
+    activeDays === 0
       ? elsewhere > 0
         ? `Nothing in ${project.name} yet — your ${elsewhere.toLocaleString()} reviews so far belong to other projects.`
         : "Nothing written down yet. Every book starts on a blank page."
       : streak >= 2
         ? `Day ${streak} without a gap.` + (streak >= longest ? " Your longest run yet." : ` Your best is ${longest}.`)
         : streak === 1
-          ? "One day in. The second is the one that counts."
-          : s.last7 > 0
+          ? todayActivity.total > 0
+            ? "One day in. The second is the one that counts."
+            : "Yesterday counted. Anything at all today makes it two."
+          : week.total > 0
             ? "The thread dropped. Pick it back up today and it barely shows."
             : `Nothing for a week. ${cards - seen > 0 ? "The cards are still there." : "Start again where you left off."}`;
   const call =
@@ -209,7 +222,7 @@ export default function HomeView() {
             };
 
   return (
-    <Shell current="home" aside={<HomeRail log={log} projectId={projectId} />} asideLabel="This week">
+    <Shell current="home" aside={<HomeRail days={days} projectId={projectId} />} asideLabel="This week">
       <div className="app-scroll">
         <div className="page home">
           <header className="home-hello">
@@ -247,11 +260,20 @@ export default function HomeView() {
               note={streak === 0 ? "none going" : `best ${longest}`}
               tone={streak > 0 ? "accent" : "muted"}
             />
+            {/* Everything, not just cards graded — the breakdown is the strip
+                under Activity, so the note here says the review half rather
+                than repeating it. */}
             <Figure
-              value={s.today}
-              label="reviewed today"
-              note={session ? `run ${session.done} of ${session.target}` : "no run set"}
-              tone={s.today > 0 ? "green" : "muted"}
+              value={todayActivity.total}
+              label="done today"
+              note={
+                todayActivity.total === 0
+                  ? "nothing logged yet"
+                  : session
+                    ? `run ${session.done} of ${session.target}`
+                    : `${s.today} reviewed`
+              }
+              tone={todayActivity.total > 0 ? "green" : "muted"}
             />
             <Figure
               value={counts.due}
@@ -269,11 +291,15 @@ export default function HomeView() {
             />
           </div>
 
-          {/* An empty grid is ambiguous — it looks the same whether you have
-              never reviewed anything or your history is filed under another
-              project — so it says which. Reading a blank calendar as "you
-              have done nothing" when you have done thousands is the version
-              of this that makes the page feel broken. */}
+          {/* Every section feeds this, which is the whole point of it being on
+              the front page rather than in Review: an evening of journal, chat
+              and an exam used to draw a blank square and break the streak, and
+              an app that tells you a productive day did not happen is worse
+              than one with no calendar at all.
+
+              An empty grid is still ambiguous — it looks the same whether you
+              have never done anything or your history is filed under another
+              project — so it says which. */}
           <Section
             title="Activity"
             note={
@@ -284,7 +310,12 @@ export default function HomeView() {
                   : undefined
             }
           >
-            <ActivityGrid log={log} />
+            <TodayStrip day={todayActivity} />
+            <ActivityGrid days={days} />
+            <p className="home-note">
+              Every section counts: cards reviewed and written, notes, journal entries, conversations, exams and
+              memories saved. Hover a square to see what a day held.
+            </p>
             {activeDays === 0 && elsewhere > 0 && (
               <p className="home-empty">
                 {elsewhere.toLocaleString()} review{elsewhere === 1 ? "" : "s"} are logged against decks in your

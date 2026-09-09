@@ -228,6 +228,93 @@
   color: var(--ink-3);
   margin: 0;
 }
+/* The quiet line under a section that says what the thing above it counts. */
+.home-note {
+  font: 400 var(--t-2xs) / 1.6 var(--sans);
+  color: var(--ink-3);
+  margin: var(--s-3) 0 0;
+  max-width: var(--measure);
+}
+
+/* -------------------------------------------------------------- today -- */
+/* What has happened in the project today, across all six sections, as one
+   row above the year. The calendar answers "have I kept this up"; this
+   answers "have I done anything yet", which is the question you actually
+   open the app with — and until the activity model covered more than graded
+   cards there was no screen anywhere that could.
+
+   Tiles are doors, not stats: each one opens the section that produced the
+   number, so "3 journal entries?" is a click rather than a hunt. */
+.today {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  padding: 0 0 var(--s-4);
+  margin-bottom: var(--s-4);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.today-label {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  flex: 0 0 auto;
+}
+.today-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  flex: 1;
+  min-width: 0;
+}
+.today-tile {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-2);
+  background: var(--page-2);
+  cursor: pointer;
+  transition: border-color var(--fast), background var(--fast), transform 0.1s var(--ease);
+}
+.today-tile:hover {
+  border-color: var(--accent-45);
+  background: var(--accent-05);
+  transform: translateY(-1px);
+}
+.today-n {
+  font-family: var(--mono);
+  font-size: var(--t-md);
+  color: var(--accent);
+  line-height: 1;
+}
+.today-what {
+  font-family: var(--sans);
+  font-size: var(--t-2xs);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.today-total {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  flex: 0 0 auto;
+}
+/* Nothing yet: a sentence rather than a row of zeroes, because a scoreboard
+   you are losing is a worse thing to open the app to than an invitation. */
+.today-none p {
+  flex: 1;
+  min-width: 0;
+  font: 400 var(--t-xs) / 1.55 var(--sans);
+  color: var(--ink-3);
+  margin: 0;
+  max-width: var(--measure);
+}
 /* Section rules are hairlines under the subhead, not boxes around content.
    The calendar sits straight on the page. */
 

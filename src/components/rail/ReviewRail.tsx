@@ -10,29 +10,24 @@
  * memorise what can be computed).
  * ========================================================================== */
 import * as store from "@/services/store";
+import * as activity from "@/services/activity";
+import * as chatStore from "@/services/chatStore";
+import * as journalStore from "@/services/journalStore";
+import * as examStore from "@/services/examStore";
+import * as memoryStore from "@/services/memoryStore";
 import { useDrillStore } from "@/hooks/useDrillStore";
+import { useStoreSync } from "@/hooks/useStoreSync";
 import { useSheet } from "@/context/SheetContext";
-import { streaks } from "@/lib/activity";
-import { DAY, stripTags } from "@/lib/util";
+import { streaks, week as weekOf } from "@/lib/activity";
+import { stripTags } from "@/lib/util";
 import { RailBar, RailEmpty, RailFigure, RailGroup, RailItem, RailList, RailSub, RailWeek } from "./Rail";
 
-/** Seven booleans, oldest first, ending today: was anything reviewed that day?
- *  Read straight off the review log rather than stored anywhere.
- *
- *  Scoped to what you are actually drilling. It read the whole of db.log
- *  before, so a week spent in another project lit this one's streak up — and
- *  disagreed with Home, which has always filtered. */
-function weekOfActivity(): boolean[] {
-  const log = store.logOf(store.projectDecks());
-  const midnight = new Date().setHours(0, 0, 0, 0);
-  const days: boolean[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const from = midnight - i * DAY;
-    const to = from + DAY;
-    days.push(log.some((e) => e.t >= from && e.t < to));
-  }
-  return days;
-}
+/* The week and the streak are the project's whole activity, not this rail's
+   own arithmetic over db.log. Two reasons, both learned the hard way: this
+   read the *unfiltered* log, so a week spent in another project lit up here;
+   and it counted only graded cards, so a day of journal and chat broke a
+   streak that Home said was intact. Same map, same function, same answer, in
+   both places. */
 
 /** The cards costing the most: leeches first, then most-lapsed. Same ordering
  *  the chat context uses for its "weak" source, so the rail and the tutor
@@ -51,21 +46,27 @@ function worstCards(limit: number) {
 }
 
 export default function ReviewRail() {
-  useDrillStore();
+  const db = useDrillStore();
+  /* The activity map reads all four IndexedDB stores, so this has to
+     re-render when any of them lands — they load after the review loop's
+     first paint. */
+  useStoreSync(chatStore);
+  useStoreSync(journalStore);
+  useStoreSync(examStore);
+  useStoreSync(memoryStore);
   const { open } = useSheet();
 
   const s = store.stats();
   const counts = store.counts();
   const session = store.session();
-  const week = weekOfActivity();
+  const days = activity.daysFor(db.activeProjectId);
+  const { active: week, total: weekTotal } = weekOf(days);
   const worst = worstCards(4);
-  /* Computed from the log by the same function Home uses, over the same
-     project scope, rather than read off `deck.meta.streak`. The stored
-     counter is per deck and only advances for decks that happen to be in
-     pool() when rollover() runs, so it drifted — Home said "day 6" and this
-     said "3 days", about the same week, on the same screen if you had both
-     open. START-HERE §2.6: never memorise what can be computed. */
-  const streak = streaks(store.logOf(store.projectDecks())).current;
+  /* One definition of a streak, in lib/activity, over the whole project's
+     activity. It was max(deck.meta.streak) — a stored per-deck counter that
+     only advances for decks in pool() when rollover() runs — so it drifted
+     from the one Home computed and the two disagreed on screen. */
+  const streak = streaks(days).current;
   const retention = s.rev > 0 ? Math.round((s.ok / s.rev) * 100) : null;
   const target = store.settings().sessionSize || 10;
 
@@ -107,9 +108,18 @@ export default function ReviewRail() {
         </RailSub>
       </RailGroup>
 
+      {/* The week and the streak count everything the project had happen in
+          a day, not just cards graded — same map as Home, same function — so
+          the sentence under them has to say so. It read "N reviews in the
+          last seven days" under a row of squares that had started lighting up
+          for journal entries and conversations. */}
       <RailGroup title="Streak" note={streak > 0 ? `${streak} day${streak === 1 ? "" : "s"}` : undefined}>
         <RailWeek days={week} />
-        <RailSub>{s.last7} reviews in the last seven days</RailSub>
+        <RailSub>
+          {weekTotal === 0
+            ? "nothing logged in seven days"
+            : `${weekTotal} thing${weekTotal === 1 ? "" : "s"} done in the last seven days · ${s.last7} of them reviews`}
+        </RailSub>
       </RailGroup>
 
       <RailGroup title="Retention" note="30 days">
