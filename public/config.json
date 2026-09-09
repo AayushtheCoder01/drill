@@ -5,9 +5,9 @@
     "To set your own: copy this file to config.local.json and edit that.",
     "config.local.json is gitignored and overrides anything here.",
     "",
-    "If you open Drill by double-clicking index.html (a file:// page), the",
-    "browser will not let it read config.local.json. run.bat converts the file",
-    "into config.local.js for you; run it once after editing your config.",
+    "config.local.json is fetched at runtime, not bundled, so Drill must be",
+    "served over http — npm run dev, or any static server over dist/. Opening",
+    "index.html as a file:// page cannot read it.",
     "",
     "Every field below can also be set in the app under Menu -> Settings, and",
     "what you set there wins over what is written here."

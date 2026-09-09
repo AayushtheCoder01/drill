@@ -438,6 +438,11 @@ goes anywhere else. Your API key is stored in the same browser (or in
 `config.local.json`, which is gitignored) and is sent only to the backend you
 picked. With Ollama or llama.cpp, nothing leaves the machine at all.
 
+Nothing Drill exports contains your key. Backups and deck exports are written
+with the credentials stripped out, so a backup is safe to keep in a synced
+folder or attach to a bug report; restoring one leaves the key already in that
+browser alone rather than overwriting it with a blank.
+
 One thing worth being explicit about: when you attach deck or insight-log
 context to a conversation, those cards and notes are sent to whichever
 inference provider that conversation is pointed at. That is the feature working

@@ -60,7 +60,7 @@ export async function collect(): Promise<FullBackup> {
     version: 1,
     exportedAt: Date.now(),
     dbVersion: CURRENT_DB_VERSION,
-    db: store.get(),
+    db: store.withoutCredentials(store.get()),
     conversations,
     memories,
     candidates: memCandidates,
@@ -160,6 +160,8 @@ export async function summariseCurrent(): Promise<BackupSummary> {
  * activeProjectId to file any project-less conversation under.
  */
 export async function restoreEverything(b: FullBackup): Promise<BackupSummary> {
+  /* Backups carry no keys (store.withoutCredentials strips them); store.restoreBackup keeps
+     this browser's own, so restoring does not sign you out of your provider. */
   store.restoreBackup(b.db as DrillDB | LegacyDBv3 | LegacyDBv2);
 
   await Promise.all([

@@ -18,6 +18,7 @@ import * as migrate from "@/lib/migrate";
 import { SEED_DECK } from "@/lib/seed";
 import { normaliseCardHtml } from "@/lib/cardFormat";
 import type {
+  BackendCreds,
   Card,
   Deck,
   DeckMeta,
@@ -1044,10 +1045,17 @@ export function readPayload(txt: string): ImportPayload {
  *  SM-2 conversion first, v3 and older-v4 through migrateToV4, and a current
  *  v4 blob through migrateToV4's repair path. */
 export function restoreBackup(raw: DrillDB | LegacyDBv3 | LegacyDBv2): void {
+  /* Exported files carry no API keys (withoutCredentials strips them), so the
+     keys have to survive the replace or restoring a backup would silently sign
+     you out of your provider. Only the secrets are kept — every other setting
+     comes from the file, which is what "restore" is supposed to mean. */
+  const keptKeys = keysNow();
+
   const v = migrate.dbVersionOf(raw);
   const asV3 = v <= 2 ? migrateV2(raw as LegacyDBv2) : (raw as LegacyDBv3 | DrillDB);
   db = migrate.migrateToV4(asV3);
   db.settings = normSettings({ ...DEFAULT_SETTINGS, ...(db.settings || {}) });
+  reinstateKeys(keptKeys);
   if (!Array.isArray(db.log)) db.log = [];
   if (!Array.isArray(db.notes)) db.notes = [];
   if (!db.projects[db.activeProjectId]) db.activeProjectId = Object.keys(db.projects)[0];
@@ -1056,11 +1064,51 @@ export function restoreBackup(raw: DrillDB | LegacyDBv3 | LegacyDBv2): void {
   notify();
 }
 
+/* ---------- credentials and the files that must not contain them ---------- */
+
+/** Every API key this browser holds, by backend id, with the live field folded
+ *  in so the currently selected backend is covered too. */
+function keysNow(): Record<string, string> {
+  const s = db.settings;
+  const out: Record<string, string> = {};
+  for (const id of Object.keys(s.creds || {})) out[id] = s.creds[id].key || "";
+  if (s.backend) out[s.backend] = s.key || "";
+  return out;
+}
+
+/** Put those keys back over whatever a restored database arrived with. */
+function reinstateKeys(keys: Record<string, string>): void {
+  const s = db.settings;
+  if (!s.creds) s.creds = {};
+  for (const id of Object.keys(keys)) {
+    const prev = s.creds[id];
+    s.creds[id] = { key: keys[id], model: prev?.model || "", baseUrl: prev?.baseUrl || "" };
+  }
+  s.key = keys[s.backend] || "";
+}
+
+/**
+ * A copy of the database with every API key taken out of it.
+ *
+ * settings.key and settings.creds hold pasted provider keys, and every export
+ * in the app serialises the whole database — so without this, "Export decks
+ * and progress" and a full backup both ship a live credential inside a file
+ * people share, mail to themselves and attach to bug reports. Nothing else in
+ * there is a secret, so blanking these is enough. It copies rather than
+ * mutates because this is the live object; clearing the real key would sign
+ * you out mid-export.
+ */
+export function withoutCredentials(src: DrillDB): DrillDB {
+  const creds: Record<string, BackendCreds> = {};
+  for (const id of Object.keys(src.settings.creds || {})) creds[id] = { ...src.settings.creds[id], key: "" };
+  return { ...src, settings: { ...src.settings, key: "", creds } };
+}
+
 export function exportDeck(d: Deck): string {
   return JSON.stringify({ name: d.name, cards: d.cards }, null, 1);
 }
 export function exportAll(): string {
-  return JSON.stringify(db, null, 1);
+  return JSON.stringify(withoutCredentials(db), null, 1);
 }
 
 /* ---------- notes ---------- */
