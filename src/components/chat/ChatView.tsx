@@ -1,7 +1,6 @@
 /* ============================================================================
  * ChatView — the chat platform's shell: sidebar, transcript, composer, and
- * the surfaces that hang off them (settings drawer, command palette, card
- * maker).
+ * the surfaces that hang off them (command palette, card maker).
  *
  * Owns the slash commands and palette actions, because those are the places
  * where chat reaches into the drill half of the app and it is worth having
@@ -16,6 +15,7 @@ import { poolFor } from "@/lib/memoryBrief";
 import type { ChatMessage } from "@/types";
 import { useChat } from "@/context/ChatContext";
 import { useRoute } from "@/context/RouteContext";
+import { useSettings } from "@/context/SettingsContext";
 import { useToast } from "@/context/ToastContext";
 import { useDrillStore } from "@/hooks/useDrillStore";
 import { describeSource } from "@/lib/chatContext";
@@ -30,7 +30,6 @@ import Icon from "../ui/Icon";
 import ChatSidebar from "./ChatSidebar";
 import MessageTurn from "./MessageTurn";
 import Composer, { type SlashCommand } from "./Composer";
-import ConversationSettings from "./ConversationSettings";
 import CommandPalette, { type PaletteAction } from "./CommandPalette";
 import CardsModal from "./CardsModal";
 import ChatEmpty from "./ChatEmpty";
@@ -47,9 +46,12 @@ export default function ChatView() {
   const chat = useChat();
   const { conversationId, openDrill } = useRoute();
   const toast = useToast();
+  /* Chat had its own settings drawer — a second navigation over the same
+     settings, with a scope tab strip the sidebar's panel did not have. It
+     opens the one panel now, on this thread's own page. */
+  const settings = useSettings();
   useDrillStore(); // deck/note changes should refresh context labels
 
-  const [drawer, setDrawer] = useState(false);
   const [palette, setPalette] = useState(false);
   const [cardSource, setCardSource] = useState<string | null>(null);
   const [seed, setSeed] = useState<{ text: string; nonce: number } | null>(null);
@@ -108,14 +110,16 @@ export default function ChatView() {
         e.preventDefault();
         newChat();
       } else if (e.key === "Escape") {
+        /* Settings is not handled here. It is one surface for the whole app
+           now, and Shell — which mounts it — owns its Escape, so closing it
+           from chat must not also clear the message you were writing. */
         if (palette) setPalette(false);
         else if (cardSource) setCardSource(null);
-        else if (drawer) setDrawer(false);
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [palette, cardSource, drawer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [palette, cardSource]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const newChat = useCallback(() => chat.newConversation(), [chat]);
 
@@ -271,7 +275,7 @@ export default function ChatView() {
         cmd: "/deck",
         desc: "Attach a deck as context",
         run: () => {
-          setDrawer(true);
+          settings.open("conversation");
           toast("Pick a deck under “Attach a whole deck”");
         }
       },
@@ -300,10 +304,10 @@ export default function ChatView() {
       {
         cmd: "/settings",
         desc: "Model, mode, temperature, context",
-        run: () => setDrawer(true)
+        run: () => settings.open("conversation")
       }
     ],
-    [c, chat, saveNote, exportConversation, toast]
+    [c, chat, saveNote, exportConversation, toast, settings]
   );
 
   /* --------------------------------------------------- palette actions -- */
@@ -312,11 +316,11 @@ export default function ChatView() {
     () => [
       { id: "new", label: "New chat", hint: "ctrl+J", run: newChat },
       { id: "drill", label: "Go to the review loop", hint: "view", run: openDrill },
-      { id: "settings", label: "Conversation settings", hint: "action", run: () => setDrawer(true) },
+      { id: "settings", label: "Conversation settings", hint: "action", run: () => settings.open("conversation") },
       { id: "export", label: "Export this conversation", hint: "action", run: exportConversation },
       ...commands.map((cm) => ({ id: cm.cmd, label: cm.desc, hint: cm.cmd, run: () => cm.run("") }))
     ],
-    [newChat, openDrill, exportConversation, commands]
+    [newChat, openDrill, exportConversation, commands, settings]
   );
 
   /* -------------------------------------------------------------- render -- */
@@ -372,7 +376,11 @@ export default function ChatView() {
               >
                 <Icon name={c.pinned ? "star-filled" : "star"} size={13} />
               </button>
-              <button className={"chat-headbtn" + (drawer ? " on" : "")} onClick={() => setDrawer((v) => !v)} title="Conversation settings">
+              <button
+                className={"chat-headbtn" + (settings.cat === "conversation" ? " on" : "")}
+                onClick={() => settings.open("conversation")}
+                title="Conversation settings  (ctrl + ,)"
+              >
                 <Icon name="settings" size={13} />
                 <span>Settings</span>
               </button>
@@ -486,8 +494,6 @@ export default function ChatView() {
           onSend={(text, attachments) => void chat.send(text, attachments)}
           onStop={chat.stop}
         />
-
-        {drawer && <ConversationSettings onClose={() => setDrawer(false)} />}
       </div>
 
       {palette && <CommandPalette actions={paletteActions} onClose={() => setPalette(false)} />}

@@ -77,7 +77,7 @@ project `createProject` has ever made — showed and drilled another project's
 cards. Never widen that fallback past `decksOf(activeProjectId)`.
 
 **A crash in `Shell`/`Sidebar` white-screens the whole app.** There is no
-error boundary, and `Sidebar` now calls `store.counts()` and
+error boundary above them, and `Sidebar` now calls `store.counts()` and
 `journalStore.unrolledEntries()` on every render in every view. Anything those
 touch is effectively a global dependency. Note `store.pool()` returns
 `[deck()]` when deck-mixing is off, and `deck()` is `db.decks[db.active]` — an
@@ -103,12 +103,18 @@ as the KaTeX-free counterpart to `lib/markdown.ts`.
 user- or model-supplied goes through `lib/markdown.ts` (DOMPurify) first.
 
 **Keyboard bindings live in three places** and `components/ui/ShortcutsModal.tsx`
-is the published promise about all of them: `Shell.tsx` (ctrl+B, ctrl+\, `?`,
-Escape), `AppShell.tsx` (the review loop: Space, 1–4, G, N, S — all guarded to
-not fire while an INPUT/TEXTAREA/SELECT has focus), and `ChatView`/`Composer`
-(ctrl+K, ctrl+J, Enter to send, `/`, `@`, Escape). **Change a binding, change
-the modal in the same commit.** A cheatsheet row that nothing listens for is
-worse than no row.
+is the published promise about all of them: `Shell.tsx` (ctrl+B, ctrl+\, ctrl+,
+`?`, Escape), `AppShell.tsx` (the review loop: Space, 1–4, G, N, S — all guarded
+to not fire while an INPUT/TEXTAREA/SELECT has focus, *or* while settings is
+open, since it covers the card it would otherwise grade), and
+`ChatView`/`Composer` (ctrl+K, ctrl+J, Enter to send, `/`, `@`, Escape).
+**Change a binding, change the modal in the same commit.** A cheatsheet row that
+nothing listens for is worse than no row.
+
+Escape is layered, innermost first, and `Shell` owns the outermost layer:
+settings, then the shortcuts sheet, then the mobile drawer. `ChatView`
+deliberately does *not* handle Escape for settings — if it did, closing the
+panel from chat would also clear the message you were writing.
 
 **One composer control is model-dependent, not backend-dependent.** Everything
 else in the app asks "can this backend do it"; thinking asks "can this *model*
@@ -168,9 +174,13 @@ the whole picture. Four things bite:
   re-registered only when the palette or drawer moves and otherwise holds a
   first-render closure.
 
-**There is still no error boundary.** A render crash anywhere — `Shell`,
+**There is still no error boundary at the root.** A render crash in `Shell`,
 `Sidebar`, or a composer chip rendered before its new prop was threaded through
-— white-screens the whole app. That happened for real while building Phase 12.
+white-screens the whole app. That happened for real while building Phase 12.
+`components/ui/ErrorGuard.tsx` is the local version — the sheet router and the
+settings body wrap themselves in it, so a pane or a settings page that throws
+costs you that panel rather than the session. Wrap anything that renders data
+it did not create; it does not help with a crash above it.
 
 ## Verifying
 
@@ -244,8 +254,25 @@ its listener to nothing and never runs again.
   wrote through immediately, with nothing saying which was which — so editing
   a number and closing the panel silently discarded it. `ui/TextRow.tsx` is
   the field that keeps the rule; do not add a field that batches into a Save.
-- **One settings navigation, `settings/SettingsHome.tsx`.** All three surfaces
-  (the review loop's sheet, the journal/exam modal, chat's drawer) render it,
-  and chat's only difference is `withConversation`, which prepends the thread's
-  own scope to the same category list. Conversation, project and global are one
-  inheritance chain, so they read as one list rather than three tab strips.
+- **One settings surface, and it is not a view.** `context/SettingsContext.tsx`
+  holds which category is open; `Shell` renders `settings/SettingsSurface.tsx`
+  once, so the same panel with the same navigation appears in all six sections
+  (`ctrl + ,`, the sidebar, chat's header button, the review Menu). It is
+  mounted from `Shell` rather than the app root deliberately — that is what puts
+  it inside `ChatProvider` in chat, so the "This chat" category has a
+  conversation to read. Conversation, project and global are one inheritance
+  chain, so they read as one list rather than three tab strips.
+- **Categories are declared once, in `settings/registry.tsx`.** Id, label,
+  blurb, search keywords and the render call live in one record. There used to
+  be four copies of the list inside `SettingsHome` — a union, a label map, an
+  order array and a switch — and getting three of the four right gave you a page
+  that was unreachable or unlabelled. A category that needs a context only one
+  view mounts declares `needs`, and is left out elsewhere rather than shown
+  empty. **Add a control, add the word someone would type to find it**: the
+  search box is the second line of defence against the failure that put backup
+  and restore in the review loop's Menu, where five of six sections could not
+  reach it.
+- **Anything data-shaped belongs in Settings → Data**, not in a section's own
+  menu. Backup, restore, import, export and the example decks are all there
+  (`settings/sections/data/`). They reach `useMaybeReview()` rather than
+  `useReview()` because settings opens far outside the review loop now.

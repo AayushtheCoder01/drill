@@ -210,11 +210,11 @@ Include:
 - Browser and whether you were on `npm run dev` or the built/deployed app.
 - Anything in the browser console.
 - **For a card that renders or schedules wrongly, paste the card JSON.** Copy it
-  out of **⋯ → Import / export → Export this deck**.
+  out of **Settings → Data → Export a piece → This deck**.
 
-For a scheduling bug, also include the card's `srs` row from **Export
-everything** — `S`, `D`, `reps`, `lapses` and `due` are what make it
-reproducible.
+For a scheduling bug, also include the card's `srs` row from **Every deck, with
+progress** on the same page — `S`, `D`, `reps`, `lapses` and `due` are what make
+it reproducible.
 
 Please strip your API key out of anything you paste. It is in `settings.key` of
 a full backup.

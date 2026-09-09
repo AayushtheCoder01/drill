@@ -175,17 +175,25 @@ IndexedDB behind a sync cache, copying the `chatStore` pattern.
 - **`types/core.ts`** — `Project`, `Memory`, `MemoryCandidate`, `Note`, `Effort`,
   `KnowledgeItem`, `FullBackup` all defined in Phase 0.
 - **`services/backup.ts`** — full export/restore across both storage worlds,
-  ids preserved. Extend it whenever a new store appears.
+  ids preserved. Extend it whenever a new store appears. Its UI is
+  **Settings → Data**, reachable from every section; it used to be behind the
+  review loop's Menu, where five of the six sections could not get to it.
+- **`context/SettingsContext.tsx` + `components/settings/registry.tsx`** — one
+  settings panel for the whole app, mounted once by `Shell`, with its category
+  list declared in one record. Anything settings-shaped goes in the registry,
+  not into a section's own menu.
 
 ### Known problems still open
 
 *Both original entries here were fixed by Phases 3 and 6 and are removed;
 what follows is the list as it actually stands on 2026-09-06.*
 
-- **No error boundary anywhere.** A render crash in `Shell`, `Sidebar` or the
+- **No error boundary at the root.** A render crash in `Shell`, `Sidebar` or the
   composer takes down the whole app, not one view. This was hit for real during
   Phase 12 (a component rendered before its new prop was threaded through) and
-  the whole tree went with it.
+  the whole tree went with it. `components/ui/ErrorGuard.tsx` now contains it
+  locally — the sheet router and the settings body use it — but nothing wraps
+  the tree above them.
 - **The agent loop has never run against a real model.** No API key in this
   environment. See §13, "What is verified, and what is not".
 - **Drafts reset on navigation.** `draftModel`, `draftEffort`, `draftMode` and

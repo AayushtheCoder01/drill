@@ -1,4 +1,3 @@
-import { Component, type ReactNode } from "react";
 import type { PaneState } from "@/context/SheetContext";
 import { useSheet } from "@/context/SheetContext";
 import MenuPane from "./panes/MenuPane";
@@ -10,12 +9,10 @@ import AIPane from "./panes/AIPane";
 import FixPane from "./panes/FixPane";
 import NotesPane from "./panes/NotesPane";
 import ChatPane from "./panes/ChatPane";
-import SettingsPanel from "./settings/SettingsPanel";
-import IOPane from "./panes/IOPane";
-import ExamplesPane from "./panes/ExamplesPane";
 import MemoryPanel from "./memory/MemoryPanel";
 import CandidateTray from "./memory/CandidateTray";
 import RunTranscript from "./RunTranscript";
+import ErrorGuard from "./ui/ErrorGuard";
 
 function renderPane(pane: PaneState) {
   switch (pane.name) {
@@ -37,12 +34,6 @@ function renderPane(pane: PaneState) {
       return <NotesPane card={pane.card} />;
     case "chat":
       return <ChatPane card={pane.card} />;
-    case "settings":
-      return <SettingsPanel />;
-    case "io":
-      return <IOPane />;
-    case "examples":
-      return <ExamplesPane />;
     case "memory":
       return <MemoryPanel />;
     case "candidates":
@@ -71,17 +62,4 @@ export default function Sheet({ pane }: { pane: PaneState | null }) {
       )}
     </div>
   );
-}
-
-/** A pane throwing (bad state, a missing card after a delete) closes the
- *  sheet instead of taking the whole app down with it. */
-class ErrorGuard extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  render() {
-    if (this.state.failed) return null;
-    return this.props.children;
-  }
 }

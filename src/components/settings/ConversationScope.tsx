@@ -13,7 +13,7 @@ import { formatCost, formatTokens } from "@/lib/tokens";
 import { describeSource, retrieveForSource } from "@/lib/chatContext";
 import { originLabel, resolveBackend, resolveEffort, resolveModel } from "@/lib/resolveSetting";
 import type { RetrievalTrace, ScoreComponents } from "@/lib/memoryRetrieval";
-import { useChat } from "@/context/ChatContext";
+import { useMaybeChat } from "@/context/ChatContext";
 import Section from "./Section";
 import SelectRow from "../ui/SelectRow";
 import ModelPicker from "../ui/ModelPicker";
@@ -34,12 +34,19 @@ function reasonFor(comp: ScoreComponents): string {
 }
 
 export default function ConversationScope() {
-  const { conversation: c, update, setContext } = useChat();
+  /* Settings is one panel opened from all six sections, and this page is the
+     one that needs a context only chat mounts. The registry keeps it out of
+     the list elsewhere; asking rather than demanding means a mistake there
+     costs an empty page instead of a white screen. */
+  const chat = useMaybeChat();
+  const c = chat?.conversation ?? null;
   const [customPrompt, setCustomPrompt] = useState(c?.systemPrompt || "");
 
   useEffect(() => setCustomPrompt(c?.systemPrompt || ""), [c?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (!chat) return <div className="empty">Open a conversation to change what it does.</div>;
   if (!c) return <div className="empty">Open or start a conversation first.</div>;
+  const { update, setContext } = chat;
 
   const project = store.get().projects[c.projectId];
   const rBackend = resolveBackend(c, project);

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useDrillStore } from "@/hooks/useDrillStore";
 import { useReview } from "@/context/ReviewContext";
 import { useSheet } from "@/context/SheetContext";
+import { useSettings } from "@/context/SettingsContext";
 import Shell from "./Shell";
 import Header from "./Header";
 import Ladder from "./Ladder";
@@ -14,6 +15,7 @@ export default function AppShell() {
   const db = useDrillStore(); // subscribe: re-render on every store mutation
   const review = useReview();
   const { pane, open, close } = useSheet();
+  const settings = useSettings();
 
   // Re-run on mount, and again whenever the active project changes — the
   // queue is scoped to it (store.pool()), so switching projects elsewhere
@@ -32,6 +34,11 @@ export default function AppShell() {
         if (e.key === "Escape") (e.target as HTMLElement).blur();
         return;
       }
+      /* Settings opens over the review loop like a sheet does, but it is not
+         a sheet — it is one panel for the whole app, mounted by Shell. Without
+         this, Space graded the card behind it and S opened statistics under
+         it. Escape is Shell's while it is open, so this only steps aside. */
+      if (settings.cat) return;
       if (pane) {
         if (e.key === "Escape") close();
         return;
@@ -59,7 +66,7 @@ export default function AppShell() {
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [pane, review, close, open]);
+  }, [pane, review, close, open, settings.cat]);
 
   return (
     /* The grade bar is docked so the answer you are grading and the grade you

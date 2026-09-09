@@ -12,6 +12,7 @@ import { applyAppearance } from "@/lib/theme";
 import { useDrillStore } from "@/hooks/useDrillStore";
 import { ToastProvider } from "@/context/ToastContext";
 import { SheetProvider } from "@/context/SheetContext";
+import { SettingsProvider } from "@/context/SettingsContext";
 import { ReviewProvider } from "@/context/ReviewContext";
 import { RouteProvider, useRoute } from "@/context/RouteContext";
 import { ChatProvider } from "@/context/ChatContext";
@@ -180,9 +181,14 @@ export default function App() {
   return (
     <ToastProvider>
       <AppearanceSync />
-      <RouteProvider>
-        <Views />
-      </RouteProvider>
+      {/* Which settings page is open is one piece of state for the whole app,
+          held above the view branch so it survives moving between sections
+          and so every section's Shell renders the same panel. */}
+      <SettingsProvider>
+        <RouteProvider>
+          <Views />
+        </RouteProvider>
+      </SettingsProvider>
     </ToastProvider>
   );
 }

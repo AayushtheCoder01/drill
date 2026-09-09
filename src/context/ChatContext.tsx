@@ -719,3 +719,11 @@ export function useChat(): ChatState {
   if (!ctx) throw new Error("useChat must be used within ChatProvider");
   return ctx;
 }
+
+/** Settings is one surface opened from all six sections, and one of its
+ *  categories — "This chat" — is only meaningful inside chat. This is how it
+ *  asks whether it is there, rather than being offered in every view and
+ *  throwing in five of them. */
+export function useMaybeChat(): ChatState | null {
+  return useContext(Ctx);
+}

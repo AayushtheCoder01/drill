@@ -19,9 +19,6 @@ export type PaneState =
   | { name: "fix"; item: QueueItem }
   | { name: "notes"; card: Card | null }
   | { name: "chat"; card: Card }
-  | { name: "settings" }
-  | { name: "io" }
-  | { name: "examples" }
   | { name: "memory" }
   | { name: "candidates" }
   | { name: "transcript" };

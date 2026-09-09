@@ -27,8 +27,14 @@ import Section from "./Section";
 import type { Autonomy, BackendType, Effort } from "@/types";
 import Icon from "../ui/Icon";
 
-export default function ProjectScope({ projectId }: { projectId: string }) {
+/** Reads the active project itself rather than being handed one. The caller
+ *  is a table of categories with no store subscription of its own, so a
+ *  projectId passed down from there would be whatever it was when the panel
+ *  opened — switching space behind the panel would leave this editing the
+ *  previous one. */
+export default function ProjectScope({ projectId: given }: { projectId?: string }) {
   useDrillStore();
+  const projectId = given || store.get().activeProjectId;
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [knowledgeText, setKnowledgeText] = useState("");

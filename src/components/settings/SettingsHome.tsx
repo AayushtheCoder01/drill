@@ -1,98 +1,137 @@
 /* ============================================================================
- * SettingsHome — one category at a time, instead of everything at once.
+ * SettingsHome — one category at a time, and a way to find which one.
  *
- * What was here before was three tabs (Global / Project / Usage) where the
- * first one held fifteen unrelated controls in one column: the theme picker,
- * then the accent swatches, then the API key, then five switches, then the
- * scheduler, then a tutor prompt. Nothing grouped, nothing headed, no order
- * anyone could name, and a Save button at the bottom that applied to seven of
- * the fields and not to the other eight.
+ * What was here before the settings rework was three tabs where the first
+ * held fifteen unrelated controls in one column: the theme picker, then the
+ * accent swatches, then the API key, then five switches, then the scheduler,
+ * then a tutor prompt. Nothing grouped, nothing headed, no order anyone could
+ * name, and a Save button at the bottom that applied to seven of the fields
+ * and not to the other eight.
  *
- * Now the categories are the navigation. Each is a page you can read to the
- * end, in the order the questions actually get asked: can it connect, what do
- * new chats do, how does review behave, what does it look like, what is in
- * this project, what has it cost, where does it all live.
- *
- * Two things stay deliberate about the arrangement:
- *
- *   Connection is first. It is the one category that decides whether the app
- *   does anything at all, and it used to sit two thirds of the way down under
- *   the accent picker.
+ * Now the categories are the navigation, and they are declared once in
+ * registry.tsx rather than four times here. Two things stay deliberate:
  *
  *   Conversation is prepended, not bolted on. Opened from a thread, the
  *   settings for *that thread* are the most local scope and belong at the
  *   front of the same list rather than in a separate tab strip — the three
  *   scopes are one inheritance chain (conversation beats project beats
  *   global), and showing them as one list is what makes that legible.
+ *
+ *   The search box is not decoration. Every category here is one word you
+ *   have to guess, and the app has already lost one feature to that: backup
+ *   and restore sat in the review loop's Menu while the person who needed it
+ *   went looking under Settings. Typing "backup" now lands on it wherever it
+ *   ends up living.
  * ========================================================================== */
-import { useState } from "react";
-import * as store from "@/services/store";
-import { isPersonalProject } from "@/services/projects";
-import ProjectScope from "./ProjectScope";
-import UsageScope from "./UsageScope";
-import ConversationScope from "./ConversationScope";
-import Connection from "./sections/Connection";
-import ChatPrefs from "./sections/ChatPrefs";
-import Review from "./sections/Review";
-import Appearance from "./sections/Appearance";
-import Data from "./sections/Data";
+import { useMemo, useRef, useState } from "react";
+import { useDrillStore } from "@/hooks/useDrillStore";
+import { useMaybeChat } from "@/context/ChatContext";
+import { useSettings } from "@/context/SettingsContext";
+import ErrorGuard from "../ui/ErrorGuard";
+import Icon from "../ui/Icon";
+import { categoriesFor, categoryById, labelOf, matches, type CatId } from "./registry";
 
-type Cat = "conversation" | "connection" | "chat" | "review" | "appearance" | "project" | "usage" | "data";
+export default function SettingsHome() {
+  /* Category names and bodies both read the store — the project page is
+     called "Personal" in one space and by the project's own name in the
+     others — so the navigation has to re-render when it changes. */
+  useDrillStore();
 
-const LABEL: Record<Cat, string> = {
-  conversation: "This chat",
-  connection: "Connection",
-  chat: "Chat",
-  review: "Review",
-  appearance: "Appearance",
-  project: "Project",
-  usage: "Usage",
-  data: "Data"
-};
+  /* "This chat" is offered where there is a chat to configure. Asking the
+     context rather than taking a prop means no caller can offer the page in a
+     view whose provider is not mounted, which is the version of this that
+     throws. */
+  const inChat = useMaybeChat() !== null;
+  const cats = useMemo(() => categoriesFor({ conversation: inChat }), [inChat]);
 
-const ORDER: Cat[] = ["connection", "chat", "review", "appearance", "project", "usage", "data"];
+  /* The page on screen lives in SettingsContext, not here, so that there is
+     one answer to "which category" — the sidebar, a link from another page
+     and this navigation all write the same field. Falling back to the first
+     available category covers the one case they can disagree: a category
+     whose scope this view does not provide. */
+  const { cat, open } = useSettings();
+  const current = categoryById(cats.some((c) => c.id === cat) ? cat : cats[0].id);
 
-export default function SettingsHome({
-  /** Set when the panel was opened from inside a conversation, which adds the
-   *  most local scope to the front of the same list. */
-  withConversation = false,
-  initial
-}: {
-  withConversation?: boolean;
-  initial?: Cat;
-}) {
-  const cats: Cat[] = withConversation ? ["conversation", ...ORDER] : ORDER;
-  const [cat, setCat] = useState<Cat>(initial && cats.includes(initial) ? initial : cats[0]);
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const found = useMemo(() => cats.filter((c) => matches(c, query)), [cats, query]);
 
-  const projectId = store.get().activeProjectId;
-  /* The personal space is a project in the database and a place to put loose
-     chats everywhere else, so the tab is named for what it is from here. */
-  const projectLabel = isPersonalProject(projectId) ? "Personal" : LABEL.project;
+  function go(id: CatId) {
+    open(id);
+    setQuery("");
+    searchRef.current?.blur();
+  }
 
   return (
     <div className="setpage">
-      <nav className="setnav" aria-label="Settings sections">
-        {cats.map((c) => (
-          <button
-            key={c}
-            className={"setnav-btn" + (c === cat ? " on" : "")}
-            aria-current={c === cat ? "page" : undefined}
-            onClick={() => setCat(c)}
-          >
-            {c === "project" ? projectLabel : LABEL[c]}
-          </button>
-        ))}
-      </nav>
+      <div className="setsearch">
+        <Icon name="search" size={14} />
+        <input
+          ref={searchRef}
+          className="setsearch-in"
+          type="search"
+          value={query}
+          placeholder="Search settings — try “backup”"
+          aria-label="Search settings"
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && query) {
+              /* Clears the search rather than closing the whole panel, and
+                 stops there so the modal's own Escape does not also fire. */
+              e.stopPropagation();
+              setQuery("");
+            }
+            if (e.key === "Enter" && found.length) go(found[0].id);
+          }}
+        />
+      </div>
 
+      {query ? (
+        /* Searching replaces the pills with the results rather than filtering
+           them in place: a pill is one word, and one word is not enough to
+           tell you whether the thing you are hunting for is on that page. */
+        <div className="setfound" role="listbox" aria-label="Matching settings">
+          {found.map((c) => (
+            <button key={c.id} className="setfound-row" role="option" aria-selected={false} onClick={() => go(c.id)}>
+              <span className="t">{labelOf(c)}</span>
+              <span className="s">{c.blurb}</span>
+            </button>
+          ))}
+          {!found.length && (
+            <div className="empty">
+              Nothing matches “{query}”. Everything Drill keeps is under Data — backup, restore, import and export.
+            </div>
+          )}
+        </div>
+      ) : (
+        <nav className="setnav" aria-label="Settings sections">
+          {cats.map((c) => (
+            <button
+              key={c.id}
+              className={"setnav-btn" + (c.id === current?.id ? " on" : "")}
+              aria-current={c.id === current?.id ? "page" : undefined}
+              onClick={() => go(c.id)}
+            >
+              {labelOf(c)}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      {/* Keyed on the category so switching pages clears a failure rather
+          than leaving the whole panel stuck on the one page that threw. */}
       <div className="setbody">
-        {cat === "conversation" && <ConversationScope />}
-        {cat === "connection" && <Connection />}
-        {cat === "chat" && <ChatPrefs />}
-        {cat === "review" && <Review />}
-        {cat === "appearance" && <Appearance />}
-        {cat === "project" && <ProjectScope projectId={projectId} />}
-        {cat === "usage" && <UsageScope />}
-        {cat === "data" && <Data />}
+        <ErrorGuard
+          key={current?.id}
+          fallback={
+            <div className="empty">
+              This page could not be drawn. Nothing was changed — pick another category, and the console has the
+              details.
+            </div>
+          }
+        >
+          {current?.render()}
+        </ErrorGuard>
       </div>
     </div>
   );

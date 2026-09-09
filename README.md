@@ -69,12 +69,14 @@ npm run dev
 ```
 
 Opens at `http://localhost:5173` (or wherever Vite prints). Paste an API key
-under **⋯ → Settings** and you are running. Everything below is optional.
+under **Settings → Connection** (sidebar, or `ctrl + ,` from anywhere) and you
+are running. Everything below is optional.
 
 > **One rule: always open it the same way.** Browsers store your progress per
 > origin. `http://localhost:5173` in dev and your deployed URL are two
 > different stores. Pick the one you use day to day, and export a backup
-> before switching (**⋯ → Import / export → Export everything**).
+> before switching (**Settings → Data → Back up everything**), and restore it
+> on the other side from the same page.
 
 ### Deploying to Vercel
 
@@ -137,7 +139,8 @@ Settings you change inside the app always beat the config file, so a shared
 One key, every model, including free ones.
 
 1. Get a key at [openrouter.ai/keys](https://openrouter.ai/keys)
-2. **⋯ → Settings**, leave the backend on **OpenRouter**, paste the key
+2. **Settings → Connection** (sidebar, or `ctrl + ,`), leave the backend on
+   **OpenRouter**, paste the key
 3. **Load model list**, pick a model, **Test**
 
 `anthropic/claude-sonnet-4.5` writes the best cards. `google/gemini-2.5-flash`
@@ -154,7 +157,7 @@ Groq speaks the OpenAI chat format, so everything works: streaming, the model
 list, card writing, recall marking.
 
 1. Get a key at [console.groq.com/keys](https://console.groq.com/keys)
-2. **⋯ → Settings → Where inference runs → Groq**, paste the key
+2. **Settings → Connection → Where inference runs → Groq**, paste the key
 3. **Load model list**, pick a model, **Test**
 
 ```json
@@ -196,7 +199,8 @@ your machine unless you're the one visiting it.)
    Ollama. On Linux with systemd: `systemctl edit ollama.service`, add
    `Environment="OLLAMA_ORIGINS=*"`, then `systemctl restart ollama`.
 
-3. **⋯ → Settings → Ollama (local)**, set the model to what you pulled, **Test**.
+3. **Settings → Connection → Ollama (local)**, set the model to what you pulled,
+   **Test**.
 
 ```json
 { "inference": { "type": "ollama", "model": "llama3.1:8b", "baseUrl": "http://localhost:11434" } }
@@ -237,7 +241,7 @@ Point `baseUrl` at the `/v1` root. The key is optional.
 - **Where you're at** — true retention over 30 days, what is coming due, and how
   solid the deck is. If retention sits below your target, the cards are usually
   overloaded, not the intervals wrong.
-- **Example decks** — **⋯ → Import / export → Example decks**. Reads
+- **Example decks** — **Settings → Data → Example decks**. Reads
   `public/decks/examples/`.
 
 ### Keyboard
@@ -337,10 +341,14 @@ src/
       index.ts            resolve() + chat() + card writing / marking / titles.
                          This is the file to redirect first if inference ever
                          moves behind a server route
-  context/              route, sheet pane, review loop, chat orchestration, toasts
+  context/              route, sheet pane, review loop, chat orchestration,
+                         settings (which category is open), toasts
   hooks/                useDrillStore — the React binding onto the store singleton
   components/           the review loop and every sheet pane
     chat/               the chat platform
+    settings/           one settings panel for all six sections. registry.tsx
+                         declares the categories; SettingsSurface is the window,
+                         mounted once by Shell
   styles/
     tokens.css           the design system: two printings, one type/space/radius
                           scale. Nothing downstream spells out a colour or a size
@@ -415,9 +423,10 @@ backend. The backend dropdown and the key have to match.
 chatty. Try a stronger one; that one job is worth the better model.
 
 **My progress is only in one browser** — that is by design; there is no server.
-**⋯ → Import / export → Export everything** writes decks, scheduling, insight
-log and settings to one JSON. Progress survives restarts but not clearing site
-data. Export now and then.
+**Settings → Data → Back up everything** writes decks, scheduling, chats,
+journal, memory and usage to one JSON, and **Restore from a backup…** on the
+same page reads it back, showing you what it replaces first. Progress survives
+restarts but not clearing site data. Back up now and then.
 
 **My conversations are gone but my cards are fine** — they live in different
 stores. Cards are in localStorage; conversations are in IndexedDB, because

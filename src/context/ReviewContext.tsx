@@ -94,3 +94,12 @@ export function useReview(): ReviewState {
   if (!ctx) throw new Error("useReview must be used within ReviewProvider");
   return ctx;
 }
+
+/** The review loop mounts this provider; the other five sections do not.
+ *  Settings opens over all six and can change what the queue is made of — a
+ *  restored backup, an imported deck — so it needs to ask for a refresh
+ *  without requiring one. `review?.refresh()` is right in the review loop and
+ *  correctly nothing everywhere else. */
+export function useMaybeReview(): ReviewState | null {
+  return useContext(Ctx);
+}

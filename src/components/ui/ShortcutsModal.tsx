@@ -29,6 +29,7 @@ const SHORTCUTS: ShortcutGroup[] = [
     items: [
       { keys: [MOD, "B"], desc: "Show or hide the navigation" },
       { keys: [MOD, "\\"], desc: "Show or hide the right-hand panel" },
+      { keys: [MOD, ","], desc: "Settings — the same panel from every section" },
       { keys: ["?"], desc: "This list" },
       { keys: ["Esc"], desc: "Close what is open, or leave the box you are typing in" }
     ]

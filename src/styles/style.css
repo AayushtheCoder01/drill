@@ -2355,6 +2355,136 @@ a {
   color: var(--accent);
 }
 
+/* The search box, and why settings has one at all: every category is a
+   single word you have to guess right, and the app has already lost a
+   feature to that — backup and restore sat in the review loop's menu while
+   the person who needed it went looking under Settings. */
+.setsearch {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-3);
+  margin-bottom: var(--s-3);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-full);
+  background: var(--page-2);
+  color: var(--ink-3);
+  transition: border-color var(--fast);
+}
+.setsearch:focus-within {
+  border-color: var(--accent-45);
+}
+.setsearch-in {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  padding: var(--s-2) 0;
+}
+.setsearch-in::placeholder {
+  color: var(--ink-3);
+}
+/* Chrome draws its own clear button on type=search, in its own grey. */
+.setsearch-in::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+/* Results replace the pills rather than filtering them in place: a pill is
+   one word, and one word does not tell you whether what you are hunting for
+   is on that page. */
+.setfound {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--s-4);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.setfound-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: var(--s-3) var(--s-2);
+  border: none;
+  border-top: 1px solid var(--rule-soft);
+  background: none;
+  cursor: pointer;
+  transition: background var(--fast);
+}
+.setfound-row:first-child {
+  border-top: none;
+}
+.setfound-row:hover {
+  background: var(--surface-2);
+}
+.setfound-row .t {
+  font-family: var(--sans);
+  font-size: var(--t-sm);
+  color: var(--ink);
+}
+.setfound-row .s {
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+/* Restoring replaces everything, so the confirmation shows both sides of the
+   trade rather than describing only the incoming file. */
+.restore-confirm {
+  margin-top: var(--s-4);
+  padding: var(--s-4);
+  border: 1px solid var(--amber-edge);
+  border-radius: var(--r-3);
+  background: var(--amber-tint);
+}
+.restore-confirm strong {
+  font-family: var(--serif);
+  font-size: var(--t-md);
+  font-weight: 400;
+  color: var(--ink);
+}
+.restore-confirm .sset-note {
+  margin: var(--s-2) 0 var(--s-3);
+}
+.restore-diff {
+  margin: 0 0 var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.restore-diff > div {
+  display: flex;
+  gap: var(--s-3);
+  align-items: baseline;
+}
+.restore-diff dt {
+  flex: 0 0 6.5rem;
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.restore-diff dd {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: var(--t-xs);
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* Validation output is line-per-problem, so it has to keep its newlines. */
+.prewrap {
+  white-space: pre-line;
+}
+.hintline.ok {
+  color: var(--green);
+}
+
 /* A section is a heading, a sentence, and the controls it explains. The rule
    above it is what turns a run of them into a document rather than a list. */
 .sset + .sset {

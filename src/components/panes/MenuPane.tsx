@@ -3,13 +3,15 @@ import * as chatStore from "@/services/chatStore";
 import * as candidates from "@/services/candidates";
 import { useSheet } from "@/context/SheetContext";
 import { useRoute } from "@/context/RouteContext";
+import { useSettings } from "@/context/SettingsContext";
 import { useStoreSync } from "@/hooks/useStoreSync";
 import SheetShell from "../SheetShell";
 import Item from "../ui/Item";
 
 export default function MenuPane() {
-  const { open } = useSheet();
+  const { open, close } = useSheet();
   const { openCards, openChat, openJournal, openExam } = useRoute();
+  const settings = useSettings();
   useStoreSync(candidates);
   const s = store.stats();
   const db = store.get();
@@ -50,7 +52,18 @@ export default function MenuPane() {
           sub={`${nDecks} deck${nDecks > 1 ? "s" : ""}${db.settings.mix ? " · mixing" : ""}`}
           onClick={() => open({ name: "decks" })}
         />
-        <Item title="Import / export" sub="json in, json out · example decks" onClick={() => open({ name: "io" })} />
+        {/* Backup, restore, import and export live in Settings now — this
+            menu is one section's menu, and they were unreachable from the
+            other five while they lived here. The row stays as a signpost so
+            the habit still lands somewhere. */}
+        <Item
+          title="Backup, import and export"
+          sub="in Settings → Data · one file out, one file back in"
+          onClick={() => {
+            close();
+            settings.open("data");
+          }}
+        />
         <Item title="Run transcript" sub="what every AI call sent and got back" onClick={() => open({ name: "transcript" })} />
       </div>
     </SheetShell>

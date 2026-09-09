@@ -136,3 +136,13 @@ export function download(name: string, txt: string, mime?: string): void {
     a.remove();
   }, 1500);
 }
+
+/** Byte counts as a person reads them. Had two identical copies — one in the
+ *  import/export pane, one in the settings data page — which is exactly the
+ *  kind of duplication that ends with the two disagreeing about a megabyte. */
+export function fmtBytes(n: number | null | undefined): string {
+  if (n == null) return "unknown";
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(0) + " KB";
+  return (n / 1024 / 1024).toFixed(1) + " MB";
+}

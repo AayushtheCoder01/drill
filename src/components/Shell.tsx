@@ -24,7 +24,9 @@ import type { View } from "@/context/RouteContext";
 import { applyAppearance } from "@/lib/theme";
 import Sidebar from "./Sidebar";
 import ShortcutsModal from "./ui/ShortcutsModal";
+import SettingsSurface from "./settings/SettingsSurface";
 import Icon from "./ui/Icon";
+import { useSettings } from "@/context/SettingsContext";
 
 const MOBILE = "(max-width: 900px)";
 
@@ -61,6 +63,7 @@ export default function Shell({
   children: ReactNode;
 }) {
   const db = useDrillStore();
+  const settings = useSettings();
   const [drawer, setDrawer] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
   const [mobile, setMobile] = useState(
@@ -119,14 +122,24 @@ export default function Shell({
            Backslash is unbound in Chrome and reads as a divider. */
         e.preventDefault();
         toggleRail();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+        /* The conventional one, and it works from all six sections because
+           there is one settings surface now. Bound here rather than in the
+           sidebar so it fires with the navigation collapsed or on a phone,
+           where the sidebar is a drawer that is usually shut. */
+        e.preventDefault();
+        settings.open();
       } else if (e.key === "Escape") {
-        if (shortcuts) setShortcuts(false);
+        /* Innermost first. Settings sits over everything else, so it is the
+           thing Escape means while it is open. */
+        if (settings.cat) settings.close();
+        else if (shortcuts) setShortcuts(false);
         else if (drawer) setDrawer(false);
       }
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [toggle, toggleRail, drawer, shortcuts]);
+  }, [toggle, toggleRail, drawer, shortcuts, settings]);
 
   const activeProject = store.activeProject();
 
@@ -207,6 +220,11 @@ export default function Shell({
       </div>
 
       {shortcuts && <ShortcutsModal onClose={() => setShortcuts(false)} />}
+
+      {/* The one settings window in the app. Rendered from the shell every
+          section mounts, so it is the same window with the same navigation
+          whether you were reviewing, chatting or writing the journal. */}
+      <SettingsSurface />
     </div>
   );
 }

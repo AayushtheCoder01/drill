@@ -13,15 +13,15 @@
  *                 the page with a scrim, because a rail plus a page does not
  *                 fit on a phone
  * ========================================================================== */
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import * as store from "@/services/store";
 import * as journalStore from "@/services/journalStore";
 import { useDrillStore } from "@/hooks/useDrillStore";
 import { useStoreSync } from "@/hooks/useStoreSync";
 import { useRoute, type View } from "@/context/RouteContext";
 import { applyAppearance } from "@/lib/theme";
+import { useSettings } from "@/context/SettingsContext";
 import ProjectSwitcher from "./ProjectSwitcher";
-import SettingsModal from "./settings/SettingsModal";
 import Icon, { type IconName } from "./ui/Icon";
 
 const SECTIONS: { view: View; label: string; icon: IconName }[] = [
@@ -55,7 +55,10 @@ export default function Sidebar({
   const db = useDrillStore();
   useStoreSync(journalStore);
   const { openHome, openDrill, openCards, openChat, openJournal, openExam } = useRoute();
-  const [settings, setSettings] = useState(false);
+  /* Shell renders the panel, so this only asks for it. The sidebar used to
+     hold its own copy, which is how chat ended up with a second settings
+     surface that the sidebar's one knew nothing about. */
+  const settings = useSettings();
 
   const dueCount = store.counts().due;
   const unrolledCount = journalStore.unrolledEntries(db.activeProjectId).length;
@@ -155,13 +158,16 @@ export default function Sidebar({
           <Icon name="keyboard" size={17} />
           <span className="nav-label">Shortcuts</span>
         </button>
-        <button className="nav-item" onClick={() => setSettings(true)} title="Settings" aria-label="Settings">
+        <button
+          className="nav-item"
+          onClick={() => settings.open()}
+          title="Settings  (ctrl + ,)"
+          aria-label="Settings"
+        >
           <Icon name="settings" size={17} />
           <span className="nav-label">Settings</span>
         </button>
       </div>
-
-      {settings && <SettingsModal onClose={() => setSettings(false)} />}
     </aside>
   );
 }
