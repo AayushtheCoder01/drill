@@ -19,6 +19,10 @@ export interface ExamScope {
   tags: string[];
   journalIds: string[];
   cardIds: string[];
+  /** Free-text subject — "matplotlib", "gradient descent" — that narrowed
+   *  material by relevance instead of by deck/tag. Kept on the scope so
+   *  "more questions" replays the same target rather than losing it. */
+  topic?: string;
 }
 
 export interface ExamSourceRef {

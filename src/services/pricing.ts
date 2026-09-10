@@ -92,6 +92,7 @@ export function loadPricing(): Promise<Record<string, ModelPrice>> {
           context_length?: number;
           pricing?: { prompt?: string; completion?: string };
           supported_parameters?: string[];
+          architecture?: { input_modalities?: string[] };
         };
         if (!m.id || !m.pricing) continue;
         // OpenRouter quotes USD per token as a decimal string; we store per
@@ -109,7 +110,8 @@ export function loadPricing(): Promise<Record<string, ModelPrice>> {
           prompt,
           completion,
           contextLength: m.context_length,
-          reasoning: params.includes("reasoning") || params.includes("include_reasoning")
+          reasoning: params.includes("reasoning") || params.includes("include_reasoning"),
+          inputModalities: m.architecture?.input_modalities
         };
       }
       memo = models;

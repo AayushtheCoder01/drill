@@ -1,12 +1,20 @@
-import { useState } from "react";
+/* ============================================================================
+ * ModelPicker — the settings-side model control: a button that opens the same
+ * structured ModelPickerPanel the chat composer's chip uses.
+ *
+ * This used to be a plain text input backed by a native <datalist> that only
+ * filled in after an explicit "Load model list" click — no search, no
+ * grouping, no price or capability shown, nothing remembered between visits.
+ * Fetching now happens lazily on open, the same way the chip does it, so
+ * there is no separate load step at all.
+ * ========================================================================== */
+import { useEffect, useRef, useState } from "react";
 import * as AI from "@/services/ai";
 import { useToast } from "@/context/ToastContext";
 import SettingRow from "./SettingRow";
+import ModelPickerPanel from "./ModelPickerPanel";
 import type { BackendType } from "@/types";
 
-/** A model text input backed by a datalist that fills in from "Load model
- *  list", plus the fetch button itself — shared by every scope that lets you
- *  type a model id (global, project, conversation). */
 export default function ModelPicker({
   title = "Model",
   sub,
@@ -25,32 +33,56 @@ export default function ModelPicker({
   onChange: (v: string) => void;
 }) {
   const toast = useToast();
+  const [open, setOpen] = useState(false);
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const listId = "models-" + Math.random().toString(36).slice(2, 8);
+  const boxRef = useRef<HTMLDivElement | null>(null);
 
-  function load() {
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  /* Fetched the first time the popover opens, not on mount — same reasoning
+     as the chip: most settings visits never touch this, and it is a network
+     call against the user's own key. */
+  useEffect(() => {
+    if (!open || models.length || loading) return;
     setLoading(true);
     AI.listModels(backend ? { backend } : undefined)
-      .then((ids) => {
-        setModels(ids);
-        toast(ids.length + " models loaded");
-      })
+      .then(setModels)
       .catch((e: Error) => toast(e.message, 5000))
       .finally(() => setLoading(false));
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function choose(id: string) {
+    onChange(id);
+    setOpen(false);
   }
 
   return (
     <SettingRow title={title} sub={sub} origin={origin}>
-      <input className="fi mono" list={listId} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
-      <datalist id={listId}>
-        {models.map((m) => (
-          <option key={m} value={m} />
-        ))}
-      </datalist>
-      <button className="btn sm" type="button" disabled={loading} onClick={load}>
-        {loading ? "Loading…" : "Load model list"}
-      </button>
+      <div className="mdlpick" ref={boxRef}>
+        <button type="button" className="fi mono mdlpick-btn" onClick={() => setOpen((v) => !v)}>
+          <span className={"mdlpick-val" + (value ? "" : " placeholder")}>{value || placeholder || "choose a model…"}</span>
+        </button>
+        {open && (
+          <div className="mdlpick-pop">
+            <ModelPickerPanel models={models} loading={loading} backend={backend || ""} value={value} onChoose={choose} autoFocus />
+          </div>
+        )}
+      </div>
     </SettingRow>
   );
 }

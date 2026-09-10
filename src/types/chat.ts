@@ -215,4 +215,9 @@ export interface ModelPrice {
    *  answer to "can this one think?". Absent on a record written before the
    *  field existed, which reads as "not known", never as "no". */
   reasoning?: boolean;
+  /** What the model accepts as input beyond text — "image", "file", "audio" —
+   *  from the catalogue's `architecture.input_modalities`. Absent means not
+   *  known, same convention as `reasoning`; ["text"] means text-only. Read
+   *  today, acted on later: nothing in the app sends an attachment yet. */
+  inputModalities?: string[];
 }

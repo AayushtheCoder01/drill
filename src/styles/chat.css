@@ -1321,7 +1321,7 @@
   position: absolute;
   bottom: calc(100% + var(--s-2));
   left: 0;
-  width: min(420px, 78vw);
+  width: min(460px, 78vw);
   background: var(--surface-glass, var(--surface));
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -1356,37 +1356,11 @@
   text-transform: none;
   letter-spacing: 0;
 }
-.modelpop-list {
-  max-height: 260px;
-  overflow-y: auto;
-  margin-top: var(--s-2);
-}
-.modelpop-row {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: 0;
-  color: var(--ink-2);
-  font-family: var(--mono);
-  font-size: var(--t-2xs);
-  padding: var(--s-2);
-  border-radius: var(--r-1);
-  cursor: pointer;
-}
-.modelpop-row:hover {
-  background: var(--accent-10);
-  color: var(--ink);
-}
-.modelpop-row.on {
-  color: var(--accent);
-}
-.modelpop-empty {
-  font-family: var(--sans);
-  font-size: var(--t-2xs);
-  color: var(--ink-3);
-  padding: var(--s-3) var(--s-2);
-}
+/* The rest of what a picker's popover shows — the category chips, the
+   grouped/plain list, each row — lives in style.css as `.modelpop-*`, not
+   here: ModelPickerPanel is shared with Settings' model picker, which mounts
+   in every section, and style.css is the eager sheet. Only this chip's own
+   trigger and its floating container are chat-only. */
 
 /* --------------------------------------------------------- empty state -- */
 .chat-empty {

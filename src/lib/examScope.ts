@@ -10,6 +10,7 @@
 import * as store from "@/services/store";
 import * as journalStore from "@/services/journalStore";
 import { dayInRange, parseWhen, type WhenRange } from "@/lib/when";
+import { extractKeywords } from "@/lib/memoryRetrieval";
 import { stripTags } from "@/lib/util";
 import type { ExamScope } from "@/types/exam";
 import type { Card } from "@/types";
@@ -17,6 +18,37 @@ import type { JournalEntry } from "@/types/journal";
 
 const MAX_CARDS = 80;
 const MAX_ENTRIES = 30;
+
+/** Keyword overlap, the same method memoryRetrieval.ts uses for memory — no
+ *  embeddings (a locked decision), just counting how many of the topic's own
+ *  words show up in the candidate. Good enough to rank "matplotlib" above
+ *  everything else in a project without requiring an exact tag match. */
+function topicScore(topicWords: string[], text: string): number {
+  if (!topicWords.length) return 0;
+  const words = new Set(extractKeywords(text));
+  return topicWords.filter((w) => words.has(w)).length;
+}
+
+function journalText(e: JournalEntry): string {
+  const s = e.summary!;
+  return [s.narrative, ...s.learned, ...s.stuck, ...s.open].join(" ");
+}
+
+function cardText(c: Card): string {
+  return c.tag + " " + stripTags(c.q) + " " + stripTags(c.a);
+}
+
+/** Rank by topical relevance and drop anything that scored zero — a topic is
+ *  a request to find what is on-subject across the whole project, not to
+ *  re-sort what was already going to be included. */
+function byTopic<T>(items: T[], topicWords: string[], textOf: (item: T) => string): T[] {
+  if (!topicWords.length) return items;
+  return items
+    .map((item) => ({ item, score: topicScore(topicWords, textOf(item)) }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((x) => x.item);
+}
 
 function buildMaterial(entries: JournalEntry[], cards: Card[]): string {
   const parts: string[] = [];
@@ -70,6 +102,11 @@ export interface ScopeInput {
   deckIds: string[];
   /** Empty means every tag. */
   tags: string[];
+  /** Free-text subject — "matplotlib", "gradient descent". When set, cards
+   *  and journal entries are found by keyword relevance across whatever decks
+   *  are in scope (every deck in the project, unless deckIds narrows that),
+   *  rather than requiring an exact tag. Empty means no topic filter. */
+  topic?: string;
 }
 
 export interface ResolvedScope {
@@ -91,8 +128,12 @@ export function resolveScope(input: ScopeInput): ResolvedScope {
   const range: WhenRange | null =
     parsed || (input.manualFrom != null && input.manualTo != null ? { from: input.manualFrom, to: input.manualTo, label: "custom range" } : null);
 
+  const topic = (input.topic || "").trim();
+  const topicWords = topic ? extractKeywords(topic) : [];
+
   const allEntries = journalStore.listForProject(input.projectId).filter((e) => e.summary);
-  const entries = (range ? allEntries.filter((e) => dayInRange(e.day, range)) : allEntries).slice(0, MAX_ENTRIES);
+  let entries = range ? allEntries.filter((e) => dayInRange(e.day, range)) : allEntries;
+  entries = byTopic(entries, topicWords, journalText).slice(0, MAX_ENTRIES);
 
   const decks = input.deckIds.length ? input.deckIds.map((id) => store.get().decks[id]).filter(Boolean) : store.decksOf(input.projectId);
   let cards: Card[] = [];
@@ -101,17 +142,20 @@ export function resolveScope(input: ScopeInput): ResolvedScope {
     const tagset = new Set(input.tags.map((t) => t.toLowerCase()));
     cards = cards.filter((c) => tagset.has(c.tag.toLowerCase()));
   }
-  cards = cards.slice(0, MAX_CARDS);
+  cards = byTopic(cards, topicWords, cardText).slice(0, MAX_CARDS);
 
   const scope: ExamScope = {
     projectId: input.projectId,
     from: range?.from ?? null,
     to: range?.to ?? null,
-    label: range?.label || (input.deckIds.length || input.tags.length ? "selected material" : "everything"),
+    label: topic
+      ? topic + (range ? " · " + range.label : "")
+      : range?.label || (input.deckIds.length || input.tags.length ? "selected material" : "everything"),
     deckIds: input.deckIds,
     tags: input.tags,
     journalIds: entries.map((e) => e.id),
-    cardIds: cards.map((c) => c.id)
+    cardIds: cards.map((c) => c.id),
+    topic: topic || undefined
   };
 
   return {

@@ -153,8 +153,15 @@ export function listModels(override?: Override): Promise<string[]> {
   return r.backend.listModels(r);
 }
 
+/** A connectivity probe, not a real prompt — but it still has to survive a
+ *  reasoning model. 16 tokens used to be the whole budget, which is plenty
+ *  for a model that just says "ready" and fatal for one that reasons first:
+ *  the thinking spends the cap and the reply comes back empty, so a perfectly
+ *  valid key/URL/model reported "hit the token cap" as if the connection were
+ *  broken. Free reasoning models are exactly what OpenRouter's own note steers
+ *  people toward, so this was not an edge case. */
 export function test(): Promise<string> {
-  return chat([{ role: "user", content: "Reply with the single word: ready" }], { temperature: 0, maxTokens: 16, label: "test" });
+  return chat([{ role: "user", content: "Reply with the single word: ready" }], { temperature: 0, maxTokens: 800, label: "test" });
 }
 
 /* ------------------------------------------------------------ card writing */
@@ -662,6 +669,9 @@ const EXAM_SYS =
   "learned separately, apply something to a new case, derive a result from a stated convention, or diagnose an " +
   "error in a worked example. `kind` is one of: recall, apply, why, connect, derive, diagnose. `difficulty` is " +
   "one of: recall, apply, analyse, synthesise.\n\n" +
+  "When a TOPIC is given, it is a hard boundary, not a hint: every question must be about it. If the material " +
+  "below contains other subjects — it was found by keyword relevance and can carry noise — ignore anything that " +
+  "is not actually about the topic rather than writing a question on it.\n\n" +
   "Every question carries `sourceRefs` naming exactly what it was built from — items are tagged [card:id] or " +
   "[journal:id] in the material. If you cannot ground a question in the material, do not write it. Fewer, " +
   "well-founded questions beat a full set with invented ones.\n\n" +
@@ -678,15 +688,21 @@ function normDiff(v: unknown, fallback: Difficulty): Difficulty {
   return (DIFFICULTIES.find((d) => d === v) as Difficulty) || fallback;
 }
 
-export async function generateExam(material: string, level: Difficulty, exclude: string[]): Promise<ExamQuestion[]> {
+export async function generateExam(material: string, level: Difficulty, exclude: string[], topic?: string): Promise<ExamQuestion[]> {
+  const t = (topic || "").trim();
   const usr =
     "LEVEL: " +
     level +
     "\n\n" +
+    (t ? "TOPIC: " + t + " — see the system rules on what this means.\n\n" : "") +
     (exclude.length ? "ALREADY ASKED (do not repeat these or close variants):\n" + exclude.map((x) => "- " + x).join("\n") + "\n\n" : "") +
     "MATERIAL:\n" +
     material;
-  const sys = withMemory(EXAM_SYS, material);
+  /* The topic, not the whole material blob, is what memory and gaps are
+     scored against when one is given — otherwise "matplotlib" would retrieve
+     memory for whatever else happened to ride along in the material, which
+     defeats the point of naming a topic at all. */
+  const sys = withMemory(EXAM_SYS, t || material);
   const out = await chat([{ role: "system", content: sys }, { role: "user", content: usr }], {
     temperature: 0.5,
     maxTokens: 3200,

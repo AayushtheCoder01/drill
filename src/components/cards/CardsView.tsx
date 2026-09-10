@@ -15,7 +15,7 @@
  * editor and only one — which is why this view mounts SheetProvider and
  * ReviewProvider around itself.
  * ========================================================================== */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as store from "@/services/store";
 import * as journalStore from "@/services/journalStore";
 import * as memoryStore from "@/services/memoryStore";
@@ -27,6 +27,7 @@ import { ReviewProvider } from "@/context/ReviewContext";
 import { ago, fmt, stripTags, today as todayKey } from "@/lib/util";
 import Shell from "../Shell";
 import Sheet from "../Sheet";
+import CardHtml from "../CardHtml";
 import CardsRail from "../rail/CardsRail";
 import Icon from "../ui/Icon";
 import type { Card, Deck } from "@/types";
@@ -42,12 +43,41 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "leech", label: "Slipping" }
 ];
 
+type Sort = "new" | "due" | "hard" | "az";
+
+const SORTS: { id: Sort; label: string }[] = [
+  { id: "new", label: "Newest" },
+  { id: "due", label: "Due soonest" },
+  { id: "hard", label: "Hardest" },
+  { id: "az", label: "A–Z" }
+];
+
+const PAGE = 150;
+
 interface Row {
   card: Card;
   deck: Deck;
   state: Filter;
   /** Current interval in minutes, 0 for unseen. */
   ivl: number;
+  /** Timestamp, or Infinity for a card with no due date yet — unseen is not
+   *  "due now", so it sorts to the end of "Due soonest" rather than the front. */
+  due: number;
+  lapses: number;
+}
+
+function compareRows(a: Row, b: Row, sort: Sort): number {
+  if (sort === "due") return a.due - b.due;
+  if (sort === "hard") return b.lapses - a.lapses || b.card.a.length - a.card.a.length;
+  if (sort === "az") {
+    const ta = a.card.tag.toLowerCase();
+    const tb = b.card.tag.toLowerCase();
+    if (ta !== tb) return ta < tb ? -1 : 1;
+    const qa = stripTags(a.card.q).toLowerCase();
+    const qb = stripTags(b.card.q).toLowerCase();
+    return qa < qb ? -1 : qa > qb ? 1 : 0;
+  }
+  return 0; // "new": rows already arrive newest-first, sort() is stable
 }
 
 /** Which of the four states a card is in. One function, so the filter chips,
@@ -70,6 +100,8 @@ function CardsPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [deckId, setDeckId] = useState("");
+  const [sort, setSort] = useState<Sort>("new");
+  const [visible, setVisible] = useState(PAGE);
 
   const project = db.projects[projectId];
   const decks = store.decksOf(projectId);
@@ -79,7 +111,14 @@ function CardsPage() {
     for (const d of decks) {
       for (const c of d.cards) {
         const st = d.srs[c.id];
-        out.push({ card: c, deck: d, state: stateOf(d, c), ivl: st && st.reps ? store.currentInterval(st) : 0 });
+        out.push({
+          card: c,
+          deck: d,
+          state: stateOf(d, c),
+          ivl: st && st.reps ? store.currentInterval(st) : 0,
+          due: st && st.reps ? st.due : Infinity,
+          lapses: st ? st.lapses || 0 : 0
+        });
       }
     }
     // Newest first: the card you just made is the one you want to check.
@@ -94,12 +133,52 @@ function CardsPage() {
   }, [rows]);
 
   const q = query.trim().toLowerCase();
-  const shown = rows.filter((r) => {
-    if (filter !== "all" && r.state !== filter) return false;
-    if (deckId && r.deck.id !== deckId) return false;
-    if (!q) return true;
-    return (r.card.tag + " " + stripTags(r.card.q) + " " + stripTags(r.card.a)).toLowerCase().includes(q);
-  });
+  const shown = useMemo(() => {
+    const matched = rows.filter((r) => {
+      if (filter !== "all" && r.state !== filter) return false;
+      if (deckId && r.deck.id !== deckId) return false;
+      if (!q) return true;
+      return (r.card.tag + " " + stripTags(r.card.q) + " " + stripTags(r.card.a)).toLowerCase().includes(q);
+    });
+    return sort === "new" ? matched : [...matched].sort((a, b) => compareRows(a, b, sort));
+  }, [rows, filter, deckId, q, sort]);
+
+  // Narrowing the view is a fresh look at it — carrying the old page size
+  // forward would either hide a card that now matches or leave "load more"
+  // showing a count from before the filter changed.
+  useEffect(() => setVisible(PAGE), [filter, deckId, q, sort]);
+
+  const grouped = !deckId && decks.length > 1;
+  const paged = shown.slice(0, visible);
+  const byDeck = useMemo(() => {
+    if (!grouped) return null;
+    const m = new Map<string, Row[]>();
+    for (const r of paged) {
+      const list = m.get(r.deck.id);
+      if (list) list.push(r);
+      else m.set(r.deck.id, [r]);
+    }
+    return decks.map((d) => ({ deck: d, rows: m.get(d.id) || [] })).filter((g) => g.rows.length > 0);
+  }, [grouped, paged, decks]);
+
+  /* The front rendered as real HTML — LaTeX included — and a one-line
+     preview of the back, which this list never showed before: you had to
+     open the editor just to see what a card actually answered. */
+  function cardRow(r: Row) {
+    return (
+      <li key={r.card.id}>
+        <button className="cardrow" onClick={() => open({ name: "editor", deckId: r.deck.id, cardId: r.card.id })}>
+          <CardHtml as="span" className="cardrow-q" html={r.card.q} />
+          <CardHtml as="span" className="cardrow-a" html={r.card.a} />
+          <span className="cardrow-meta">
+            <span className={"cardrow-state " + r.state}>{r.state === "new" ? "unseen" : r.state}</span>
+            {r.ivl > 0 && <span>{fmt(r.ivl)}</span>}
+            <span className="cardrow-tag">{r.card.tag}</span>
+          </span>
+        </button>
+      </li>
+    );
+  }
 
   /* The day's raw material. Everything here is something you wrote that has
      not yet become a card — which is the whole point of showing it on this
@@ -238,35 +317,36 @@ function CardsPage() {
                   ))}
                 </select>
               )}
+              <select className="cfilter-sel" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+                {SORTS.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {shown.length === 0 ? (
               <p className="home-empty">
                 {rows.length === 0 ? "No cards in this project yet — generate some, or write one by hand." : "Nothing matches."}
               </p>
+            ) : byDeck ? (
+              byDeck.map(({ deck, rows: rs }) => (
+                <div className="cardgroup" key={deck.id}>
+                  <h4 className="cardgroup-h">
+                    <span>{deck.name}</span>
+                    <span className="cardgroup-n">{rs.length}</span>
+                  </h4>
+                  <ul className="cardlist">{rs.map(cardRow)}</ul>
+                </div>
+              ))
             ) : (
-              <ul className="cardlist">
-                {shown.slice(0, 300).map((r) => (
-                  <li key={r.card.id}>
-                    <button
-                      className="cardrow"
-                      onClick={() => open({ name: "editor", deckId: r.deck.id, cardId: r.card.id })}
-                    >
-                      <span className="cardrow-q" dangerouslySetInnerHTML={{ __html: r.card.q }} />
-                      <span className="cardrow-meta">
-                        <span className={"cardrow-state " + r.state}>{r.state === "new" ? "unseen" : r.state}</span>
-                        {r.ivl > 0 && <span>{fmt(r.ivl)}</span>}
-                        <span className="cardrow-tag">{r.card.tag}</span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <ul className="cardlist">{paged.map(cardRow)}</ul>
             )}
-            {shown.length > 300 && (
-              <p className="home-empty" style={{ marginTop: 12 }}>
-                Showing the first 300. Narrow it with the search box.
-              </p>
+            {shown.length > visible && (
+              <button className="btn sm" style={{ marginTop: 12 }} onClick={() => setVisible((v) => v + PAGE)}>
+                Show {Math.min(PAGE, shown.length - visible)} more
+              </button>
             )}
           </section>
         </div>

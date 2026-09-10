@@ -21,6 +21,7 @@ const LEVEL_HINT: Record<Difficulty, string> = {
 
 export default function ScopeBuilder({ projectId, onCreated }: { projectId: string; onCreated: (examId: string) => void }) {
   const toast = useToast();
+  const [topic, setTopic] = useState("");
   const [when, setWhen] = useState("");
   const [deckIds, setDeckIds] = useState<string[]>([]);
   const [tags, setTags] = useState("");
@@ -30,10 +31,12 @@ export default function ScopeBuilder({ projectId, onCreated }: { projectId: stri
 
   const decks = store.decksOf(projectId);
   const tagList = useMemo(() => tags.split(",").map((t) => t.trim()).filter(Boolean), [tags]);
+  const topicTrimmed = topic.trim();
   const resolved = useMemo(
-    () => resolveScope({ projectId, when, deckIds, tags: tagList }),
-    [projectId, when, deckIds, tagList]
+    () => resolveScope({ projectId, when, deckIds, tags: tagList, topic: topicTrimmed }),
+    [projectId, when, deckIds, tagList, topicTrimmed]
   );
+  const nothingForTopic = !!topicTrimmed && !resolved.counts.entries && !resolved.counts.cards;
 
   function toggleDeck(id: string) {
     setDeckIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -41,14 +44,14 @@ export default function ScopeBuilder({ projectId, onCreated }: { projectId: stri
 
   function generate() {
     if (!resolved.counts.entries && !resolved.counts.cards) {
-      toast("Nothing matches this scope yet");
+      toast(nothingForTopic ? `Nothing about "${topicTrimmed}" yet` : "Nothing matches this scope yet");
       return;
     }
     setBusy(true);
     setError(null);
-    AI.generateExam(resolved.material, level, [])
+    AI.generateExam(resolved.material, level, [], topicTrimmed || undefined)
       .then((questions) => {
-        const title = resolved.scope.label + (tagList.length ? ` · ${tagList.join(", ")}` : "");
+        const title = resolved.scope.label + (!topicTrimmed && tagList.length ? ` · ${tagList.join(", ")}` : "");
         const exam = examStore.create({ projectId, title, scope: resolved.scope, level, questions });
         onCreated(exam.id);
       })
@@ -58,7 +61,17 @@ export default function ScopeBuilder({ projectId, onCreated }: { projectId: stri
 
   return (
     <div>
-      <label className="f">When — "last week", "this month", a date, or leave blank for everything</label>
+      <label className="f">Topic — what to target, e.g. "matplotlib", "gradient descent", "the chain rule"</label>
+      <input className="fi" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="leave blank to use decks/tags below instead" />
+      <div className="hintline">
+        {topicTrimmed
+          ? "Searches every card and journal entry in this project for what matches — not just what is in the decks below."
+          : "Naming a topic finds relevant material across the whole project by itself; decks and tags below are for scoping by hand instead."}
+      </div>
+
+      <label className="f" style={{ marginTop: 14 }}>
+        When — "last week", "this month", a date, or leave blank for everything
+      </label>
       <input className="fi" value={when} onChange={(e) => setWhen(e.target.value)} placeholder="e.g. last week, 3 days ago, march" />
       {when.trim() && resolved.unparsed && <div className="hintline">Could not parse that — showing everything below instead.</div>}
 
@@ -92,8 +105,9 @@ export default function ScopeBuilder({ projectId, onCreated }: { projectId: stri
       <div className="hintline">{LEVEL_HINT[level]}</div>
 
       <div className="exam-counts">
-        {resolved.counts.entries} journal {resolved.counts.entries === 1 ? "entry" : "entries"} · {resolved.counts.cards} cards ·{" "}
-        {resolved.scope.label}
+        {nothingForTopic
+          ? `Nothing about "${topicTrimmed}" found yet — write a few cards or a journal entry mentioning it first, or broaden the topic.`
+          : `${resolved.counts.entries} journal ${resolved.counts.entries === 1 ? "entry" : "entries"} · ${resolved.counts.cards} cards · ${resolved.scope.label}`}
       </div>
 
       {error && <div className="err">{error}</div>}

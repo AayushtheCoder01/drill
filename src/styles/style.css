@@ -2869,6 +2869,195 @@ a {
   min-width: 0;
 }
 
+/* ------------------------------------------------------- model picker -- */
+/* ModelPickerPanel's own content — search results, category chips, grouped
+   rows — shared between the chat composer's chip (chat.css wraps it in a
+   floating popover there) and this settings row (wrapped in .mdlpick-pop
+   below). Lives here, in the eager sheet, because Settings mounts in every
+   section: put this in the lazy chat.css chunk and the picker renders
+   unstyled everywhere but the chat view. */
+.modelpop-cats {
+  display: flex;
+  gap: var(--s-2);
+  margin-bottom: var(--s-2);
+}
+.modelpop-cat {
+  padding: 2px var(--s-3);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--ink-3);
+  font-family: var(--sans);
+  font-size: var(--t-2xs);
+  cursor: pointer;
+  transition: border-color var(--fast), color var(--fast), background var(--fast);
+}
+.modelpop-cat:hover {
+  border-color: var(--rule);
+  color: var(--ink);
+}
+.modelpop-cat.on {
+  border-color: var(--accent);
+  background: var(--accent-10);
+  color: var(--accent);
+}
+.modelpop-list {
+  max-height: 320px;
+  overflow-y: auto;
+  margin-top: var(--s-2);
+}
+/* A provider section within "All". Recent stays flat — recency order is the
+   point of it, so grouping alphabetically would fight the reason it exists. */
+.modelpop-group + .modelpop-group {
+  margin-top: var(--s-2);
+}
+.modelpop-group-h {
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: var(--s-1) var(--s-2);
+}
+.modelpop-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: var(--ink-2);
+  padding: var(--s-2);
+  border-radius: var(--r-1);
+  cursor: pointer;
+}
+.modelpop-row:hover {
+  background: var(--accent-10);
+  color: var(--ink);
+}
+.modelpop-row.on {
+  color: var(--accent);
+}
+.modelpop-row.on .modelpop-row-name {
+  color: var(--accent);
+}
+/* A monogram, not a fetched logo: OpenRouter's catalogue carries no icon
+   field, and the app draws its own icon set rather than hotlinking bitmaps
+   from a provider's site. The hue is deterministic per provider (hashed in
+   ModelPickerPanel, picked from this fixed 5-colour palette) so the same
+   provider always lands on the same colour without a hand-kept table. */
+.modelpop-avatar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-1);
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+}
+.modelpop-avatar[data-hue="0"] {
+  background: var(--accent-10);
+  color: var(--accent);
+}
+.modelpop-avatar[data-hue="1"] {
+  background: var(--violet-tint);
+  color: var(--violet);
+}
+.modelpop-avatar[data-hue="2"] {
+  background: var(--green-tint);
+  color: var(--green);
+}
+.modelpop-avatar[data-hue="3"] {
+  background: var(--amber-tint);
+  color: var(--amber);
+}
+.modelpop-avatar[data-hue="4"] {
+  background: var(--red-tint);
+  color: var(--red);
+}
+.modelpop-row-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  color: inherit;
+}
+.modelpop-row-meta {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-family: var(--mono);
+  font-size: var(--t-3xs);
+  color: var(--ink-3);
+}
+.modelpop-badge {
+  padding: 1px 5px;
+  border-radius: var(--r-full);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+.modelpop-badge.think {
+  background: var(--violet-tint);
+  color: var(--violet);
+}
+.modelpop-badge.cap {
+  background: var(--amber-tint);
+  color: var(--amber);
+}
+.modelpop-empty {
+  font-family: var(--sans);
+  font-size: var(--t-2xs);
+  color: var(--ink-3);
+  padding: var(--s-3) var(--s-2);
+}
+
+/* The settings row's own trigger + floating panel — visually the same idea
+   as the chat chip's .modelpop, under its own names because both sheets can
+   be on screen together (Settings can be open while chat is behind it) and
+   sharing one class name would let one section's positioning fight the
+   other's. */
+.mdlpick {
+  position: relative;
+}
+.mdlpick-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.mdlpick-val.placeholder {
+  color: var(--ink-3);
+}
+.mdlpick-pop {
+  position: absolute;
+  top: calc(100% + var(--s-2));
+  left: 0;
+  right: 0;
+  width: min(460px, 100%);
+  background: var(--surface-glass, var(--surface));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border-subtle, var(--rule));
+  border-radius: var(--r-2);
+  box-shadow: var(--lift-3);
+  z-index: 50;
+  padding: var(--s-3);
+}
+.mdlpick-pop .fi {
+  margin-bottom: var(--s-2);
+}
+
 /* The list of things a space owns — knowledge, decks. Rows are records, not
    buttons, so they do not take the pointer the rest of .item does. */
 .setlist {

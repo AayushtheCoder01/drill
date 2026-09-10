@@ -15,8 +15,10 @@ import { useEffect, useRef, useState } from "react";
 import * as AI from "@/services/ai";
 import * as chatStore from "@/services/chatStore";
 import { useToast } from "@/context/ToastContext";
+import type { BackendType } from "@/types";
 import type { Conversation } from "@/types/chat";
 import Icon from "../ui/Icon";
+import ModelPickerPanel from "../ui/ModelPickerPanel";
 
 /** "anthropic/claude-sonnet-4" reads as "claude-sonnet-4" in a chip: the
  *  vendor prefix is the same on every row and eats the width. */
@@ -39,7 +41,6 @@ export default function ModelChip({
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [query, setQuery] = useState("");
   const boxRef = useRef<HTMLDivElement | null>(null);
 
   const chosen = conversation ? conversation.model : draftModel;
@@ -83,11 +84,7 @@ export default function ModelChip({
       onDraftModel(model);
     }
     setOpen(false);
-    setQuery("");
   }
-
-  const q = query.trim().toLowerCase();
-  const shown = (q ? models.filter((m) => m.toLowerCase().includes(q)) : models).slice(0, 40);
 
   return (
     <div className="modelchip" ref={boxRef}>
@@ -116,36 +113,14 @@ export default function ModelChip({
             )}
           </div>
 
-          <input
-            className="fi mono"
+          <ModelPickerPanel
+            models={models}
+            loading={loading}
+            backend={(backend || resolved.type) as BackendType}
+            value={resolved.model}
+            onChoose={choose}
             autoFocus
-            placeholder={loading ? "loading the list…" : "search, or type any model id"}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              // Typing an id the list has never heard of is legitimate — a
-              // local server's model names are not discoverable everywhere.
-              if (e.key === "Enter" && query.trim()) choose(query.trim());
-            }}
           />
-
-          <div className="modelpop-list">
-            {loading && <div className="modelpop-empty">fetching what your key can reach…</div>}
-            {!loading && shown.length === 0 && (
-              <div className="modelpop-empty">
-                {models.length ? "Nothing matches." : "No list available — type an id and press enter."}
-              </div>
-            )}
-            {shown.map((m) => (
-              <button
-                key={m}
-                className={"modelpop-row" + (m === resolved.model ? " on" : "")}
-                onClick={() => choose(m)}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
         </div>
       )}
     </div>

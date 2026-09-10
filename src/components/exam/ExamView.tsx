@@ -77,7 +77,7 @@ export default function ExamView() {
     setExtendBusy(true);
     const material = materialFromScope(target.scope);
     const exclude = target.questions.map((q) => q.prompt);
-    AI.generateExam(material, level || target.level, exclude)
+    AI.generateExam(material, level || target.level, exclude, target.scope.topic)
       .then((qs) => {
         examStore.addQuestions(target, qs);
         toast(`${qs.length} more question${qs.length === 1 ? "" : "s"} added`);

@@ -308,7 +308,10 @@ async function postWithRetry(
   /** A backend's own wording for a status the generic message would fumble —
    *  Ollama's 404 is "you have not pulled that model", not "bad model name".
    *  Returning null falls through to httpError. */
-  mapError?: (res: Response, body: string) => Error | null
+  mapError?: (res: Response, body: string) => Error | null,
+  /** Whether this backend runs on the caller's own machine — decides which
+   *  advice a network-level failure gives. See reachError(). */
+  local = false
 ): Promise<Response> {
   for (let attempt = 1; ; attempt++) {
     let res: Response | null = null;
@@ -332,7 +335,7 @@ async function postWithRetry(
     });
 
     if (!plan.retry) {
-      if (!res) throw reachError(label, url, networkError);
+      if (!res) throw reachError(label, url, networkError, local);
       const body = await res.text().catch(() => "");
       throw mapError?.(res, body) || httpError(label, res, body, attempt > 1 ? ` (tried ${attempt} times)` : "");
     }
@@ -345,21 +348,20 @@ async function postWithRetry(
   }
 }
 
-/** A network-level failure gives no status and no body. For a local server
- *  that almost always means one of two things, so say both. */
-function reachError(label: string, url: string, e: unknown): Error {
+/** A network-level failure gives no status and no body, so the two backend
+ *  families need different advice. A local server refusing the browser's
+ *  origin is the ordinary Ollama/llama.cpp story; a hosted API that never
+ *  responds is not — telling that user to set OLLAMA_ORIGINS was pure noise
+ *  that buried the real question (internet down? extension blocking it?)
+ *  under advice for a server they don't run. */
+function reachError(label: string, url: string, e: unknown, local = false): Error {
   const origin = window.location.origin;
-  return new Error(
-    "Could not reach " +
-      label +
-      " at " +
-      url +
-      ". Either it is not running, or it is refusing requests from " +
+  const hint = local
+    ? "Either it is not running, or it is refusing requests from " +
       origin +
-      " — set OLLAMA_ORIGINS=* (or the equivalent CORS setting) and restart it. [" +
-      ((e as Error)?.message || "network error") +
-      "]"
-  );
+      " — set OLLAMA_ORIGINS=* (or the equivalent CORS setting) and restart it."
+    : "Check your internet connection — or a browser extension (ad blocker, privacy tool) may be blocking the request.";
+  return new Error("Could not reach " + label + " at " + url + ". " + hint + " [" + ((e as Error)?.message || "network error") + "]");
 }
 
 /** Read an SSE stream, hand each `data:` payload to `onEvent`. */
@@ -416,7 +418,10 @@ async function readNDJSON(res: Response, onObj: (j: any) => void): Promise<void>
 function openAICompatible(
   label: string,
   id: BackendType,
-  headerFn: (ctx: AIContext) => Record<string, string>
+  headerFn: (ctx: AIContext) => Record<string, string>,
+  /** True for a backend that normally runs on the caller's own machine —
+   *  only "custom" today. Decides the wording of a network-level failure. */
+  local = false
 ): Pick<BackendDef, "chat" | "listModels"> {
   return {
     async chat(messages: ChatMessage[], opts: ChatOpts, ctx: AIContext): Promise<string> {
@@ -445,7 +450,9 @@ function openAICompatible(
         { method: "POST", headers: headerFn(ctx), body: JSON.stringify(body), signal: opts.signal },
         label,
         opts.signal,
-        () => delivered
+        () => delivered,
+        undefined,
+        local
       );
       if (!opts.onToken) {
         const j = await res.json();
@@ -511,7 +518,7 @@ function openAICompatible(
       try {
         res = await fetch(url, { headers: headerFn(ctx) });
       } catch (e) {
-        throw reachError(label, url, e);
+        throw reachError(label, url, e, local);
       }
       if (!res.ok) {
         const t = await res.text().catch(() => "");
@@ -635,7 +642,8 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
         (r) =>
           r.status === 404
             ? new Error('Ollama has no model called "' + ctx.model + '". Pull it first:  ollama pull ' + ctx.model)
-            : null
+            : null,
+        true
       );
       const reportOllamaUsage = (j: { prompt_eval_count?: number; eval_count?: number }) => {
         if (!opts.onUsage) return;
@@ -668,7 +676,7 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
       try {
         res = await fetch(url);
       } catch (e) {
-        throw reachError("Ollama", url, e);
+        throw reachError("Ollama", url, e, true);
       }
       if (!res.ok) {
         const t = await res.text().catch(() => "");
@@ -698,11 +706,16 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
        thing to do with it, and then every call was billed and reported free.
        Unpriced says "we do not know", which is the truth here. */
     pricing: "unpriced",
-    ...openAICompatible("Backend", "custom", (ctx) => {
-      const h: Record<string, string> = { "Content-Type": "application/json", ...ctx.headers };
-      if (ctx.apiKey) h.Authorization = "Bearer " + ctx.apiKey;
-      return h;
-    })
+    ...openAICompatible(
+      "Backend",
+      "custom",
+      (ctx) => {
+        const h: Record<string, string> = { "Content-Type": "application/json", ...ctx.headers };
+        if (ctx.apiKey) h.Authorization = "Bearer " + ctx.apiKey;
+        return h;
+      },
+      true
+    )
   } as BackendDef
 };
 
