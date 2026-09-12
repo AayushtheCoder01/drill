@@ -18,6 +18,8 @@ import AgentTrace, { stepsFromTrace } from "./AgentTrace";
 import type { AgentLive } from "@/context/ChatContext";
 import Sources from "./Sources";
 import RegenerateMenu from "./RegenerateMenu";
+import ListenButton from "./ListenButton";
+import { useReadingHighlight } from "./useReadingHighlight";
 import { formatCost, formatTokens } from "@/lib/tokens";
 import * as AI from "@/services/ai";
 import * as chatStore from "@/services/chatStore";
@@ -70,6 +72,9 @@ export default function MessageTurn({
 }: Props) {
   const toast = useToast();
   const bodyRef = useRef<HTMLDivElement | null>(null);
+  /* The reply's own markup, without the trace, sources and saved-memory
+     blocks that share its body — only this is read aloud. */
+  const mdRef = useRef<HTMLSpanElement | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   /* Shut by default: the summary line is the useful part at a glance, and a
@@ -101,6 +106,17 @@ export default function MessageTurn({
   }, [html, isUser, streaming]);
 
   const hasToc = !!outline && outline.heads.length >= 3;
+
+  /* Whether this reply is the one being read aloud: its current sentence is
+     lit, and its action row — and so its Pause — stays showing. */
+  const listening = useReadingHighlight({
+    conversationId: conversation.id,
+    turnId: turn.id,
+    variant: turn.active,
+    html,
+    root: mdRef,
+    enabled: !isUser && !streaming
+  });
 
   /* By index, against the live DOM — the same selector the outline was built
      from, so item n is heading n however the markdown was written. */
@@ -176,7 +192,10 @@ export default function MessageTurn({
   const cutShort = !isUser && !streaming && !!turn.error && turn.variants.length > 0;
 
   return (
-    <div className={`turn ${isUser ? "user" : "assistant"}${turn.starred ? " starred" : ""}`}>
+    <div
+      className={`turn ${isUser ? "user" : "assistant"}${turn.starred ? " starred" : ""}${listening ? " listening" : ""}`}
+      data-turn={turn.id}
+    >
       <div className="turn-head">
         <span>{isUser ? "You" : "Assistant"}</span>
         {turn.starred && <Icon name="star-filled" size={11} style={{ color: "var(--amber)" }} />}
@@ -287,7 +306,7 @@ export default function MessageTurn({
               totalMs={variant.trace.totalMs}
             />
           ) : null}
-          <span dangerouslySetInnerHTML={{ __html: html }} />
+          <span className="turn-md" ref={mdRef} dangerouslySetInnerHTML={{ __html: html }} />
           {streaming && <span className="caret" />}
           {!streaming && variant?.citations?.length ? <Sources citations={variant.citations} /> : null}
           {!streaming && variant?.saved && <MemorySaved saved={variant.saved} />}
@@ -295,7 +314,8 @@ export default function MessageTurn({
       )}
 
       {!editing && !streaming && !failed && (
-        <div className={`turn-acts${isLast ? " always" : ""}`}>
+        <div className={`turn-acts${isLast || listening ? " always" : ""}`}>
+          {!isUser && <ListenButton turn={turn} conversation={conversation} content={content} root={mdRef} />}
           <button className="tact" onClick={copyAll} title="Copy response">
             <Icon name="copy" size={11} />
             <span>Copy</span>
@@ -343,7 +363,7 @@ export default function MessageTurn({
         </div>
       )}
 
-      {!isUser && !streaming && variant && (variant.usage || variant.elapsed) && (
+      {!isUser && !streaming && variant && (variant.usage || variant.elapsed || variant.listened) && (
         <div className="turn-foot">
           {variant.model ? variant.model + " · " : ""}
           {variant.elapsed ? (variant.elapsed / 1000).toFixed(1) + "s" : ""}
@@ -355,6 +375,11 @@ export default function MessageTurn({
               that thinking happened is the bill being larger than it looks. */}
           {variant.usage?.reasoningTokens ? ` (${formatTokens(variant.usage.reasoningTokens)} thinking)` : ""}
           {variant.usage?.cost != null ? " · " + formatCost(variant.usage.cost) : ""}
+          {/* What hearing it cost, beside what writing it cost. An unpriced
+              voice shows what was read rather than a cost it cannot know. */}
+          {variant.listened
+            ? ` · listened ${variant.listened.cost != null ? formatCost(variant.listened.cost) : formatTokens(variant.listened.chars) + " characters"}`
+            : ""}
         </div>
       )}
     </div>

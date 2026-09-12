@@ -12,6 +12,11 @@
  * Cost is frozen at write time from the price then in effect. Prices move;
  * history should not. A row whose model had no known price keeps `cost:
  * undefined` forever — unknown is not zero, and summing must preserve that.
+ *
+ * Reading replies aloud is counted here too, under the label "listen". A
+ * speech call bills by the character and reports no tokens at all, so rows
+ * carry `characters` beside the token counts — without it an unpriced voice
+ * would be a row of zeros that looked exactly like a free one.
  * ========================================================================== */
 import { STORE_USAGE, idbAll, idbClear, idbPut } from "./idb";
 import * as persistence from "./persistence";
@@ -20,7 +25,7 @@ import type { TokenUsage } from "@/types";
 export interface UsageRow {
   backend: string;
   model: string;
-  /** "chat" · "cards" · "journal" · "distill" · "exam grading" … */
+  /** "chat" · "cards" · "journal" · "distill" · "exam grading" · "listen" … */
   label: string;
   calls: number;
   errors: number;
@@ -28,6 +33,8 @@ export interface UsageRow {
   completionTokens: number;
   cachedPromptTokens: number;
   reasoningTokens: number;
+  /** Characters sent to be read aloud. Zero for everything that is not. */
+  characters: number;
   /** undefined = no price was known, which is not the same as free. */
   cost?: number;
 }
@@ -48,6 +55,7 @@ export interface UsageTotals {
   completionTokens: number;
   cachedPromptTokens: number;
   reasoningTokens: number;
+  characters: number;
   cost?: number;
   /** Models seen with no known price, so the panel can say so rather than
    *  letting a blank column read as free. */
@@ -130,6 +138,7 @@ function repair(d: UsageDay): UsageDay {
     r.completionTokens ||= 0;
     r.cachedPromptTokens ||= 0;
     r.reasoningTokens ||= 0;
+    r.characters ||= 0;
   }
   return d;
 }
@@ -166,13 +175,15 @@ export interface UsageEntry {
   model: string;
   label: string;
   usage?: TokenUsage;
+  /** Characters synthesised, for a call that read text aloud. */
+  characters?: number;
   /** Already costed by the caller, which knows the price at the time. */
   cost?: number;
   failed?: boolean;
 }
 
-/** Record one AI call. Called from the single seam in services/ai/chat(), so
- *  every feature is covered without any of them opting in. */
+/** Record one AI call. Called from the two seams in services/ai — chat() and
+ *  speak() — so every feature is covered without any of them opting in. */
 export function add(e: UsageEntry): void {
   const day = dayOf(e.at);
   let rec = days.get(day);
@@ -193,12 +204,14 @@ export function add(e: UsageEntry): void {
       promptTokens: 0,
       completionTokens: 0,
       cachedPromptTokens: 0,
-      reasoningTokens: 0
+      reasoningTokens: 0,
+      characters: 0
     };
   }
 
   row.calls++;
   if (e.failed) row.errors++;
+  row.characters += e.characters || 0;
   if (e.usage) {
     row.promptTokens += e.usage.promptTokens || 0;
     row.completionTokens += e.usage.completionTokens || 0;
@@ -241,6 +254,7 @@ export function rollup(list: UsageDay[], by: (r: UsageRow) => string): UsageRow[
       cur.completionTokens += r.completionTokens;
       cur.cachedPromptTokens += r.cachedPromptTokens;
       cur.reasoningTokens += r.reasoningTokens;
+      cur.characters += r.characters;
       if (r.cost != null) cur.cost = (cur.cost || 0) + r.cost;
     }
   }
@@ -255,6 +269,7 @@ export function totals(list: UsageDay[]): UsageTotals {
     completionTokens: 0,
     cachedPromptTokens: 0,
     reasoningTokens: 0,
+    characters: 0,
     unpriced: []
   };
   const unpriced = new Set<string>();
@@ -266,10 +281,13 @@ export function totals(list: UsageDay[]): UsageTotals {
       t.completionTokens += r.completionTokens;
       t.cachedPromptTokens += r.cachedPromptTokens;
       t.reasoningTokens += r.reasoningTokens;
+      t.characters += r.characters;
       if (r.cost != null) t.cost = (t.cost || 0) + r.cost;
       /* A row with tokens but no cost is a model we could not price. One
-         with no tokens either just never reported usage. */
-      else if (r.promptTokens || r.completionTokens) unpriced.add(r.model);
+         with no tokens either just never reported usage. A voice reports
+         characters instead of tokens, and an unpriced one is just as much a
+         blank that must not read as free. */
+      else if (r.promptTokens || r.completionTokens || r.characters) unpriced.add(r.model);
     }
   }
   t.unpriced = [...unpriced];

@@ -21,9 +21,10 @@ especially its **Project layout** section. Do not restate it here.
 npm run dev     # vite; usually :5173, falls back to :5174 if taken
 npm run lint    # tsc --noEmit. The only lint there is
 npm test        # tsx --test src/**/*.test.ts
-                # 175 tests: fsrs, cardFormat, memory*, effort, title,
+                # 215 tests: fsrs, cardFormat, memory*, effort, title,
                 # thinking, agent/loop, settings/catalogue, logBudget,
-                # storage, activity, gaps, retry
+                # storage, activity, gaps, retry, speech/{words,
+                # availability, player}
 npm run build   # tsc -b && vite build
 ```
 
@@ -263,6 +264,33 @@ the whole picture. Four things bite:
   re-registered only when the palette or drawer moves and otherwise holds a
   first-render closure.
 
+**Reading aloud is one player, two engines, and a cache that is not your
+data.** `services/speech/player.ts` is the singleton the Listen button, the bar
+above the composer and the sentence highlight all read, and it takes its engine
+injected — `player.test.ts` runs the queue with fakes, the same bargain as
+`agent/loop.ts`. `choice.ts` is the only place that decides which voice reads
+(`lib/speech/availability.ts` holds the pure verdicts in Think's three states:
+a list that has not loaded leaves Listen usable), and `AI.speak()` is the only
+place a voice is paid for — run transcript, plus the usage ledger under
+"listen" with `characters`, because a voice bills per character and reports no
+tokens. Four traps:
+
+- **Create the engine inside the click.** `listen()` must run synchronously in
+  the handler: the hosted engine spends the gesture on a moment of silence so
+  Safari lets the real audio play a second later. An `await` first breaks it.
+- **Sentences come from the rendered DOM** (`lib/speech/segment.ts`), and maths
+  from the `data-tex` that `restoreMath` stamps on each KaTeX root — KaTeX's
+  HTML output keeps no TeX. Touch the markdown pipeline and the voice changes
+  with it. `useReadingHighlight` re-segments rather than sharing ranges.
+- **The audio cache is its own IndexedDB, `drill-speech`** — capped,
+  idle-purged, quota-aware, and deliberately in neither `backup.ts` nor
+  `persistence.guard`: a failed cache write loses no work, so it reports on the
+  Listening page instead of raising the save alarm. Do not move it into
+  `drill-chat`; that is a version bump, and a bump blocks while a second tab is
+  open.
+- **`AI.speechCreds()` reads the credential vault**, so a voice can use a
+  backend chat is not pointed at. It never writes `settings.backend`.
+
 **There is still no error boundary at the root.** A render crash in `Shell`,
 `Sidebar`, or a composer chip rendered before its new prop was threaded through
 white-screens the whole app. That happened for real while building Phase 12.
@@ -308,6 +336,19 @@ The driven tab is `visibilityState: "hidden"`, and that changes real behaviour:
   driving the app inside a sized same-origin iframe.
 - A page-level `transform: scale()` used to fit a screenshot corrupts every
   `getBoundingClientRect()` measurement. Clear it before measuring.
+- **Audio never starts.** An `<audio>` element given a valid blob sits at
+  `readyState` 0 firing `waiting` and `stalled`, and `play()` never settles —
+  a hosted voice looks stuck on "Preparing…" until the ten-second start
+  watchdog turns it into an error. Verify listening up to the element instead:
+  stub `fetch` for `/audio/speech` with a generated WAV, count
+  `URL.createObjectURL`/`revokeObjectURL`, and read the usage ledger, the
+  `drill-speech` cache and `navigator.mediaSession`. For this device's voice,
+  replace `window.speechSynthesis` *and* `SpeechSynthesisUtterance` with fakes
+  before chat mounts — a real utterance throws when handed a fake voice.
+- **A module imported from the console after a hot update is a second copy.**
+  Once Vite has served the app a file as `?t=…`, `import("/src/…/player.ts")`
+  builds a separate instance with its own state. Take the URL the app really
+  loaded from `performance.getEntriesByType("resource")`.
 - **`el.blur()` fires no `focusout`**, so a React `onBlur` handler never runs
   and a commit-on-blur field looks like it silently drops the edit. `el.focus()`
   does work — `document.activeElement` confirms it — which makes this

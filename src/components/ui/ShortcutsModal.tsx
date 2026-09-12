@@ -61,6 +61,15 @@ const SHORTCUTS: ShortcutGroup[] = [
     ]
   },
   {
+    title: "Listening",
+    note: "While a reply is read with a hosted voice. Keyboard and headphone media keys reach it through the browser; this device's own voice cannot be reached that way.",
+    items: [
+      { keys: ["Play/Pause"], desc: "Pause or resume the reading" },
+      { keys: ["Next track"], desc: "Skip to the next sentence" },
+      { keys: ["Previous track"], desc: "Back a sentence" }
+    ]
+  },
+  {
     title: "Writing boxes",
     note: "The recall box, an edited message, an exam answer, the journal capture.",
     items: [{ keys: [MOD, "Enter"], desc: "Commit it — check, save, or submit" }]

@@ -62,6 +62,9 @@ interface MathHit {
   /** the original source, restored verbatim wherever rendering would be
    *  wrong - inside a code block, or inside an attribute value */
   raw: string;
+  /** the TeX alone, without its delimiters - kept on the rendered root for
+   *  reading aloud (see restoreMath) */
+  tex: string;
 }
 
 /* U+2063 (invisible separator) delimits placeholders. It survives marked
@@ -92,16 +95,16 @@ function extractMath(src: string): { text: string; hits: MathHit[] } {
     }
   };
 
-  const push = (raw: string, html: string): string => {
+  const push = (raw: string, html: string, tex: string): string => {
     const token = `${SEP}M${hits.length}${SEP}`;
-    hits.push({ html, raw });
+    hits.push({ html, raw, tex });
     return token;
   };
 
-  text = text.replace(/\$\$([\s\S]+?)\$\$/g, (m, tex: string) => push(m, render(tex.trim(), true)));
-  text = text.replace(/\\\[([\s\S]+?)\\\]/g, (m, tex: string) => push(m, render(tex.trim(), true)));
-  text = text.replace(/(?<!\$)\$(?!\s)([^$\n]+?)(?<!\s)\$(?!\$)/g, (m, tex: string) => push(m, render(tex.trim(), false)));
-  text = text.replace(/\\\(([\s\S]+?)\\\)/g, (m, tex: string) => push(m, render(tex.trim(), false)));
+  text = text.replace(/\$\$([\s\S]+?)\$\$/g, (m, tex: string) => push(m, render(tex.trim(), true), tex.trim()));
+  text = text.replace(/\\\[([\s\S]+?)\\\]/g, (m, tex: string) => push(m, render(tex.trim(), true), tex.trim()));
+  text = text.replace(/(?<!\$)\$(?!\s)([^$\n]+?)(?<!\s)\$(?!\$)/g, (m, tex: string) => push(m, render(tex.trim(), false), tex.trim()));
+  text = text.replace(/\\\(([\s\S]+?)\\\)/g, (m, tex: string) => push(m, render(tex.trim(), false), tex.trim()));
 
   text = text.replace(/ CODE(\d+) /g, (_m, i: string) => codeBlocks[Number(i)]);
   return { text, hits };
@@ -158,6 +161,11 @@ function restoreMath(html: string, hits: MathHit[]): string {
         // the sanitiser allowlist below.
         const holder = document.createElement("span");
         holder.innerHTML = hit.html;
+        /* The source rides along on the rendered root, for reading aloud:
+           KaTeX's HTML output keeps no copy of the TeX, and a voice handed
+           the rendered glyphs says "x two". Set through the DOM like
+           everything else here, never spliced into the markup. */
+        holder.firstElementChild?.setAttribute("data-tex", hit.tex);
         while (holder.firstChild) frag.appendChild(holder.firstChild);
       } else {
         frag.appendChild(document.createTextNode(m[0]));

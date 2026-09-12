@@ -173,6 +173,13 @@ export default function SettingsHome() {
               {current?.render()}
             </ErrorGuard>
           </div>
+
+          <div className="setfooter">
+            <a href="https://github.com/frontier-contributor/drill" target="_blank" rel="noopener noreferrer" className="setgithub-link" title="View on GitHub">
+              <Icon name="github" size={16} />
+              GitHub
+            </a>
+          </div>
         </div>
       )}
     </div>

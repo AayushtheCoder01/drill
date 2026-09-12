@@ -1839,6 +1839,17 @@ a {
   background: var(--accent-10);
   box-shadow: inset 2px 0 0 var(--accent);
 }
+/* A row that cannot be chosen from here — still listed, so it can say why
+   and what would fix it, rather than vanishing without explanation. */
+.item:disabled {
+  cursor: default;
+}
+.item:disabled:hover {
+  background: none;
+}
+.item:disabled .t {
+  color: var(--ink-3);
+}
 .item .grow {
   flex: 1;
   min-width: 0;
@@ -2467,6 +2478,28 @@ a {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: var(--s-5);
+}
+.setfooter {
+  flex: 0 0 auto;
+  padding: var(--s-3) var(--s-5);
+  border-top: 1px solid var(--rule-soft);
+  display: flex;
+  justify-content: flex-end;
+}
+.setgithub-link {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  font: 400 var(--t-xs) / 1 var(--sans);
+  color: var(--ink-3);
+  text-decoration: none;
+  border-radius: var(--r-2);
+  transition: background var(--fast), color var(--fast);
+}
+.setgithub-link:hover {
+  background: var(--surface-2);
+  color: var(--ink);
 }
 .setnav {
   display: flex;

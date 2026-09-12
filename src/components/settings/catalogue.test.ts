@@ -84,6 +84,10 @@ const MUST_FIND: [string, string][] = [
   ["theme", "appearance.printing"],
   ["text size", "appearance.density"],
   ["follow-ups", "chat.requests"],
+  ["read aloud", "listening.voice"],
+  ["tts", "listening.voice"],
+  ["speed", "listening.playback"],
+  ["saved audio", "listening.audio"],
   ["temperature", "conversation.sampling"]
 ];
 

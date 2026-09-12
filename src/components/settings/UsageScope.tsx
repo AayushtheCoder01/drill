@@ -32,13 +32,20 @@ const RANGES: [number, string][] = [
  *  where anything is priced, tokens otherwise — a bar drawn on unknown cost
  *  would rank every unpriced model at zero. */
 function shareOf(r: UsageRow, max: number, priced: boolean): number {
-  const v = priced ? r.cost || 0 : r.promptTokens + r.completionTokens;
+  const v = priced ? r.cost || 0 : volume(r);
   return max > 0 ? Math.max(2, Math.round((v / max) * 100)) : 0;
+}
+
+/** How much a row did, for the bar when nothing is priced. A voice reports
+ *  characters and no tokens; counting only tokens would draw every listening
+ *  row at nothing. */
+function volume(r: UsageRow): number {
+  return r.promptTokens + r.completionTokens + (r.characters || 0);
 }
 
 function Group({ title, sub, rows, name }: { title: string; sub: string; rows: UsageRow[]; name: (r: UsageRow) => string }) {
   const priced = rows.some((r) => r.cost != null);
-  const max = Math.max(...rows.map((r) => (priced ? r.cost || 0 : r.promptTokens + r.completionTokens)), 0);
+  const max = Math.max(...rows.map((r) => (priced ? r.cost || 0 : volume(r))), 0);
 
   return (
     <>
@@ -60,7 +67,13 @@ function Group({ title, sub, rows, name }: { title: string; sub: string; rows: U
             </div>
             <div className="usage-meta">
               {r.calls} {r.calls === 1 ? "call" : "calls"}
-              {r.errors > 0 ? ` · ${r.errors} failed` : ""} · {formatTokens(r.promptTokens)} in · {formatTokens(r.completionTokens)} out
+              {r.errors > 0 ? ` · ${r.errors} failed` : ""}
+              {/* A voice bills by the character and reports no tokens, and
+                  "0 in · 0 out" under it would read like a fault. */}
+              {r.promptTokens || r.completionTokens || !r.characters
+                ? ` · ${formatTokens(r.promptTokens)} in · ${formatTokens(r.completionTokens)} out`
+                : ""}
+              {r.characters > 0 ? ` · ${formatTokens(r.characters)} characters read aloud` : ""}
               {r.cachedPromptTokens > 0 ? ` · ${formatTokens(r.cachedPromptTokens)} cached` : ""}
               {r.reasoningTokens > 0 ? ` · ${formatTokens(r.reasoningTokens)} reasoning` : ""}
             </div>
@@ -94,7 +107,7 @@ export default function UsageScope() {
 
       {totals.calls === 0 ? (
         <div className="empty">
-          Nothing spent in this window. Every call — chat, cards, journal, distill, exam — is counted here from now on.
+          Nothing spent in this window. Every call — chat, cards, journal, distill, exam, listening — is counted here from now on.
         </div>
       ) : (
         <>
@@ -105,6 +118,7 @@ export default function UsageScope() {
               {totals.errors > 0 ? ` · ${totals.errors} failed` : ""} · {formatTokens(totals.promptTokens)} in ·{" "}
               {formatTokens(totals.completionTokens)} out
               {totals.cachedPromptTokens > 0 ? ` · ${formatTokens(totals.cachedPromptTokens)} of the input cached` : ""}
+              {totals.characters > 0 ? ` · ${formatTokens(totals.characters)} characters read aloud` : ""}
             </span>
           </div>
 

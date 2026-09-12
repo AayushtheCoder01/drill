@@ -39,6 +39,8 @@ import type {
   QueueItem,
   Session,
   Settings,
+  SpeechEngineId,
+  SpeechSettings,
   SRSState,
   ValidateResult
 } from "@/types";
@@ -80,7 +82,8 @@ export const DEFAULT_SETTINGS: Settings = {
   navCollapsed: false,
   railCollapsed: false,
   textScale: 1,
-  sessionSize: 10
+  sessionSize: 10,
+  speech: { engine: "", rate: 1, follow: true, cacheMB: 25, voices: {} }
 };
 
 let db: DrillDB = null as unknown as DrillDB;
@@ -176,6 +179,7 @@ const RETIRED_BACKENDS: Record<string, string> = { openai: "openrouter", anthrop
 function normSettings(st: Settings): Settings {
   st.lang = normLang(st.lang);
   if (!st.creds || typeof st.creds !== "object") st.creds = {};
+  st.speech = normSpeech(st.speech);
 
   const successor = RETIRED_BACKENDS[st.backend];
   if (successor) {
@@ -194,6 +198,37 @@ function normLang(v: unknown): "english" | "hinglish" {
   const s = String(v).toLowerCase();
   if (s === "hinglish" || s === "hi-en" || s === "hinglish-en") return "hinglish";
   return "english";
+}
+
+const SPEECH_ENGINES: SpeechEngineId[] = ["device", "openrouter", "groq", "custom"];
+
+/**
+ * The listening settings, field by field.
+ *
+ * They are nested, and both load paths merge `{...DEFAULT_SETTINGS, ...saved}`
+ * — a shallow merge. A database saved before listening existed arrives with no
+ * `speech` at all, and one saved before a field was added arrives with the
+ * object present and the field missing, which a shallow merge cannot fill.
+ * A fresh object comes back every time, so nothing downstream can reach
+ * DEFAULT_SETTINGS through a live database and change the default.
+ */
+function normSpeech(v: unknown): SpeechSettings {
+  const d = DEFAULT_SETTINGS.speech;
+  const s = (v && typeof v === "object" ? v : {}) as Partial<SpeechSettings>;
+  const voices: SpeechSettings["voices"] = {};
+  if (s.voices && typeof s.voices === "object") {
+    for (const id of SPEECH_ENGINES) {
+      const c = s.voices[id];
+      if (c && typeof c === "object") voices[id] = { model: String(c.model || ""), voice: String(c.voice || "") };
+    }
+  }
+  return {
+    engine: SPEECH_ENGINES.includes(s.engine as SpeechEngineId) ? (s.engine as SpeechEngineId) : "",
+    rate: typeof s.rate === "number" && Number.isFinite(s.rate) ? U.clamp(s.rate, 0.75, 2) : d.rate,
+    follow: typeof s.follow === "boolean" ? s.follow : d.follow,
+    cacheMB: s.cacheMB === 0 || s.cacheMB === 100 ? s.cacheMB : d.cacheMB,
+    voices
+  };
 }
 
 /* ---------- persistence ---------- */

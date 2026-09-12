@@ -556,3 +556,27 @@
   color: var(--ink);
   margin-right: 5px;
 }
+
+/* ---------------------------------------------------------------- footer -- */
+.home-footer {
+  margin-top: var(--s-7);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--rule-soft);
+  display: flex;
+  justify-content: flex-end;
+}
+.home-github-link {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  font: 400 var(--t-sm) / 1 var(--sans);
+  color: var(--ink-3);
+  text-decoration: none;
+  border-radius: var(--r-2);
+  transition: background var(--fast), color var(--fast);
+}
+.home-github-link:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}

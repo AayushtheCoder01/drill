@@ -46,6 +46,17 @@ openrouter.ai.
   mid-reply, the thread says so instead of leaving a blank bubble. A key that
   is simply wrong still fails immediately — retrying that would only make you
   wait for the same answer.
+- **Listen instead of reading** — every reply has a Listen button, and nothing
+  plays until you press it. The sentence being read is highlighted and kept on
+  screen (scroll away yourself and it stops following until you ask), and a bar
+  above the composer pauses, skips a sentence either way, changes speed and
+  stops. Maths is spoken as maths — "x sub i squared over 2 m" — and code
+  blocks are announced rather than read out. Hosted voices come from
+  OpenRouter's speech models (Kokoro by default, about a cent for a long
+  reply), Groq, or any OpenAI-compatible server; your browser's own voices cost
+  nothing and work offline. Only voices that can actually speak from where you
+  are get offered, every paid character is on the Usage page, and a replay
+  comes from a capped cache for free.
 
 ### Review
 
@@ -89,8 +100,8 @@ openrouter.ai.
 One panel, the same one from all six sections (`ctrl + ,`), and everything is
 in it — no section keeps a settings menu of its own.
 
-- **Nine pages, grouped** — Connection, Chat and Memory; Review and the
-  project; Appearance, Usage and Data. Plus **This chat** while you are in a
+- **Ten pages, grouped** — Connection, Chat, Listening and Memory; Review and
+  the project; Appearance, Usage and Data. Plus **This chat** while you are in a
   conversation, because a thread, a project and the app are one inheritance
   chain and every row says which level its value came from.
 - **Search finds the control, not the page** — type "backup", "retention",
@@ -326,6 +337,9 @@ Press `?` anywhere for this list in the app.
 | `ctrl` + `j` | new chat |
 | `esc` | close whatever is open |
 
+**Listening** — while a reply is read with a hosted voice, the media keys on a
+keyboard or headphones pause and resume it and skip a sentence either way.
+
 ---
 
 ## Card format
@@ -373,6 +387,9 @@ src/
     personas.ts             the chat modes and their system prompts
     chatContext.ts          decks/weak cards/notes -> a system-prompt block
     tokens.ts               token estimation and cost formatting
+    speech/                 what a reply sounds like: maths to words, sentences,
+                             chunking, and which voice can speak (all pure but
+                             segment.ts, which reads the rendered reply)
   services/
     storage.ts          review persistence — localStorage today; swap this file
                          if Drill ever grows a real backend
@@ -381,7 +398,11 @@ src/
     idb.ts               a small promise wrapper over IndexedDB
     chatStore.ts         conversations: CRUD, search, export. Persists to IndexedDB
                          because transcripts are far too big for localStorage
-    pricing.ts           per-model pricing, when the backend publishes it
+    pricing.ts           per-model pricing, when the backend publishes it — and
+                         the separate speech catalogue, priced per character
+    speech/              reading aloud: the one player, its two engines (the
+                         browser's voice, hosted audio) and the capped cache,
+                         which is its own IndexedDB and never in a backup
     ai/
       backends.ts         one adapter per inference provider (+ abort, usage)
       index.ts            resolve() + chat() + card writing / marking / titles.
@@ -534,6 +555,10 @@ context to a conversation, those cards and notes are sent to whichever
 inference provider that conversation is pointed at. That is the feature working
 as intended, but it is your material leaving your machine — if that matters for
 what you are studying, point the conversation at Ollama.
+
+The same goes for reading a reply aloud: a hosted voice is sent the reply's
+text. Your browser's own voice keeps it on the machine — pick it under
+**Settings → Listening**.
 
 ---
 

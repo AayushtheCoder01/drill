@@ -85,6 +85,10 @@ export interface Variant {
   /** What an agent-mode reply proposed along the way, so the turn can show one
    *  receipt instead of burying it in the trace. */
   agentProposed?: { id: string; text: string; kind: "memory" | "card" | "note" }[];
+  /** What hearing this reply read aloud has cost, across every time it was
+   *  played. Replays from saved audio add nothing, because nothing was spent.
+   *  `cost` undefined means the voice has no published price, not free. */
+  listened?: { chars: number; cost?: number };
 }
 
 export interface Turn {

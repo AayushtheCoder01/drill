@@ -24,6 +24,7 @@ export type CatId =
   | "conversation"
   | "connection"
   | "chat"
+  | "listening"
   | "memory"
   | "review"
   | "appearance"
@@ -78,6 +79,12 @@ export const CATEGORY_META: CategoryMeta[] = [
     id: "chat",
     label: "Chat",
     blurb: "What every new conversation starts from, and what it spends.",
+    group: "assistant"
+  },
+  {
+    id: "listening",
+    label: "Listening",
+    blurb: "Replies read aloud: the voice, the speed, and the audio it keeps.",
     group: "assistant"
   },
   {
@@ -192,6 +199,29 @@ export const SECTIONS = sections({
     finds: ["follow-ups", "followups", "suggestions", "suggested questions", "auto title", "naming", "titles", "cost", "extra calls"]
   },
 
+  /* --------------------------------------------------------------- listening -- */
+  "listening.voice": {
+    cat: "listening",
+    title: "Voice",
+    sub: "Who reads replies aloud. Only voices that can actually speak from here are offered — a hosted one needs its key on the Connection page.",
+    finds: [
+      "voice", "voices", "read aloud", "listen", "listening", "text to speech", "tts", "speech", "narrator", "audio",
+      "kokoro", "openrouter voice", "groq voice", "device voice", "browser voice", "speech model", "sample", "preview"
+    ]
+  },
+  "listening.playback": {
+    cat: "listening",
+    title: "Playback",
+    sub: "How fast it reads, and whether the page follows along.",
+    finds: ["speed", "rate", "faster", "slower", "playback", "follow along", "highlight", "auto-scroll", "karaoke"]
+  },
+  "listening.audio": {
+    cat: "listening",
+    title: "Saved audio",
+    sub: "Clips already heard are kept so a replay is instant and free — capped, and never at the expense of your own data.",
+    finds: ["saved audio", "audio cache", "cache", "disk", "clear audio", "replay", "offline", "storage used"]
+  },
+
   /* ------------------------------------------------------------------ memory -- */
   "memory.policy": {
     cat: "memory",
@@ -294,8 +324,8 @@ export const SECTIONS = sections({
   "usage.cost": {
     cat: "usage",
     title: "What this has cost",
-    sub: "Every call the app makes, not just chat — cards, journal, distill and exam go through the same seam and are counted here.",
-    finds: ["usage", "cost", "spend", "money", "price", "tokens", "billing", "history", "ledger", "expensive", "clear history"]
+    sub: "Every call the app makes, not just chat — cards, journal, distill, exam and listening go through the same two seams and are counted here.",
+    finds: ["usage", "cost", "spend", "money", "price", "tokens", "characters", "billing", "history", "ledger", "expensive", "clear history"]
   },
   "usage.transcript": {
     cat: "usage",

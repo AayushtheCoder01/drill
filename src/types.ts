@@ -161,6 +161,39 @@ export interface Settings {
    *  bounded amount of work for today, not a cap on the queue — the queue
    *  keeps serving after it, you just get told you are done. */
   sessionSize: number;
+  /** Reading replies aloud: which voice, how fast, what is kept. Nested, so
+   *  store.normSettings fills its fields — the load-time merge is shallow and
+   *  would otherwise hand an older database a half-empty object. */
+  speech: SpeechSettings;
+}
+
+/* --------------------------------------------------------------- speech -- */
+
+/** Who reads a reply aloud: this device's own voice, or a backend's. Ollama
+ *  has no speech endpoint, so it is not one of them. */
+export type SpeechEngineId = "device" | "openrouter" | "groq" | "custom";
+
+/** The model and voice one engine uses. The device engine keeps a voiceURI
+ *  in `voice` and leaves `model` empty. */
+export interface SpeechChoice {
+  model: string;
+  voice: string;
+}
+
+export interface SpeechSettings {
+  /** "" is automatic: OpenRouter's voice when a key for it is saved,
+   *  otherwise this device's. */
+  engine: SpeechEngineId | "";
+  /** Playback speed, 0.75–2. */
+  rate: number;
+  /** Highlight the sentence being read and keep it on screen. */
+  follow: boolean;
+  /** Megabytes of already-heard audio kept for free replays. 0 keeps none. */
+  cacheMB: 0 | 25 | 100;
+  /** Each engine remembers its own model and voice, the way `creds`
+   *  remembers each backend's key, so switching and switching back loses
+   *  nothing. */
+  voices: Partial<Record<SpeechEngineId, SpeechChoice>>;
 }
 
 /**
@@ -403,6 +436,40 @@ export interface AIContext {
   headers: Record<string, string>;
 }
 
+/** One piece of text to turn into audio. */
+export interface SpeechRequest {
+  model: string;
+  voice: string;
+  input: string;
+  signal?: AbortSignal;
+}
+
+/** The audio for one request, whole. Compressed bytes, never decoded: a
+ *  minute of mp3 is about half a megabyte and the same minute as raw samples
+ *  is ten times that. */
+export interface SpeechClip {
+  audio: ArrayBuffer;
+  mime: string;
+  /** OpenRouter's id for the request, kept on the run transcript. */
+  generationId?: string;
+}
+
+/** What a backend needs to read aloud. Absent means it cannot. */
+export interface SpeechDef {
+  /** Where its speech models and their voices are listed:
+   *    catalogue  OpenRouter's /models?output_modalities=speech
+   *    fixed      written here, because the provider publishes no list
+   *    typed      whatever you type — a server nothing can ask in advance */
+  source: "catalogue" | "fixed" | "typed";
+  defaultModel: string;
+  defaultVoice: string;
+  /** Characters one request may carry. Groq refuses more than 200. */
+  maxChars: number;
+  /** For `fixed`: each documented model and its voices. */
+  models?: Record<string, string[]>;
+  synthesize(req: SpeechRequest, ctx: AIContext): Promise<SpeechClip>;
+}
+
 export interface BackendDef {
   id: BackendType;
   label: string;
@@ -418,6 +485,8 @@ export interface BackendDef {
   /** Which chat actions this backend can actually perform. Absent means none
    *  — see lib/chatActions.ts. */
   supports?: ChatActionId[];
+  /** Reading replies aloud, when the provider has a speech endpoint. */
+  speech?: SpeechDef;
   chat(messages: ChatMessage[], opts: ChatOpts, ctx: AIContext): Promise<string>;
   listModels(ctx: AIContext): Promise<string[]>;
 }

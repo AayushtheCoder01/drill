@@ -8,6 +8,10 @@
  *   chat(messages, opts, ctx)  ->  Promise<string>
  *   listModels(ctx)            ->  Promise<string[]>
  *
+ * A provider that can read text aloud also gets a `speech` entry, whose
+ * synthesize(request, ctx) resolves to one whole clip of audio. Ollama has
+ * none, and nothing offers it a voice.
+ *
  * `messages` is always the OpenAI shape and adapters translate outward from
  * that. `ctx` is the resolved {apiKey, model, baseUrl, headers} for the call.
  *
@@ -18,7 +22,17 @@
  * ========================================================================== */
 import { CHAT_ACTIONS, availability, type ChatActionId } from "@/lib/chatActions";
 import { MAX_ATTEMPTS, jitter, planRetry } from "@/lib/retry";
-import type { AIContext, BackendDef, BackendType, ChatMessage, ChatOpts, Citation, TokenUsage, WireToolCall } from "@/types";
+import type {
+  AIContext,
+  BackendDef,
+  BackendType,
+  ChatMessage,
+  ChatOpts,
+  Citation,
+  SpeechDef,
+  TokenUsage,
+  WireToolCall
+} from "@/types";
 
 /** True for the exception fetch throws when an AbortSignal fires. Callers
  *  treat this as "the user stopped it", not as a failure to report. */
@@ -533,6 +547,95 @@ function openAICompatible(
   };
 }
 
+/* ---------------------------------------------------------------- headers */
+
+/** OpenRouter wants an origin it can attribute the call to. */
+function openRouterHeaders(ctx: AIContext): Record<string, string> {
+  const ref = window.location.origin && window.location.origin !== "null" ? window.location.origin : "http://localhost";
+  return {
+    "Content-Type": "application/json",
+    Authorization: "Bearer " + ctx.apiKey,
+    "HTTP-Referer": ref,
+    "X-Title": "Drill",
+    ...ctx.headers
+  };
+}
+
+function groqHeaders(ctx: AIContext): Record<string, string> {
+  return { "Content-Type": "application/json", Authorization: "Bearer " + ctx.apiKey, ...ctx.headers };
+}
+
+function customHeaders(ctx: AIContext): Record<string, string> {
+  const h: Record<string, string> = { "Content-Type": "application/json", ...ctx.headers };
+  if (ctx.apiKey) h.Authorization = "Bearer " + ctx.apiKey;
+  return h;
+}
+
+/* ----------------------------------------------------------------- speech */
+
+/**
+ * OpenAI's /audio/speech, which OpenRouter, Groq and most compatible servers
+ * speak: one POST per piece of text, answered with the whole clip.
+ *
+ * Retried through the same loop as chat, with `started` always false. That is
+ * safe here in a way it is not for a stream: a clip arrives whole or not at
+ * all, so a request that failed has put nothing in anyone's ears and asking
+ * again cannot repeat a word.
+ *
+ * Two of chat's error messages would be wrong for speech, so they are
+ * replaced. A 400 that mentions tokens becomes chat's "this conversation is
+ * too long", and a speech request has no conversation. A 404 from a local
+ * server almost always means a server with no speech endpoint at all.
+ */
+function openAISpeech(
+  label: string,
+  headerFn: (ctx: AIContext) => Record<string, string>,
+  format: "mp3" | "wav",
+  local = false
+): SpeechDef["synthesize"] {
+  return async (req, ctx) => {
+    const url = ctx.baseUrl + "/audio/speech";
+    const body = { model: req.model, input: req.input, voice: req.voice, response_format: format };
+    const res = await postWithRetry(
+      url,
+      { method: "POST", headers: headerFn(ctx), body: JSON.stringify(body), signal: req.signal },
+      label,
+      req.signal,
+      () => false,
+      (r, text) => {
+        if (r.status === 404) {
+          return new Error(
+            local
+              ? `${label} has no speech endpoint at ${url}. Point Base URL at a server that speaks OpenAI's /audio/speech, or use this device's voice.`
+              : `${label} 404 — usually a speech model or voice it does not have (${req.model}, ${req.voice}). ${shortErr(text)}`
+          );
+        }
+        if (r.status === 400 || r.status === 422) {
+          return new Error(`${label} refused the speech request (${r.status}) — ${shortErr(text)}`);
+        }
+        return null;
+      },
+      local
+    );
+    /* OpenRouter's own advice for this endpoint: check that what came back is
+       audio, and that there is some. A gateway that answers 200 with a JSON
+       error would otherwise be handed to the audio element and fail there
+       with a message about decoding that explains nothing. */
+    const mime = (res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (mime && !mime.startsWith("audio/") && mime !== "application/octet-stream") {
+      const text = await res.text().catch(() => "");
+      throw new Error(`${label} answered with ${mime} instead of audio — ${shortErr(text)}`);
+    }
+    const audio = await res.arrayBuffer();
+    if (!audio.byteLength) throw new Error(`${label} returned an empty clip for ${req.model}.`);
+    return {
+      audio,
+      mime: mime.startsWith("audio/") ? mime : format === "wav" ? "audio/wav" : "audio/mpeg",
+      generationId: res.headers.get("x-generation-id") || undefined
+    };
+  };
+}
+
 /* --------------------------------------------------------------- backends */
 
 
@@ -553,21 +656,18 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
     /* The catalogue this prices against is OpenRouter's own, so its ids match
        by construction. */
     pricing: "catalogue",
-    ...openAICompatible(
-      "OpenRouter",
-      "openrouter",
-      (ctx) => {
-      /* OpenRouter wants an origin it can attribute the call to. */
-      const ref = window.location.origin && window.location.origin !== "null" ? window.location.origin : "http://localhost";
-      return {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + ctx.apiKey,
-        "HTTP-Referer": ref,
-        "X-Title": "Drill",
-        ...ctx.headers
-      };
-      }
-    )
+    speech: {
+      source: "catalogue",
+      /* The cheapest speech model billed by the character that also
+         publishes its voices, when this was written — and pleasant enough to
+         listen to for an hour. Everything else in the speech catalogue is one
+         click away under Settings → Listening. */
+      defaultModel: "hexgrad/kokoro-82m",
+      defaultVoice: "af_heart",
+      maxChars: 800,
+      synthesize: openAISpeech("OpenRouter", openRouterHeaders, "mp3")
+    },
+    ...openAICompatible("OpenRouter", "openrouter", openRouterHeaders)
   } as BackendDef,
 
   groq: {
@@ -586,11 +686,24 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
        move onto a paid Groq plan, change this to "unpriced" — an honest
        blank beats a confident zero. */
     pricing: "free",
-    ...openAICompatible("Groq", "groq", (ctx) => ({
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + ctx.apiKey,
-      ...ctx.headers
-    }))
+    speech: {
+      source: "fixed",
+      defaultModel: "canopylabs/orpheus-v1-english",
+      defaultVoice: "hannah",
+      /* A hard limit, not a preference: Orpheus refuses more than 200
+         characters in one request. The free tier also allows ten requests a
+         minute and a hundred a day, which is why Groq is never the automatic
+         choice — one long reply can spend a day's allowance. */
+      maxChars: 200,
+      /* Groq publishes no list of its speech models or their voices, so the
+         documented ones are written down here. */
+      models: {
+        "canopylabs/orpheus-v1-english": ["autumn", "diana", "hannah", "austin", "daniel", "troy"],
+        "canopylabs/orpheus-arabic-saudi": ["abdullah", "fahad", "sultan", "lulwa", "noura", "aisha"]
+      },
+      synthesize: openAISpeech("Groq", groqHeaders, "wav")
+    },
+    ...openAICompatible("Groq", "groq", groqHeaders)
   } as BackendDef,
 
   ollama: {
@@ -706,16 +819,16 @@ export const BACKENDS: Record<BackendType, BackendDef> = {
        thing to do with it, and then every call was billed and reported free.
        Unpriced says "we do not know", which is the truth here. */
     pricing: "unpriced",
-    ...openAICompatible(
-      "Backend",
-      "custom",
-      (ctx) => {
-        const h: Record<string, string> = { "Content-Type": "application/json", ...ctx.headers };
-        if (ctx.apiKey) h.Authorization = "Bearer " + ctx.apiKey;
-        return h;
-      },
-      true
-    )
+    speech: {
+      source: "typed",
+      /* OpenAI's own names, which most compatible speech servers — LocalAI,
+         openedai-speech, Kokoro-FastAPI — also answer to. */
+      defaultModel: "tts-1",
+      defaultVoice: "alloy",
+      maxChars: 800,
+      synthesize: openAISpeech("Backend", customHeaders, "mp3", true)
+    },
+    ...openAICompatible("Backend", "custom", customHeaders, true)
   } as BackendDef
 };
 

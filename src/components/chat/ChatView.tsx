@@ -36,6 +36,8 @@ import ChatEmpty from "./ChatEmpty";
 import ReadProgress from "./ReadProgress";
 import ModelChip from "./ModelChip";
 import ToolsMenu from "./ToolsMenu";
+import ListenBar from "./ListenBar";
+import ErrorGuard from "../ui/ErrorGuard";
 
 /* Imported here rather than in main.tsx so both stylesheets ride along with
    the lazy chat chunk instead of blocking the review loop's first paint. */
@@ -483,6 +485,13 @@ export default function ChatView() {
             </div>
           </div>
         )}
+
+        {/* Outside the transcript's scroll container, like the composer under
+            it: what you are hearing keeps its controls in view. Guarded,
+            because it renders voices and errors that came from a provider. */}
+        <ErrorGuard>
+          <ListenBar scrollRef={scrollRef} />
+        </ErrorGuard>
 
         <Composer
           key={conversationId || "new"}

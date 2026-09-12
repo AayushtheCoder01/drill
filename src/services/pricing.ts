@@ -197,10 +197,129 @@ export function catalogueEntry(model: string): ModelPrice | undefined {
   return undefined;
 }
 
+/* ---------------------------------------------------------------- speech -- */
+
+/* Speech models are a separate listing: /models leaves them out unless they
+   are asked for by output modality. The listing is small — under twenty
+   models — and trimmed to what is used before it is cached, because
+   localStorage is the drawer the review log lives in. */
+const SPEECH_CACHE_KEY = "drill:speech-models:v1";
+const SPEECH_CATALOGUE = CATALOGUE + "?output_modalities=speech";
+/** How long a failed fetch is left alone before trying again. Short, because
+ *  "not loaded" keeps every voice usable anyway, and giving up for the day
+ *  would leave every listen that day priced as unknown. */
+const SPEECH_RETRY_MS = 60_000;
+
+export interface SpeechModel {
+  id: string;
+  name?: string;
+  /** USD per character, when the model bills by the character. Undefined for
+   *  one billed some other way — Gemini's speech model counts audio tokens —
+   *  which a character count cannot price, so it shows as unknown. */
+  perChar?: number;
+  /** The voices the model publishes. Empty means it publishes none. */
+  voices: string[];
+}
+
+interface SpeechCache {
+  at: number;
+  models: Record<string, SpeechModel>;
+}
+
+let speechMemo: Record<string, SpeechModel> | null = null;
+let speechInflight: Promise<Record<string, SpeechModel> | null> | null = null;
+let speechFailedAt = 0;
+
+/** Fetch the speech models and their voices. Resolves to null when the
+ *  network says no — which callers read as "not known yet", never as "there
+ *  are no speech models". */
+export function loadSpeechCatalogue(): Promise<Record<string, SpeechModel> | null> {
+  if (speechMemo) return Promise.resolve(speechMemo);
+  if (speechInflight) return speechInflight;
+
+  try {
+    const raw = localStorage.getItem(SPEECH_CACHE_KEY);
+    const c = raw ? (JSON.parse(raw) as SpeechCache) : null;
+    if (c && c.models && Date.now() - c.at <= TTL) {
+      speechMemo = c.models;
+      return Promise.resolve(speechMemo);
+    }
+  } catch {
+    /* an unreadable cache is a cache miss */
+  }
+  if (Date.now() - speechFailedAt < SPEECH_RETRY_MS) return Promise.resolve(null);
+
+  speechInflight = fetch(SPEECH_CATALOGUE)
+    .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+    .then((j: { data?: unknown[] }) => {
+      const models: Record<string, SpeechModel> = {};
+      for (const raw of j.data || []) {
+        const m = raw as {
+          id?: string;
+          name?: string;
+          pricing?: { prompt?: string; completion?: string };
+          supported_voices?: unknown;
+        };
+        if (!m.id) continue;
+        /* Speech on OpenRouter is billed per character of input, and the
+           catalogue carries that rate in `prompt` with `completion` at zero.
+           A model with a non-zero completion rate is billed on its output
+           instead, and no character count prices that honestly. */
+        const prompt = parseFloat(m.pricing?.prompt ?? "");
+        const completion = parseFloat(m.pricing?.completion ?? "0");
+        models[m.id] = {
+          id: m.id,
+          name: m.name,
+          perChar: Number.isFinite(prompt) && (!Number.isFinite(completion) || completion === 0) ? prompt : undefined,
+          voices: Array.isArray(m.supported_voices)
+            ? m.supported_voices.filter((v): v is string => typeof v === "string" && !!v)
+            : []
+        };
+      }
+      speechMemo = models;
+      try {
+        localStorage.setItem(SPEECH_CACHE_KEY, JSON.stringify({ at: Date.now(), models } satisfies SpeechCache));
+      } catch {
+        /* quota — the list is a nicety, and it is fetched again tomorrow */
+      }
+      return models;
+    })
+    .catch(() => {
+      speechFailedAt = Date.now();
+      return null;
+    })
+    .finally(() => {
+      speechInflight = null;
+    });
+
+  return speechInflight;
+}
+
+/** The speech catalogue if it has loaded, otherwise null. */
+export function speechCatalogue(): Record<string, SpeechModel> | null {
+  return speechMemo;
+}
+
+/**
+ * USD per character for a speech model reached through a backend.
+ *
+ * Gated on the backend's pricing mode exactly as priceForModel is: 0 for a
+ * backend that costs nothing, a catalogue rate only for the catalogue's own
+ * backend, and undefined — unknown, not free — for everything else.
+ */
+export function speechPriceFor(backend: string, model: string): number | undefined {
+  const mode = BACKENDS[backend as keyof typeof BACKENDS]?.pricing ?? "unpriced";
+  if (mode === "free") return 0;
+  if (mode !== "catalogue") return undefined;
+  return speechMemo?.[model]?.perChar;
+}
+
 export function clearPricing(): void {
   memo = null;
+  speechMemo = null;
   try {
     localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(SPEECH_CACHE_KEY);
     for (const k of STALE_KEYS) localStorage.removeItem(k);
   } catch {
     /* ignore */

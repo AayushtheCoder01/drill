@@ -158,6 +158,15 @@ myservice: {
 
 That is all `openrouter`, `groq` and `custom` are.
 
+**If your service can also read text aloud** through OpenAI's `/audio/speech`
+shape, give the entry a `speech` block: `source` (where its speech models and
+voices are listed — `catalogue`, `fixed` or `typed`), `defaultModel`,
+`defaultVoice`, `maxChars` (the provider's own per-request limit, not a
+preference), and `synthesize: openAISpeech(label, headers, "mp3")`. Nothing
+else needs to change: the Listen button, Settings → Listening and the usage
+ledger all read it from there. A backend with no `speech` block is simply never
+offered as a voice.
+
 ### What a good backend PR includes
 
 - The `BACKENDS` entry and the `BACKEND_ORDER` line.

@@ -41,7 +41,13 @@ export type IconName =
   | "refresh"
   | "globe"
   | "brain"
-  | "sliders";
+  | "sliders"
+  | "speaker"
+  | "play"
+  | "pause"
+  | "skip-back"
+  | "skip-forward"
+  | "github";
 
 /* Every path is drawn on a 24-grid, stroked, never filled — except the two
    that mean "on" (star-filled), where a fill is the whole signal. */
@@ -122,6 +128,23 @@ const PATHS: Record<IconName, { d: string; fill?: boolean }[]> = {
   sliders: [
     { d: "M4 7h9M17 7h3M4 17h3M11 17h9" },
     { d: "M15 7a2 2 0 1 0 4 0 2 2 0 0 0-4 0ZM7 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0Z" }
+  ],
+  /* Listening. The speaker's waves are drawn open so the glyph still reads at
+     11px in a reply's action row, where a filled cone would be a blot. */
+  speaker: [{ d: "M4 9.5h3.2L12 5.5v13l-4.8-4H4z" }, { d: "M15.5 9.2a4 4 0 0 1 0 5.6" }, { d: "M18.2 6.6a7.6 7.6 0 0 1 0 10.8" }],
+  play: [{ d: "M8 5.8v12.4a.6.6 0 0 0 .9.5l9.6-6.2a.6.6 0 0 0 0-1L8.9 5.3a.6.6 0 0 0-.9.5Z" }],
+  pause: [{ d: "M8.5 5.5v13M15.5 5.5v13" }],
+  "skip-back": [{ d: "M6 5.5v13" }, { d: "M18 6.2v11.6a.6.6 0 0 1-.9.5l-7.7-5.8a.6.6 0 0 1 0-1l7.7-5.8a.6.6 0 0 1 .9.5Z" }],
+  "skip-forward": [{ d: "M18 5.5v13" }, { d: "M6 6.2v11.6a.6.6 0 0 0 .9.5l7.7-5.8a.6.6 0 0 0 0-1L6.9 5.7a.6.6 0 0 0-.9.5Z" }],
+  /* The one glyph in this set that is a fixed logo rather than a drawn
+     concept — the Octocat silhouette, filled rather than stroked like
+     star-filled, because approximating it in strokes on a 24-grid reads as
+     a smear rather than a recognisable mark. */
+  github: [
+    {
+      d: "M12 .8C5.86.8.9 5.78.9 11.94c0 4.93 3.2 9.1 7.63 10.58.56.1.76-.24.76-.54 0-.26-.01-1.13-.02-2.05-3.1.67-3.76-1.32-3.76-1.32-.51-1.3-1.24-1.64-1.24-1.64-1.02-.69.08-.68.08-.68 1.12.08 1.71 1.15 1.71 1.15 1 1.7 2.63 1.21 3.27.93.1-.72.39-1.21.71-1.49-2.48-.28-5.08-1.24-5.08-5.51 0-1.22.44-2.21 1.15-2.99-.11-.28-.5-1.42.11-2.96 0 0 .94-.3 3.08 1.14a10.7 10.7 0 0 1 5.6 0c2.14-1.44 3.08-1.14 3.08-1.14.61 1.54.22 2.68.11 2.96.72.78 1.15 1.77 1.15 2.99 0 4.28-2.61 5.22-5.1 5.5.4.35.76 1.03.76 2.08 0 1.5-.01 2.71-.01 3.08 0 .3.2.65.77.54 4.42-1.48 7.61-5.65 7.61-10.58C23.1 5.78 18.14.8 12 .8Z",
+      fill: true
+    }
   ]
 };
 

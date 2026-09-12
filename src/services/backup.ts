@@ -45,6 +45,10 @@ export async function collect(): Promise<FullBackup> {
 
   usageLog.flushAll();
 
+  /* Saved audio from reading replies aloud is deliberately not collected. It
+     lives in a database of its own (services/speech/cache.ts), can be fetched
+     again from the voice that made it, and would make a backup megabytes
+     larger for nothing anyone wrote. */
   const [conversations, memories, memCandidates, journal, rollups, exams, usage] = await Promise.all([
     idbAll<Conversation>(STORE_CONV).catch(() => [] as Conversation[]),
     idbAll<Memory>(STORE_MEM).catch(() => [] as Memory[]),

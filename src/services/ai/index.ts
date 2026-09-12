@@ -14,12 +14,13 @@ import * as CFG from "@/lib/config";
 import * as store from "@/services/store";
 import * as transcript from "@/services/transcript";
 import * as usageLog from "@/services/usageLog";
-import { loadPricing, priceForModel } from "@/services/pricing";
+import { loadPricing, loadSpeechCatalogue, priceForModel, speechPriceFor } from "@/services/pricing";
 import { costOf } from "@/lib/tokens";
 import { memoryBrief, type BriefOpts } from "@/lib/memoryBrief";
 import { cleanTitle } from "@/lib/title";
 import { BACKENDS, BACKEND_ORDER, isAbort } from "./backends";
 import type {
+  AIContext,
   BackendType,
   Card,
   ChatMessage,
@@ -27,6 +28,8 @@ import type {
   InferenceConfig,
   MarkResult,
   ResolvedBackend,
+  SpeechClip,
+  SpeechEngineId,
   TokenUsage
 } from "@/types";
 import type { JournalEntry, JournalSummary, MemoryDiffLine } from "@/types/journal";
@@ -151,6 +154,140 @@ export function chat(messages: ChatMessage[], opts: ChatOpts = {}, override?: Ov
 export function listModels(override?: Override): Promise<string[]> {
   const r = resolve(override);
   return r.backend.listModels(r);
+}
+
+/* -------------------------------------------------------------- listening */
+
+/** A hosted voice: which backend, which of its speech models, which voice. */
+export interface SpeakTarget {
+  engine: Exclude<SpeechEngineId, "device">;
+  model: string;
+  voice: string;
+}
+
+export interface Spoken extends SpeechClip {
+  chars: number;
+  /** undefined when the voice has no published price — unknown, not free. */
+  cost?: number;
+}
+
+export interface SpeechCreds {
+  apiKey: string;
+  baseUrl: string;
+  headers: Record<string, string>;
+  /** Something about this backend has been set up here: it is the one chat
+   *  uses, or a key or base URL was saved for it, or the config file names
+   *  it. What decides whether a custom server is worth offering a voice for. */
+  configured: boolean;
+}
+
+/**
+ * The credentials saved for one backend, whether or not chat is using it.
+ *
+ * resolve() reads the live fields, which belong to whichever backend chat is
+ * pointed at. Listening may use a different one — Groq for fast replies,
+ * OpenRouter's voices to hear them — so this also reads the vault that
+ * store.setBackend() fills. It never moves `settings.backend`; only
+ * setBackend may do that.
+ */
+export function speechCreds(id: BackendType): SpeechCreds {
+  const s = store.settings();
+  const c = CFG.get().inference || ({} as InferenceConfig);
+  const active = (s.backend || c.type || "openrouter") as BackendType;
+  const saved = id === active ? { key: s.key, baseUrl: s.baseUrl } : s.creds?.[id];
+  /* The config file names one backend. Its key belongs to this backend only
+     if this is the one it names — or it names none, and this is the backend
+     chat falls back to. */
+  const fromConfig = c.type ? c.type === id : id === active;
+  const be = BACKENDS[id];
+  return {
+    apiKey: saved?.key || (fromConfig ? c.apiKey || "" : ""),
+    baseUrl: (saved?.baseUrl || (fromConfig ? c.baseUrl : "") || be?.defaultBaseUrl || "").replace(/\/+$/, ""),
+    headers: fromConfig ? c.headers || {} : {},
+    configured: id === active || !!saved?.key || !!saved?.baseUrl || (!!c.type && c.type === id)
+  };
+}
+
+export function speechReady(id: BackendType): { ok: boolean; why?: string } {
+  const be = BACKENDS[id];
+  if (!be?.speech) return { ok: false, why: `${be?.label || id} cannot read aloud.` };
+  if (be.needsKey && !speechCreds(id).apiKey) {
+    return { ok: false, why: `No ${be.label} key yet — add one under Settings → Connection.` };
+  }
+  return { ok: true };
+}
+
+/**
+ * Turn text into audio: the one place a voice is paid for.
+ *
+ * The listening counterpart of chat(). Every request goes on the run
+ * transcript, and every one that returns goes in the usage ledger under
+ * "listen", with its characters and its cost at the price in effect now. A
+ * request stopped before it came back is recorded nowhere, the same as a chat
+ * reply that was stopped.
+ */
+export async function speak(input: string, target: SpeakTarget, signal?: AbortSignal): Promise<Spoken> {
+  const def = BACKENDS[target.engine]?.speech;
+  const check = speechReady(target.engine);
+  if (!def || !check.ok) throw new Error(check.why || "This backend cannot read aloud.");
+
+  /* Waited for, not kicked off: the cost is frozen when the ledger row is
+     written, and a price that lands a moment later is too late to count. The
+     list is cached for a day, so this is almost always already resolved. */
+  if (def.source === "catalogue") await loadSpeechCatalogue();
+
+  const creds = speechCreds(target.engine);
+  const ctx: AIContext = { apiKey: creds.apiKey, model: target.model, baseUrl: creds.baseUrl, headers: creds.headers };
+  const started = Date.now();
+  const chars = input.length;
+  const perChar = speechPriceFor(target.engine, target.model);
+  const cost = perChar == null ? undefined : perChar * chars;
+  const label = "listen";
+
+  const meter = (failed: boolean) => {
+    try {
+      usageLog.add({
+        at: started,
+        backend: target.engine,
+        model: target.model,
+        label,
+        characters: failed ? 0 : chars,
+        cost: failed ? undefined : cost,
+        failed
+      });
+    } catch {
+      /* the ledger is a bystander */
+    }
+  };
+
+  try {
+    const clip = await def.synthesize({ model: target.model, voice: target.voice, input, signal }, ctx);
+    transcript.record({
+      at: started,
+      label,
+      model: target.model,
+      messages: [{ role: "user", content: input }],
+      response: `[${U.fmtBytes(clip.audio.byteLength)} of ${clip.mime} · voice ${target.voice}${clip.generationId ? " · " + clip.generationId : ""}]`,
+      error: null,
+      elapsedMs: Date.now() - started
+    });
+    meter(false);
+    return { ...clip, chars, cost };
+  } catch (err) {
+    if (!isAbort(err)) {
+      transcript.record({
+        at: started,
+        label,
+        model: target.model,
+        messages: [{ role: "user", content: input }],
+        response: null,
+        error: (err as Error)?.message || String(err),
+        elapsedMs: Date.now() - started
+      });
+      meter(true);
+    }
+    throw err;
+  }
 }
 
 /** A connectivity probe, not a real prompt — but it still has to survive a
